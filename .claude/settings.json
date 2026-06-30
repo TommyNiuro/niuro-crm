@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run dev:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm run start:*)",
+      "Bash(npm run lint:*)",
+      "Bash(npm run seed:*)",
+      "Bash(npm run init:*)",
+      "Bash(npm run local:*)",
+      "Bash(npm run mcp:*)",
+      "Bash(npm install:*)",
+      "Bash(npx drizzle-kit:*)",
+      "Bash(git:*)",
+      "Bash(curl:*)",
+      "Bash(ls:*)",
+      "Bash(mkdir:*)",
+      "Bash(node:*)",
+      "Bash(npx tsx:*)",
+      "Bash(cat:*)",
+      "Bash(python3:*)",
+      "Bash(head:*)",
+      "Bash(wc:*)"
+    ]
+  }
+}

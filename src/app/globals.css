@@ -1,0 +1,338 @@
+/* Fuentes de marca Niuro: solo se usan dentro de .niuro-proposal (modulo
+   propuestas). No afectan la tipografia del CRM.
+   Va ANTES de los @import de Tailwind: en CSS todos los @import deben preceder
+   a cualquier otra regla, y Tailwind v4 expande reglas al importarse; si este
+   @import queda despues, PostCSS/Lightning falla el build de CSS (rompe next dev). */
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Host+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap");
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-geist-mono);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-fg-2: var(--fg-2);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-hover: var(--hover);
+  --color-selected: var(--selected);
+  --color-meta: var(--meta);
+  --color-info: var(--info);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-purple: var(--purple);
+  --color-primary-hover: var(--primary-hover);
+  --color-positive: var(--positive);
+  --color-positive-foreground: var(--positive-foreground);
+  --color-border-soft: var(--border-soft);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/* Tokens de dark mode (default) */
+:root {
+  --background: #09090b;
+  --foreground: #fafafa;
+  --fg-2: #d4d4d8;
+  --card: #0f0f12;
+  --card-foreground: #fafafa;
+  --popover: #0f0f12;
+  --popover-foreground: #fafafa;
+  --surface-2: #18181b;
+  --surface-3: #1f1f23;
+  --hover: #27272a;
+  --selected: #3f3f46;
+
+  /* Primary = verde */
+  --primary: #10b981;
+  --primary-foreground: #ffffff;
+  --primary-hover: #059669;
+  --accent-dim: rgba(16, 185, 129, 0.14);
+
+  --secondary: #18181b;
+  --secondary-foreground: #fafafa;
+  --muted: #18181b;
+  --muted-foreground: #a1a1aa;
+  --meta: #71717a;
+  --accent: #1f1f23;
+  --accent-foreground: #fafafa;
+
+  --positive: #10b981;
+  --positive-foreground: #ffffff;
+  --positive-dim: rgba(16, 185, 129, 0.14);
+
+  --destructive: #ef4444;
+  --destructive-dim: rgba(239, 68, 68, 0.12);
+  --warning: #f59e0b;
+  --warning-foreground: #000000;
+  --warning-dim: rgba(245, 158, 11, 0.14);
+  --info: #3b82f6;
+  --info-dim: rgba(59, 130, 246, 0.14);
+  --purple: #a855f7;
+  --purple-dim: rgba(168, 85, 247, 0.12);
+  --success: #10b981;
+  --success-foreground: #ffffff;
+
+  --border: #27272a;
+  --border-soft: #1f1f23;
+  --input: #27272a;
+  --ring: #10b981;
+
+  --chart-1: #10b981;
+  --chart-2: #3b82f6;
+  --chart-3: #f59e0b;
+  --chart-4: #a855f7;
+  --chart-5: #71717a;
+
+  --radius: 0.75rem;
+
+  --sidebar: #0f0f12;
+  --sidebar-foreground: #fafafa;
+  --sidebar-primary: #10b981;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #27272a;
+  --sidebar-accent-foreground: #fafafa;
+  --sidebar-border: #27272a;
+  --sidebar-ring: #10b981;
+
+  --channel-whatsapp: #25d366;
+  --channel-instagram: #e4405f;
+  --channel-messenger: #0084ff;
+}
+
+.dark {
+  --background: #09090b;
+  --foreground: #fafafa;
+  --fg-2: #d4d4d8;
+  --card: #0f0f12;
+  --card-foreground: #fafafa;
+  --popover: #0f0f12;
+  --popover-foreground: #fafafa;
+  --surface-2: #18181b;
+  --surface-3: #1f1f23;
+  --hover: #27272a;
+  --selected: #3f3f46;
+  --secondary: #18181b;
+  --secondary-foreground: #fafafa;
+  --muted: #18181b;
+  --muted-foreground: #a1a1aa;
+  --accent: #1f1f23;
+  --accent-foreground: #fafafa;
+  --border: #27272a;
+  --border-soft: #1f1f23;
+  --input: #27272a;
+  --sidebar: #0f0f12;
+  --sidebar-foreground: #fafafa;
+  --sidebar-accent: #27272a;
+  --sidebar-accent-foreground: #fafafa;
+  --sidebar-border: #27272a;
+}
+
+/* ── Tema claro: sistema neutro estilo Twenty ──
+   Superficies blancas / gris muy claro, texto neutro (gray12 → gray9),
+   borders hairline, un único acento (azul) para CTA / estado activo.
+   Radio ajustado más chico (4-8px) para densidad tipo Twenty. */
+.light {
+  --radius: 0.5rem;
+
+  --background: #ffffff;
+  --foreground: #1a1a1a;
+  --fg-2: #404040;
+  --card: #ffffff;
+  --card-foreground: #1a1a1a;
+  --popover: #ffffff;
+  --popover-foreground: #1a1a1a;
+  --surface-2: #f7f7f7; /* gray3 */
+  --surface-3: #f1f1f1; /* gray4 */
+  --hover: #f4f4f4;
+  --selected: #ececec; /* highlight neutro de nav/fila activa */
+
+  /* Primary = acento único (azul) para CTA / links / estado activo */
+  --primary: #2f54eb;
+  --primary-foreground: #ffffff;
+  --primary-hover: #1d39c4;
+  --accent-dim: rgba(47, 84, 235, 0.08);
+
+  --secondary: #f1f1f1;
+  --secondary-foreground: #1a1a1a;
+  --muted: #f4f4f4;
+  --muted-foreground: #666666; /* gray11 */
+  --meta: #6b6b6b; /* gray10, AA sobre blanco para texto chico */
+  --accent: #f1f1f1;
+  --accent-foreground: #1a1a1a;
+
+  --positive: #0a8a5f; /* dinero / positivo, AA sobre blanco */
+  --positive-foreground: #ffffff;
+  --positive-dim: rgba(10, 138, 95, 0.1);
+
+  --destructive: #d4351c;
+  --destructive-dim: rgba(212, 53, 28, 0.1);
+  --warning: #b54708;
+  --warning-foreground: #ffffff;
+  --warning-dim: rgba(181, 71, 8, 0.1);
+  --info: #2f54eb;
+  --info-dim: rgba(47, 84, 235, 0.1);
+  --purple: #6741d9;
+  --purple-dim: rgba(103, 65, 217, 0.1);
+  --success: #0a8a5f;
+  --success-foreground: #ffffff;
+
+  --border: #e5e5e5; /* hairline */
+  --border-soft: #f0f0f0;
+  --input: #dcdcdc;
+  --ring: #2f54eb;
+
+  --chart-1: #2f54eb;
+  --chart-2: #0a8a5f;
+  --chart-3: #b54708;
+  --chart-4: #6741d9;
+  --chart-5: #8a8a8a;
+
+  /* Sidebar neutro Twenty: gris muy claro, texto neutro, activo gris */
+  --sidebar: #fbfbfa;
+  --sidebar-foreground: #1a1a1a;
+  --sidebar-primary: #2f54eb;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #ececec;
+  --sidebar-accent-foreground: #1a1a1a;
+  --sidebar-border: #ececec;
+  --sidebar-ring: #2f54eb;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--hover); border-radius: 3px; }
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+.fade-in { animation: fadeIn .12s ease; }
+.slide-in { animation: slideIn .2s ease; }
+.pulse { animation: pulse 2s infinite; }
+
+.drag-over { background: var(--accent-dim) !important; outline: 2px dashed var(--primary) !important; outline-offset: -2px; }
+
+/* ============================================================
+   MARCA NIURO (scopeada) — solo para el modulo de propuestas.
+   Todo vive bajo .niuro-proposal para NO pisar el tema dark/semantico
+   del CRM (--background, --foreground, --primary, etc. quedan intactos).
+   Hex exactos de propuestas-niuro/src/app/globals.css, nunca aproximar.
+   Tipografias: Fraunces (display), Host Grotesk (heading), Inter (body),
+   JetBrains Mono (eyebrows/fechas/codigo).
+   ============================================================ */
+.niuro-proposal {
+  /* Paleta core */
+  --np-navy: #050F41;
+  --np-navy-2: #0B1B5E;
+  --np-gold: #FFD166;
+  --np-cobalt: #3B5FE5;
+  --np-blue: #3B5FE5;
+
+  /* Fondos calidos (nunca blanco puro como fondo de pagina) */
+  --np-warm-white: #FAF9F5;
+  --np-parchment: #F5F0E8;
+  --np-cream: #FFFDF5;
+
+  /* Estado / semantico */
+  --np-amber: #D4940A;
+  --np-green: #16A34A;
+  --np-red: #DC2626;
+
+  /* Escala de tinta */
+  --np-ink-1: #050F41;
+  --np-ink-2: #3F4868;
+  --np-ink-3: #6B7280;
+  --np-ink-muted: #94989F;
+
+  /* Bordes / superficies suaves */
+  --np-bord-soft: #E8E6DC;
+  --np-bord-med: #D4D1C4;
+
+  /* Variantes gold */
+  --np-gold-soft: #FFE7A6;
+  --np-gold-bg: #FFF6E0;
+
+  /* Variantes cobalto */
+  --np-cobalt-bg: #EEF0FB;
+  --np-cobalt-bord: #D7DEF7;
+
+  /* Tipografias de marca */
+  --np-font-display: "Fraunces", Georgia, serif;
+  --np-font-heading: "Host Grotesk", system-ui, sans-serif;
+  --np-font-body: "Inter", system-ui, sans-serif;
+  --np-font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  /* Body en Inter dentro del scope */
+  font-family: var(--np-font-body);
+  color: var(--np-ink-1);
+}
+
+/* Display (titulos grandes, precios) en Fraunces. */
+.niuro-proposal h1,
+.niuro-proposal .np-display {
+  font-family: var(--np-font-display);
+}
+
+/* Headings / labels en Host Grotesk. */
+.niuro-proposal h2,
+.niuro-proposal h3,
+.niuro-proposal h4,
+.niuro-proposal .np-heading {
+  font-family: var(--np-font-heading);
+}
+
+/* Eyebrows, fechas y codigo en JetBrains Mono. */
+.niuro-proposal .np-eyebrow,
+.niuro-proposal .np-mono,
+.niuro-proposal code {
+  font-family: var(--np-font-mono);
+}

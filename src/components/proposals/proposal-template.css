@@ -1,0 +1,790 @@
+/* ============================================================
+   Niuro Proposal Template — v5 Editorial
+   Port literal de cotizador-niuro-deploy + reference HTML BCI v4.
+   Todos los selectores scoped bajo .proposal-doc.
+   Navy primary, Gold accent, Cobalt secondary, Warm parchment surfaces.
+   ============================================================ */
+
+.proposal-doc {
+  --navy:         #050F41;
+  --navy-2:       #0B1B5E;
+  --navy-ink:     #0A1654;
+  --gold:         #FFD166;
+  --gold-soft:    #FFE7A6;
+  --gold-bg:      #FFF6E0;
+  --gold-deep:    #B8870E;
+  --cobalt:       #3B5FE5;
+  --cobalt-bg:    #EEF0FB;
+  --cobalt-bord:  #D7DEF7;
+  --cobalt-deep:  #1F3FC7;
+
+  --warm-white:   #FAF9F5;
+  --parchment:    #F5F0E8;
+  --parchment-2:  #EFE9DD;
+  --cream:        #FFFDF5;
+  --paper:        #FFFFFF;
+
+  --bord-soft:    #EAE6D8;
+  --bord-med:     #D4D1C4;
+  --bord-hair:    #F0EDE2;
+
+  --ink-1:        #050F41;
+  --ink-2:        #3F4868;
+  --ink-3:        #6B7280;
+  --ink-muted:    #94989F;
+
+  --warn-bg:      #FDF2EE;
+  --warn-bord:    #F0CBB8;
+  --warn-ink:     #B23A1A;
+  --warn-deep:    #8C2A11;
+
+  --green:        #16A34A;
+  --green-bg:     #E8F6EE;
+
+  --font-body:    'Inter', system-ui, -apple-system, sans-serif;
+  --font-head:    'Host Grotesk', 'Inter', sans-serif;
+  --font-display: 'Fraunces', 'Host Grotesk', Georgia, serif;
+  --font-mono:    'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  font-family: var(--font-body);
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 36px 28px 60px;
+  color: var(--ink-1);
+  background-color: var(--warm-white);
+  font-size: 11.5px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.proposal-doc * { box-sizing: border-box; }
+.proposal-doc h1,
+.proposal-doc h2,
+.proposal-doc h3,
+.proposal-doc h4,
+.proposal-doc h5,
+.proposal-doc h6 {
+  color: var(--ink-1);
+  margin: 0;
+  line-height: 1.18;
+  font-family: var(--font-head);
+  letter-spacing: -0.012em;
+  font-weight: 700;
+}
+.proposal-doc p { margin: 0; }
+
+/* ============================================================
+   PAGE — warm paper card with gold accent
+   ============================================================ */
+.proposal-doc .page {
+  position: relative;
+  min-height: 1040px;
+  margin-bottom: 36px;
+  padding: 44px 48px 60px;
+  page-break-after: always;
+  background-color: var(--paper);
+  border: 1px solid var(--bord-soft);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 1px 0 rgba(5, 15, 65, 0.03), 0 12px 32px -20px rgba(5, 15, 65, 0.18);
+}
+.proposal-doc .page::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--gold) 0%, var(--gold-soft) 50%, var(--gold) 100%);
+  z-index: 2;
+}
+.proposal-doc .page:last-child { page-break-after: auto; }
+
+/* ============================================================
+   HEADER — client logo + Niuro logo
+   ============================================================ */
+.proposal-doc .header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 36px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--bord-hair);
+}
+.proposal-doc .logo-client {
+  display: flex; align-items: center;
+  height: 56px;
+  font-weight: 700;
+  color: var(--navy);
+  font-size: 18px;
+}
+.proposal-doc .logo-client img {
+  height: 52px; width: auto;
+  object-fit: contain;
+}
+.proposal-doc .logo-client-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  color: #FAF9F5;
+  font-family: var(--font-display, 'Fraunces', Georgia, serif);
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  flex-shrink: 0;
+  box-shadow: 0 1px 2px rgba(5, 15, 65, 0.08);
+}
+.proposal-doc .logo-client .placeholder {
+  height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--bord-soft);
+  border-radius: 6px;
+  display: flex; align-items: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--navy);
+  background: var(--parchment);
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+  font-style: italic;
+}
+.proposal-doc .logo-niuro {
+  height: 46px;
+  object-fit: contain;
+}
+
+/* ============================================================
+   DOC TITLE — editorial hero
+   ============================================================ */
+.proposal-doc .doc-title {
+  margin-bottom: 28px;
+  text-align: left;
+}
+.proposal-doc .doc-title .eyebrow {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--cobalt);
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.proposal-doc .doc-title .eyebrow::before {
+  content: '';
+  width: 28px; height: 1px;
+  background: var(--cobalt);
+  display: inline-block;
+}
+.proposal-doc .doc-title h1 {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 30px;
+  line-height: 1.08;
+  letter-spacing: -0.025em;
+  color: var(--navy);
+  margin-bottom: 8px;
+}
+.proposal-doc .doc-title h1 em {
+  font-style: italic;
+  font-weight: 400;
+  color: var(--cobalt);
+}
+.proposal-doc .doc-title .sub {
+  font-family: var(--font-head);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-2);
+  letter-spacing: -0.005em;
+}
+
+/* ============================================================
+   BLUE-BOX (executive summary) — editorial pull quote
+   ============================================================ */
+.proposal-doc .blue-box {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(255, 209, 102, 0.14), transparent 45%),
+    radial-gradient(circle at 0% 100%, rgba(59, 95, 229, 0.18), transparent 50%),
+    linear-gradient(135deg, var(--navy) 0%, var(--navy-2) 100%);
+  border-radius: 12px;
+  padding: 24px 26px 22px;
+  margin-bottom: 28px;
+  border: 1px solid rgba(255, 209, 102, 0.15);
+  position: relative;
+  overflow: hidden;
+  color: var(--warm-white);
+}
+.proposal-doc .blue-box::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; bottom: 0;
+  width: 4px;
+  background: linear-gradient(180deg, var(--gold) 0%, var(--gold-deep) 100%);
+}
+.proposal-doc .blue-box-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 14px;
+  color: rgba(250, 249, 245, 0.65);
+  font-size: 9.5px;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-weight: 600;
+}
+.proposal-doc .blue-box-header > span:first-child {
+  color: var(--gold);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.proposal-doc .blue-box-header > span:first-child::before {
+  content: '';
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--gold);
+  box-shadow: 0 0 0 3px rgba(255, 209, 102, 0.2);
+}
+.proposal-doc .summary-text {
+  font-family: var(--font-display);
+  font-size: 14.5px;
+  line-height: 1.55;
+  color: var(--warm-white);
+  margin-bottom: 18px;
+  font-weight: 400;
+  letter-spacing: -0.005em;
+}
+.proposal-doc .summary-text strong {
+  font-weight: 700;
+  color: var(--gold);
+  font-family: var(--font-head);
+  letter-spacing: -0.005em;
+}
+
+.proposal-doc .context-box {
+  background-color: rgba(250, 249, 245, 0.08);
+  border-radius: 10px;
+  padding: 16px 18px 14px;
+  margin: 16px 0 8px;
+  border: 1px solid rgba(255, 209, 102, 0.18);
+  backdrop-filter: blur(6px);
+}
+.proposal-doc .context-box-title {
+  font-size: 9.5px; font-weight: 700;
+  color: var(--gold); margin-bottom: 12px;
+  display: flex; align-items: center; gap: 8px;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+.proposal-doc .context-box-title span:first-child {
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: var(--gold);
+  color: var(--navy);
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 10px;
+  font-family: var(--font-head);
+  font-weight: 700;
+}
+.proposal-doc .context-box p {
+  font-size: 11px;
+  color: rgba(250, 249, 245, 0.92);
+  margin: 0 0 14px;
+  line-height: 1.6;
+}
+.proposal-doc .context-box p strong { color: var(--warm-white); font-weight: 700; }
+.proposal-doc .context-box .data-title {
+  font-size: 9.5px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: var(--gold);
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+.proposal-doc .context-box ul {
+  margin: 0;
+  padding-left: 0;
+  list-style: none;
+}
+.proposal-doc .context-box ul li {
+  font-size: 10.5px;
+  color: rgba(250, 249, 245, 0.88);
+  margin-bottom: 6px;
+  line-height: 1.55;
+  padding-left: 18px;
+  position: relative;
+}
+.proposal-doc .context-box ul li::before {
+  content: '';
+  position: absolute;
+  left: 4px; top: 8px;
+  width: 4px; height: 4px;
+  background: var(--gold);
+  border-radius: 50%;
+}
+
+/* ============================================================
+   BADGES — translucent over navy
+   ============================================================ */
+.proposal-doc .badges {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  margin-top: 16px; margin-bottom: 0;
+}
+.proposal-doc .badge {
+  background-color: rgba(250, 249, 245, 0.1);
+  border: 1px solid rgba(255, 209, 102, 0.25);
+  border-radius: 999px;
+  padding: 5px 11px 5px 9px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--warm-white);
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font-body);
+  letter-spacing: -0.005em;
+}
+.proposal-doc .badge .ico {
+  color: var(--gold);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+.proposal-doc .badge:nth-child(2) {
+  background: rgba(255, 209, 102, 0.18);
+  border-color: var(--gold-soft);
+}
+.proposal-doc .badge:nth-child(6) {
+  background: rgba(22, 163, 74, 0.18);
+  border-color: rgba(22, 163, 74, 0.4);
+}
+.proposal-doc .badge:nth-child(6) .ico { color: #5BE08F; }
+
+/* ============================================================
+   HIGHLIGHT (pricing teaser inside blue-box)
+   ============================================================ */
+.proposal-doc .highlight-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  color: var(--navy);
+  margin-top: 18px;
+  font-size: 12.5px;
+  font-family: var(--font-head);
+  letter-spacing: -0.01em;
+  background: var(--gold);
+  padding: 9px 14px 9px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--gold-deep);
+  box-shadow: 0 4px 12px -4px rgba(0, 0, 0, 0.25);
+}
+.proposal-doc .highlight-text::before {
+  content: '$';
+  display: inline-flex;
+  align-items: center; justify-content: center;
+  width: 20px; height: 20px;
+  background: var(--navy);
+  color: var(--gold);
+  border-radius: 50%;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+/* ============================================================
+   SECTION TITLE — magazine numbered headers
+   ============================================================ */
+.proposal-doc .section-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 36px 0 18px 0;
+  display: flex; align-items: center; gap: 14px;
+  color: var(--navy);
+  font-family: var(--font-display);
+  letter-spacing: -0.018em;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--bord-hair);
+}
+.proposal-doc .section-title:first-child { margin-top: 0; }
+.proposal-doc .section-icon-box {
+  width: 34px; height: 34px;
+  background-color: var(--navy);
+  border-radius: 9px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--gold);
+  flex-shrink: 0;
+}
+.proposal-doc .section-icon-box svg { width: 17px; height: 17px; }
+
+/* ============================================================
+   CARDS
+   ============================================================ */
+.proposal-doc .grid-2 {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
+  margin-bottom: 16px; align-items: stretch;
+}
+
+.proposal-doc .card {
+  border: 1px solid var(--bord-soft);
+  border-radius: 12px;
+  padding: 18px;
+  background-color: var(--paper);
+  display: flex; flex-direction: column;
+  position: relative;
+}
+.proposal-doc .card-header {
+  display: flex; align-items: flex-start; gap: 12px;
+  margin-bottom: 10px;
+}
+.proposal-doc .card-icon {
+  background-color: var(--gold-bg);
+  width: 36px; height: 36px;
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--navy);
+  flex-shrink: 0;
+  border: 1px solid var(--gold-soft);
+}
+.proposal-doc .card-icon svg { width: 18px; height: 18px; display: block; }
+.proposal-doc .card h3 {
+  font-size: 12.5px;
+  font-weight: 700;
+  margin: 4px 0 0;
+  line-height: 1.3;
+  color: var(--navy);
+  font-family: var(--font-head);
+  letter-spacing: -0.01em;
+}
+.proposal-doc .card p {
+  font-size: 11px;
+  color: var(--ink-2);
+  margin: 8px 0 10px;
+  line-height: 1.6;
+  flex-grow: 1;
+}
+.proposal-doc .tag-pill {
+  display: inline-block;
+  background-color: var(--paper);
+  padding: 3px 9px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--cobalt-deep);
+  margin-right: 4px;
+  margin-top: 4px;
+  align-self: flex-start;
+  border: 1px solid var(--cobalt-bord);
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+/* Risk cards (warm coral) */
+.proposal-doc .special-card {
+  background-color: var(--warn-bg);
+  border: 1px solid var(--warn-bord);
+  border-radius: 12px;
+  padding: 18px 20px;
+  margin-top: 12px;
+}
+.proposal-doc .special-card h3 {
+  font-size: 12.5px; font-weight: 700; margin: 4px 0 0;
+  line-height: 1.3; color: var(--warn-deep);
+  font-family: var(--font-head); letter-spacing: -0.01em;
+}
+.proposal-doc .special-card p {
+  font-size: 11px; color: var(--ink-2);
+  margin: 8px 0 0; line-height: 1.6;
+}
+.proposal-doc .special-card ul {
+  margin: 8px 0 0; padding-left: 20px; list-style: none;
+}
+.proposal-doc .special-card ul li {
+  font-size: 11px; color: var(--ink-2);
+  line-height: 1.6; padding-left: 4px;
+  margin-bottom: 4px; position: relative;
+}
+.proposal-doc .special-card ul li::before {
+  content: ''; position: absolute;
+  left: -14px; top: 8px;
+  width: 4px; height: 4px;
+  background: var(--warn-ink);
+  border-radius: 50%;
+}
+.proposal-doc .special-card .card-icon,
+.proposal-doc .special-risk .card-icon {
+  background-color: rgba(178, 58, 26, 0.1);
+  color: var(--warn-ink);
+  border-color: var(--warn-bord);
+}
+
+/* ============================================================
+   TABLES
+   ============================================================ */
+.proposal-doc table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  margin-bottom: 16px;
+  border: 1px solid var(--bord-soft);
+  border-radius: 12px;
+  overflow: hidden;
+  font-size: 10.5px;
+  background-color: var(--paper);
+}
+.proposal-doc th {
+  background-color: var(--parchment);
+  text-align: left;
+  padding: 12px 14px;
+  font-size: 9.5px;
+  font-weight: 700;
+  color: var(--navy);
+  border-bottom: 1px solid var(--bord-med);
+  font-family: var(--font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.proposal-doc td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--bord-hair);
+  vertical-align: top;
+  color: var(--ink-2);
+  background-color: var(--paper);
+  line-height: 1.55;
+}
+.proposal-doc tbody tr:nth-child(even) td { background-color: var(--cream); }
+.proposal-doc tr:last-child td { border-bottom: none; }
+.proposal-doc tr { break-inside: avoid; page-break-inside: avoid; }
+
+.proposal-doc ul { margin: 0; padding-left: 16px; list-style-type: disc; }
+.proposal-doc li {
+  margin-bottom: 4px;
+  font-size: 10.5px;
+  line-height: 1.55;
+  color: var(--ink-2);
+}
+.proposal-doc li::marker { color: var(--gold); }
+
+/* ============================================================
+   PRICING BOX — hero number, navy stage
+   ============================================================ */
+.proposal-doc .pricing-box {
+  break-inside: avoid; page-break-inside: avoid;
+  background:
+    radial-gradient(circle at 88% 18%, rgba(255, 209, 102, 0.4), transparent 50%),
+    radial-gradient(circle at 8% 92%, rgba(59, 95, 229, 0.45), transparent 55%),
+    linear-gradient(135deg, var(--navy) 0%, var(--navy-2) 100%);
+  border-radius: 14px;
+  padding: 28px 32px;
+  margin: 22px 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border: none;
+  position: relative;
+  overflow: hidden;
+  color: var(--warm-white);
+}
+.proposal-doc .pricing-box::after {
+  content: '';
+  position: absolute;
+  top: 16px; right: 18px;
+  width: 26px; height: 26px;
+  background: var(--gold);
+  border-radius: 50%;
+  opacity: 0.85;
+  box-shadow: 0 0 0 4px rgba(255, 209, 102, 0.15);
+}
+.proposal-doc .pricing-box .pricing-text {
+  font-size: 10px;
+  color: var(--gold);
+  font-weight: 700;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  margin-bottom: 6px;
+}
+.proposal-doc .pricing-box > div:first-child > div:nth-child(2),
+.proposal-doc .pricing-box > div:first-child > div:nth-child(3) {
+  color: rgba(250, 249, 245, 0.72) !important;
+  font-size: 11px;
+  font-family: var(--font-body);
+  font-weight: 500;
+  margin-top: 4px;
+  max-width: 360px;
+  line-height: 1.5;
+}
+.proposal-doc .pricing-box .pricing-price {
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--warm-white) !important;
+  text-align: right;
+  font-family: var(--font-display);
+  letter-spacing: -0.025em;
+  line-height: 1.05;
+}
+.proposal-doc .pricing-box .pricing-price > div:first-child {
+  font-size: 28px;
+  color: var(--warm-white) !important;
+  font-weight: 600;
+}
+.proposal-doc .pricing-box .pricing-price > div:last-child {
+  font-size: 11px;
+  color: rgba(250, 249, 245, 0.7) !important;
+  font-weight: 500;
+  font-family: var(--font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-top: 6px;
+}
+
+/* ============================================================
+   DISCLAIMER
+   ============================================================ */
+.proposal-doc .disclaimer {
+  background-color: var(--parchment);
+  border-radius: 10px;
+  padding: 16px 20px;
+  font-size: 10.5px;
+  color: var(--ink-3);
+  margin-top: 22px;
+  text-align: left;
+  line-height: 1.65;
+  border: 1px solid var(--bord-soft);
+}
+.proposal-doc .disclaimer p { margin: 0; font-size: 10.5px; }
+.proposal-doc .disclaimer strong { color: var(--navy); }
+
+/* ============================================================
+   UTILITIES
+   ============================================================ */
+.proposal-doc .bold { font-weight: 700; color: var(--navy); }
+.proposal-doc .text-xs { font-size: 9.5px; }
+.proposal-doc .text-muted { color: var(--ink-3); }
+.proposal-doc .mt-1 { margin-top: 4px; }
+
+.proposal-doc .page,
+.proposal-doc .blue-box,
+.proposal-doc .card,
+.proposal-doc .special-card,
+.proposal-doc .pricing-box,
+.proposal-doc table {
+  break-inside: avoid; page-break-inside: avoid;
+}
+
+.proposal-doc .pending {
+  background: var(--gold-bg);
+  color: var(--gold-deep);
+  padding: 1px 7px;
+  border-radius: 3px;
+  font-weight: 600;
+  font-size: 0.94em;
+  border: 1px dashed var(--gold-soft);
+  font-family: var(--font-mono);
+}
+
+.proposal-doc strong { color: var(--navy); font-weight: 700; }
+
+/* Blue-box: navy con strong gold/blanco visible */
+.proposal-doc .blue-box strong { color: var(--gold) !important; font-weight: 700; }
+.proposal-doc .blue-box .summary-text strong {
+  color: var(--gold) !important;
+  font-weight: 700;
+  font-family: var(--font-head);
+}
+.proposal-doc .blue-box .context-box p strong {
+  color: var(--warm-white) !important; font-weight: 700;
+}
+.proposal-doc .blue-box .context-box ul li strong {
+  color: var(--gold) !important; font-weight: 700;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.92em;
+}
+.proposal-doc .blue-box .context-box-title strong { color: var(--gold) !important; }
+
+/* ============================================================
+   PRINT — A4 exact, fit content per page
+   ============================================================ */
+@media print {
+  @page { size: A4; margin: 0; }
+
+  .proposal-doc {
+    max-width: none;
+    padding: 0;
+    margin: 0;
+    background-color: white;
+    font-size: 9px;
+    line-height: 1.4;
+  }
+  .proposal-doc .page {
+    page-break-after: always;
+    page-break-inside: avoid;
+    break-inside: avoid;
+    break-after: page;
+    margin: 0;
+    padding: 9mm 11mm 11mm;
+    border: none;
+    border-radius: 0;
+    min-height: 0;
+    box-shadow: none;
+    box-sizing: border-box;
+  }
+  .proposal-doc .page::before { display: block; height: 3px; }
+  .proposal-doc .page:last-child { page-break-after: auto; break-after: auto; }
+
+  .proposal-doc .header { margin-bottom: 14px; padding-bottom: 10px; }
+  .proposal-doc .doc-title { margin-bottom: 16px; }
+  .proposal-doc .doc-title h1 { font-size: 22px; }
+  .proposal-doc .doc-title .eyebrow { font-size: 8.5px; margin-bottom: 6px; }
+  .proposal-doc .doc-title .sub { font-size: 11px; }
+  .proposal-doc .blue-box { padding: 14px 16px 12px; margin-bottom: 14px; }
+  .proposal-doc .blue-box-header { font-size: 8px; margin-bottom: 8px; }
+  .proposal-doc .summary-text { font-size: 11.5px; line-height: 1.4; margin-bottom: 10px; }
+  .proposal-doc .context-box { padding: 10px 12px; margin: 10px 0 6px; }
+  .proposal-doc .context-box-title { font-size: 8.5px; margin-bottom: 8px; }
+  .proposal-doc .badges { gap: 4px; margin-top: 10px; }
+  .proposal-doc .badge { font-size: 8.5px; padding: 3px 8px 3px 7px; }
+  .proposal-doc .highlight-text { font-size: 10.5px; padding: 6px 10px 6px 8px; margin-top: 10px; }
+  .proposal-doc .highlight-text::before { width: 16px; height: 16px; font-size: 8.5px; }
+  .proposal-doc .section-title { font-size: 15px; margin: 16px 0 12px; padding-bottom: 9px; gap: 11px; }
+  .proposal-doc .section-title:first-child { margin-top: 0; }
+  .proposal-doc .section-icon-box { width: 28px; height: 28px; border-radius: 7px; }
+  .proposal-doc .section-icon-box svg { width: 14px; height: 14px; }
+  .proposal-doc .grid-2 { gap: 12px; margin-bottom: 14px; }
+  .proposal-doc .card { padding: 14px 16px; border-radius: 10px; }
+  .proposal-doc .card-icon { width: 30px; height: 30px; border-radius: 8px; }
+  .proposal-doc .card-icon svg { width: 15px; height: 15px; }
+  .proposal-doc .card h3 { font-size: 11.5px; line-height: 1.28; margin: 2px 0 0; }
+  .proposal-doc .card p { font-size: 10px; line-height: 1.5; margin: 6px 0; }
+  .proposal-doc .tag-pill { font-size: 8.5px; padding: 2px 8px; margin-top: 5px; }
+  .proposal-doc .special-card { padding: 14px 16px; margin-top: 12px; border-radius: 10px; }
+  .proposal-doc .special-card h3 { font-size: 11.5px; }
+  .proposal-doc .special-card p { font-size: 10px; line-height: 1.5; margin-top: 7px; }
+  .proposal-doc table { font-size: 10px; margin-bottom: 14px; border-radius: 10px; }
+  .proposal-doc th { padding: 10px 12px; font-size: 9px; }
+  .proposal-doc td { padding: 10px 12px; line-height: 1.5; }
+  .proposal-doc .pricing-box { padding: 16px 20px; margin: 14px 0; border-radius: 10px; }
+  .proposal-doc .pricing-box .pricing-text { font-size: 9.5px; margin-bottom: 4px; }
+  .proposal-doc .pricing-box .pricing-price { font-size: 22px; }
+  .proposal-doc .pricing-box .pricing-price > div:first-child { font-size: 22px; }
+  .proposal-doc .pricing-box .pricing-price > div:last-child { font-size: 9.5px; margin-top: 3px; }
+  .proposal-doc .pricing-box::after { width: 20px; height: 20px; top: 12px; right: 14px; }
+  .proposal-doc .disclaimer { padding: 12px 14px; font-size: 9.5px; line-height: 1.5; margin-top: 14px; }
+  .proposal-doc .pending { font-size: 0.92em; padding: 0 6px; }
+}
+
+/* prefers-reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  .proposal-doc *,
+  .proposal-doc *::before,
+  .proposal-doc *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

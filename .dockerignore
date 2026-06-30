@@ -1,0 +1,9 @@
+node_modules
+.next
+data/crm.db
+data/crm.db-wal
+data/crm.db-journal
+.env*
+.git
+.claude
+drizzle
