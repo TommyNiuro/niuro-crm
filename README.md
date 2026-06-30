@@ -70,9 +70,22 @@ macOS-first. El core de la app corre bien en **Linux**. **Windows** está sin pr
 
 Next.js App Router (páginas + route handlers en `/api/*`), un motor genérico de vistas de registro configurado por objeto, un sistema de objetos/campos custom basado en metadatos (EAV), un motor de workflows in-process, IA por subproceso del CLI, y SQLite con Drizzle (schema y seeds en `src/db/index.ts`). El detalle técnico para contribuir está en [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
+## App de Mac (Tauri)
+
+Podés correr el CRM como app nativa de macOS (`.app` + `.dmg`). El scaffolding está
+incluido (`src-tauri/`): la app levanta el server Next embebido en localhost y lo abre
+en una ventana nativa. Requiere Node 24+, Rust y Xcode Command Line Tools.
+
+```bash
+npm install
+npm run desktop:build   # genera src-tauri/target/release/bundle/
+```
+
+Guía completa en [docs/DESKTOP.md](docs/DESKTOP.md).
+
 ## Roadmap
 
-- Fase 2: app nativa de Mac (`.app`) empaquetada con Tauri.
+- Desktop v2: bundlear Node (app autocontenida), firma + notarización, auto-update.
 
 ## Contribuir
 

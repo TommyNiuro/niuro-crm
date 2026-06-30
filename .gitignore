@@ -69,3 +69,9 @@ data/
 # Python
 __pycache__/
 *.pyc
+
+# Tauri (desktop) — todo lo generado por el build
+/src-tauri/target/
+/src-tauri/gen/
+/src-tauri/icons/
+/src-tauri/resources/server/
