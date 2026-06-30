@@ -11,7 +11,7 @@ entrado al commit baseline de tu repo privado original, así que rotala por las 
 
 - Entrá a https://resend.com/api-keys
 - Revocá la key actual y generá una nueva
-- Actualizá tu `.env.local` real del CRM en producción (`~/niuro/auto-crm`) con la nueva
+- Actualizá el `.env.local` de tu instancia de producción con la nueva key
 
 ## 2. Crear el repo privado y pushear
 

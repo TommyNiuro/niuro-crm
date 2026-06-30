@@ -14,7 +14,7 @@ carpeta escribible del usuario, no dentro del bundle.
 ```
 [ .app ]
   └── launcher Rust (src-tauri/src/main.rs)
-        1. busca node (PATH + /opt/homebrew/bin + /usr/local/bin)
+        1. busca node (PATH + Homebrew + tu shell de login, que carga nvm/fnm/volta/asdf)
         2. spawnea el server Next standalone embebido (resources/server/server.js)
            con PORT=4555, HOSTNAME=127.0.0.1, CRM_DB_PATH=~/Library/Application Support/io.niuro.crm/crm.db
         3. muestra un splash y espera a que el puerto responda
@@ -75,13 +75,27 @@ de Apple Developer (firma + notarización); queda fuera de v1.
 
 ## Troubleshooting
 
-- **"No se encontró Node.js"**: instalá Node 24+ (`brew install node`). Si usás nvm,
-  exportá `NIURO_NODE_BIN=$(which node)` antes de abrir, o pasá a Homebrew node.
+- **"No se encontró Node.js"** (clásico con nvm/fnm/volta/asdf): las apps lanzadas
+  desde Finder reciben un PATH pelado, sin tu gestor de versiones cargado. El launcher
+  ya cubre esto: busca en PATH, en rutas de Homebrew, y le pregunta a tu shell de login
+  (que carga nvm y compañía), con fallback directo a `~/.nvm`. Si aun así falla, exportá
+  `NIURO_NODE_BIN=$(which node)` antes de abrir, o instalá Node por Homebrew
+  (`brew install node`), que vive en una ruta fija.
+- **El `.dmg` no se genera / falla `bundle_dmg.sh`**: el bundler del `.dmg` usa
+  AppleScript/Finder y necesita una **sesión gráfica**. Corré `npm run desktop:build`
+  desde la Terminal de tu Mac (no por SSH ni en un shell headless). El `.app` sí se
+  genera siempre; el `.dmg` solo con GUI.
+- **Cambié algo y la app sigue con el bug viejo**: si arrastraste el `.app` a
+  Aplicaciones, esa copia quedó congelada. Tras un rebuild, reemplazala: borrá la de
+  `/Applications` y volvé a arrastrar la nueva desde `src-tauri/target/release/bundle/macos/`.
 - **"No se encontró el server embebido"**: corré `npm run desktop:build` (faltó el
   staging de `resources/server`).
 - **Ventana en blanco / no carga**: el server tardó más de 60s o el puerto 4555 está
   ocupado. Cerrá otras instancias del CRM y reabrí.
 - **Falla `tauri icon`**: confirmá que existe `src-tauri/app-icon.png`.
+- **Error de compilación en el crate `time` / `cookie`**: `time 0.3.52` rompió semver.
+  El `Cargo.lock` ya pinea `time = 0.3.51`. Si actualizás dependencias y reaparece,
+  volvé a pinearlo: `cargo update -p time --precise 0.3.51` dentro de `src-tauri/`.
 
 ## Roadmap (v2 del desktop)
 
@@ -89,4 +103,5 @@ de Apple Developer (firma + notarización); queda fuera de v1.
   autocontenida y no dependa del Node del sistema.
 - **Firma + notarización** para distribución sin warnings de Gatekeeper.
 - **Auto-update** con el updater de Tauri.
-- Builds universales (arm64 + x86_64) y CI para releases.
+- Builds universales (arm64 + x86_64). El CI ya construye en macOS y adjunta el `.dmg`
+  al release cuando pusheás un tag `vX.Y.Z` (ver `.github/workflows/desktop.yml`).
