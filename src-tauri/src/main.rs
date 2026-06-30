@@ -99,7 +99,7 @@ fn boot_server(app: &AppHandle) {
     }
 
     if wait_for_port(PORT, Duration::from_secs(60)) {
-        if let Some(mut win) = window {
+        if let Some(win) = window {
             if let Ok(url) = format!("http://127.0.0.1:{PORT}").parse::<tauri::Url>() {
                 let _ = win.navigate(url);
             }
