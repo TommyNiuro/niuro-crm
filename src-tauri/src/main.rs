@@ -134,6 +134,51 @@ fn find_node() -> Option<PathBuf> {
             return Some(pb);
         }
     }
+    // Version managers (nvm, fnm, volta, asdf): el binario no esta en un PATH fijo.
+    // Le preguntamos al shell de login del usuario, que carga su profile donde el
+    // manager se configura. Cubre cualquiera de ellos sin enumerar rutas.
+    if let Some(pb) = node_from_login_shell() {
+        return Some(pb);
+    }
+    // Fallback directo a nvm por si el shell no resolvio (ej. nvm lazy-load).
+    node_from_nvm()
+}
+
+/// Resuelve `node` via el shell de login+interactivo del usuario (carga ~/.zshrc
+/// donde vive nvm/fnm/etc.). Toma la ultima linea no vacia de stdout.
+fn node_from_login_shell() -> Option<PathBuf> {
+    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".into());
+    let out = Command::new(&shell)
+        .args(["-lic", "command -v node"])
+        .output()
+        .ok()?;
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    let path = stdout.lines().rev().map(str::trim).find(|l| !l.is_empty())?;
+    let pb = PathBuf::from(path);
+    if works(&pb) {
+        Some(pb)
+    } else {
+        None
+    }
+}
+
+/// Fallback: nvm instala en ~/.nvm/versions/node/<ver>/bin/node. Toma la version
+/// mas alta (orden lexical) que funcione.
+// ponytail: orden lexical, no semver puro; alcanza para arrancar con un node usable.
+fn node_from_nvm() -> Option<PathBuf> {
+    let home = std::env::var_os("HOME")?;
+    let dir = PathBuf::from(home).join(".nvm/versions/node");
+    let mut versions: Vec<PathBuf> = std::fs::read_dir(&dir)
+        .ok()?
+        .filter_map(|e| e.ok().map(|e| e.path()))
+        .collect();
+    versions.sort();
+    for v in versions.into_iter().rev() {
+        let pb = v.join("bin/node");
+        if works(&pb) {
+            return Some(pb);
+        }
+    }
     None
 }
 
