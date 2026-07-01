@@ -104,60 +104,72 @@ function sqlQuote(s: string): string {
 let _migrateChecked = false;
 
 /**
- * Migra crm.db de texto plano a cifrado, UNA sola vez, si hace falta. Idempotente
- * por dos motivos: (1) un flag por proceso evita repetir el chequeo, y (2) la
- * deteccion por header hace que un segundo arranque vea la DB ya opaca y no
- * re-keye. SQLCipher no puede abrir una DB plana con PRAGMA key, asi que hay que
- * exportarla: abrimos la plana, la volcamos cifrada a un tmp con
- * sqlcipher_export y reemplazamos de forma atomica.
+ * Migra crm.db de texto plano a cifrado, UNA sola vez, si hace falta. Idempotente:
+ * (1) un flag por proceso evita repetir el chequeo, y (2) la deteccion por header
+ * hace que un segundo arranque vea la DB ya opaca y no re-keye.
  *
- * Seguridad ante fallo: el original se conserva como .plain-bak y el tmp solo
- * reemplaza al original si el export termino OK. Un corte a mitad deja el
- * original intacto y reintenta el proximo arranque.
+ * Mecanismo: PRAGMA rekey de SQLite3MultipleCiphers, que cifra la DB plana
+ * IN-PLACE (este binario NO tiene sqlcipher_export, que es especifico de SQLCipher;
+ * verificado empiricamente). Red de seguridad: se copia el plano a .plain-bak antes
+ * del rekey; si el rekey falla, o si la DB cifrada resultante no se puede leer con
+ * la llave, se restaura del backup. Si todo sale bien, el .plain-bak se BORRA para
+ * no dejar una copia sin cifrar de los datos al lado de la DB cifrada.
  */
 export function migrateToEncryptedIfNeeded(file: string, key: string): void {
   if (!fs.existsSync(file)) return; // DB nueva: nace cifrada en la primera apertura keyed
   if (!isPlaintextDb(file)) return; // ya cifrada (o header desconocido): no tocar
 
-  const tmp = `${file}.enc-tmp`;
   const bak = `${file}.plain-bak`;
+  if (fs.existsSync(bak)) fs.rmSync(bak, { force: true });
+  fs.copyFileSync(file, bak); // backup del plano antes del rekey in-place
 
-  // Limpieza de un intento previo abortado.
-  for (const f of [tmp]) if (fs.existsSync(f)) fs.rmSync(f, { force: true });
-
-  const plain = new Database(file, { timeout: 15000 });
+  const db = new Database(file, { timeout: 15000 });
   try {
-    // Doblar el WAL sobre el archivo principal antes de exportar, para no perder
+    // Doblar el WAL sobre el archivo principal antes del rekey, para no perder
     // datos que vivan solo en el -wal.
     try {
-      plain.pragma("wal_checkpoint(TRUNCATE)");
-      plain.pragma("journal_mode = DELETE");
+      db.pragma("wal_checkpoint(TRUNCATE)");
+      db.pragma("journal_mode = DELETE");
     } catch {
       // no critico: si no hay WAL, seguimos
     }
-    plain.exec(`ATTACH DATABASE '${sqlQuote(tmp)}' AS encrypted KEY '${sqlQuote(key)}'`);
-    plain.prepare("SELECT sqlcipher_export('encrypted')").get();
-    plain.exec("DETACH DATABASE encrypted");
+    // rekey cifra la DB plana in-place con el cipher por defecto (el mismo que
+    // aplica openDb al abrir con PRAGMA key).
+    db.pragma(`rekey = '${sqlQuote(key)}'`);
+    db.close();
   } catch (e) {
-    plain.close();
-    if (fs.existsSync(tmp)) fs.rmSync(tmp, { force: true });
+    try { db.close(); } catch { /* ya cerrada */ }
+    try { fs.copyFileSync(bak, file); } catch { /* best-effort restore */ }
     throw new Error(
-      `migrateToEncryptedIfNeeded: fallo el export cifrado, DB original intacta: ${
+      `migrateToEncryptedIfNeeded: fallo el rekey, DB restaurada del backup: ${
         e instanceof Error ? e.message : String(e)
       }`
     );
   }
-  plain.close();
 
-  // Reemplazo atomico. Guardamos el plano como .plain-bak (borrable a mano una
-  // vez verificado). Los sidecars WAL/SHM del plano ya no aplican al archivo
-  // cifrado: se eliminan para que SQLite no intente reusarlos.
-  if (fs.existsSync(bak)) fs.rmSync(bak, { force: true });
-  fs.renameSync(file, bak);
+  // Sidecars WAL/SHM del plano: ya no aplican a la DB cifrada.
   for (const side of [`${file}-wal`, `${file}-shm`]) {
     if (fs.existsSync(side)) fs.rmSync(side, { force: true });
   }
-  fs.renameSync(tmp, file);
+
+  // Verificar que la DB cifrada abre y lee con la llave ANTES de descartar el
+  // backup plano; si no, restaurar (no perder datos por un rekey a medias).
+  try {
+    const check = new Database(file, { timeout: 15000 });
+    check.pragma(`key = '${sqlQuote(key)}'`);
+    check.prepare("SELECT count(*) FROM sqlite_master").get(); // fuerza una lectura real
+    check.close();
+  } catch (e) {
+    try { fs.copyFileSync(bak, file); } catch { /* best-effort restore */ }
+    throw new Error(
+      `migrateToEncryptedIfNeeded: DB cifrada ilegible con la llave, restaurada del backup: ${
+        e instanceof Error ? e.message : String(e)
+      }`
+    );
+  }
+
+  // Cifrado OK y verificado: borrar el backup plano (no dejar datos sin cifrar).
+  fs.rmSync(bak, { force: true });
 }
 
 /**
