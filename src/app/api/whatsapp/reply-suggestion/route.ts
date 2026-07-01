@@ -7,7 +7,7 @@ import { scoreLead } from "@/lib/score-lead";
 import { getRubricConfig } from "@/lib/score-lead-server";
 import { runClaude, FAST_MODEL } from "@/lib/claude-subprocess";
 import { STAGES } from "@/lib/crm-ui";
-import { operator } from "@/lib/operator";
+import { getOperator } from "@/lib/operator";
 import type { Temperature } from "@/types";
 
 interface Body {
@@ -28,7 +28,7 @@ const STAGE_PLAYS: Record<string, { hot: string[]; warm: string[]; cold: string[
       "Te leo. Para no irnos por las ramas, ¿qué rol específico estás buscando y para cuándo? Con eso te digo en 24h si te puedo bajar 2-3 perfiles.",
     ],
     cold: [
-      `Hola, ¿qué tal? Soy ${operator.name} de ${operator.company}, bajamos ingenieros senior de LATAM para startups. Si en algún momento necesitas sumar gente al equipo, escríbeme y vemos. Sin apuro.`,
+      `Hola, ¿qué tal? Soy {{name}} de {{company}}, bajamos ingenieros senior de LATAM para startups. Si en algún momento necesitas sumar gente al equipo, escríbeme y vemos. Sin apuro.`,
       "Hola. Te dejo abierta la puerta: si te toca contratar tech, podemos bajar perfiles pre-vetted en 2 semanas. Cualquier cosa me escribes.",
     ],
   },
@@ -125,6 +125,7 @@ async function generateAISuggestion(opts: {
   score: number | null;
 }): Promise<string | null> {
   if (!dbExists()) return null;
+  const operator = getOperator();
   const msgs = getMessages({ chatJid: opts.chatJid, limit: 15 });
   if (!msgs.length) return null;
 
@@ -263,7 +264,10 @@ export async function POST(request: NextRequest) {
   const pool = STAGE_PLAYS[stageKey] || DEFAULT_PLAYS;
   const tempPool = pool[temperature] || pool.warm || DEFAULT_PLAYS.warm;
   const seed = (chatJid || "x").length + (Date.now() % 13);
-  const text = pick(tempPool, seed);
+  const op = getOperator();
+  const text = pick(tempPool, seed)
+    .replace(/\{\{name\}\}/g, op.name)
+    .replace(/\{\{company\}\}/g, op.company);
 
   return NextResponse.json({
     suggestion: text,

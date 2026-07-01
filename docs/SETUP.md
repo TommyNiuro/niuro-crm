@@ -57,7 +57,11 @@ npm run local
 
 `npm run local` hace tres cosas: `build` + `init` (crea/inicializa la DB) + `start`. La base SQLite se crea sola en la primera corrida en `./data/crm.db` (con `CREATE TABLE IF NOT EXISTS` + seeds), no hay migración manual.
 
-Abrí `http://localhost:3000`.
+Abrí `http://localhost:3000`. El **primer arranque abre un onboarding** que te pide tu
+nombre, tu empresa (qué hace) y, opcional, la conexión de WhatsApp. Eso se guarda en la DB
+en runtime: no hace falta editar `.env.local` ni rebuildear para cambiar nombre/empresa (lo
+podés reconfigurar después desde `/settings`). Las `OPERATOR_*` / `COMPANY_*` del `.env` son
+solo un pre-seed opcional.
 
 Para desarrollo con hot-reload usá `npm run dev` en vez de `npm run local`.
 

@@ -15,7 +15,7 @@ import crypto from "crypto";
 import { getMessages, dbExists } from "@/lib/whatsapp";
 import { estimateMonthlyRate, findRoleEntry, type Seniority } from "@/lib/rate-cards";
 import { runClaudeCached, FAST_MODEL } from "@/lib/claude-subprocess";
-import { operator } from "@/lib/operator";
+import { getOperator } from "@/lib/operator";
 
 // Hash del transcript COMPLETO para la cache key (auditoria de seguridad
 // 2026-06-23). La key vieja usaba length + prefijo (slice 0,200): dos
@@ -96,6 +96,7 @@ function asStringArr(v: unknown): string[] {
 }
 
 async function extractBasic(transcript: string, today: string): Promise<BasicLead | null> {
+  const operator = getOperator();
   const prompt = `Sos ${operator.name}, de ${operator.company} (${operator.pitch}). Analizá esta conversación de WhatsApp. Hoy es ${today}.
 
 CONVERSACION:
@@ -167,6 +168,7 @@ Solo el JSON, sin texto adicional ni markdown.`;
 }
 
 async function extractIntel(transcript: string, today: string, declaredStage: string): Promise<IntelLead | null> {
+  const operator = getOperator();
   const prompt = `Sos ${operator.name}, de ${operator.company} (${operator.pitch}). Hoy es ${today}.
 
 CONVERSACION:
@@ -241,6 +243,7 @@ BREVEDAD OBLIGATORIA (la velocidad importa): máx 2 items por lista, cada string
 // Heurística: priorizá últimos 15 + primeros 5 + mensajes largos del lead.
 // Reduce prompt en ~40% sin perder contexto crítico de la negociación.
 function buildTranscript(msgs: Array<{ content: string | null; isFromMe: boolean; mediaType: string | null }>): string {
+  const operator = getOperator();
   const filtered = msgs.filter((m) => (m.content && m.content.trim()) || m.mediaType);
   if (filtered.length <= 25) {
     return filtered

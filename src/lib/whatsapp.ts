@@ -13,6 +13,7 @@
 import Database from "better-sqlite3";
 import fs from "fs";
 import path from "path";
+import { readSettings } from "./settings";
 
 const DEFAULT_DB_PATH = "./data/whatsapp/messages.db";
 const DEFAULT_BRIDGE_URL = "http://localhost:8080";
@@ -47,7 +48,10 @@ export function getDbPath(): string {
 }
 
 export function getBridgeUrl(): string {
-  return (process.env.WHATSAPP_BRIDGE_URL || DEFAULT_BRIDGE_URL).replace(/\/$/, "");
+  // Prioridad: crm_settings (onboarding) > env > default.
+  const fromDb = readSettings(["whatsapp_bridge_url"]).whatsapp_bridge_url;
+  const url = fromDb || process.env.WHATSAPP_BRIDGE_URL || DEFAULT_BRIDGE_URL;
+  return url.replace(/\/$/, "");
 }
 
 /**

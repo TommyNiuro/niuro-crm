@@ -70,6 +70,17 @@ export function Sidebar() {
   const [isDark, setIsDark] = useState(true);
   const [favorites, setFavorites] = useState<Favorite[]>([]);
   const [customObjects, setCustomObjects] = useState<CustomObject[]>([]);
+  const [operator, setOperator] = useState<{ name: string; role: string }>({
+    name: "Operador",
+    role: "Ventas",
+  });
+
+  useEffect(() => {
+    fetch("/api/operator")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d && setOperator({ name: d.name || "Operador", role: d.role || "Ventas" }))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     fetch("/api/metadata/objects")
@@ -254,10 +265,10 @@ export function Sidebar() {
       {/* User footer */}
       <div className="px-3 py-3 border-t border-sidebar-border space-y-2">
         <div className="flex items-center gap-2.5 rounded-lg p-2 bg-hover">
-          <div className="h-7 w-7 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xs font-semibold shrink-0">{(process.env.NEXT_PUBLIC_OPERATOR_NAME ?? "Operador").charAt(0).toUpperCase()}</div>
+          <div className="h-7 w-7 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xs font-semibold shrink-0">{operator.name.charAt(0).toUpperCase()}</div>
           <div className="min-w-0 flex-1">
-            <div className="text-xs font-medium truncate">{process.env.NEXT_PUBLIC_OPERATOR_NAME ?? "Operador"}</div>
-            <div className="text-[10px] text-muted-foreground">{process.env.NEXT_PUBLIC_OPERATOR_ROLE ?? "Ventas"}</div>
+            <div className="text-xs font-medium truncate">{operator.name}</div>
+            <div className="text-[10px] text-muted-foreground">{operator.role}</div>
           </div>
           <button
             onClick={toggleTheme}

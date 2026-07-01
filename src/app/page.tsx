@@ -1,7 +1,9 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { db } from "@/db";
 import { contacts, leadCandidates, tasks, activities, groupOpportunities, crmSettings } from "@/db/schema";
 import { desc, eq, gt } from "drizzle-orm";
+import { getOperator } from "@/lib/operator";
 import {
   ArrowRight, Flame, MessageCircle, Sparkles, Target, TrendingUp,
   Clock, BarChart3, Radar, Trophy, Scale, ExternalLink, CalendarClock, AlertTriangle,
@@ -38,6 +40,17 @@ type Calibration = {
 };
 
 export default function HomePage() {
+  // Gate de primer arranque: sin identidad configurada -> onboarding.
+  // ponytail: solo la home (es donde aterriza la app al abrir). Upgrade path:
+  // mover a src/middleware.ts si hay que bloquear todas las rutas.
+  const onboarded = db
+    .select()
+    .from(crmSettings)
+    .where(eq(crmSettings.key, "onboarding_completed"))
+    .get();
+  if (!onboarded?.value) redirect("/onboarding");
+
+  const operator = getOperator();
   const now = new Date();
   const weekAgo = new Date(now.getTime() - 7 * 86_400_000);
 
@@ -117,7 +130,7 @@ export default function HomePage() {
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <p className="text-[11px] text-muted-foreground capitalize">{dateStr}</p>
-            <h1 className="text-[26px] font-semibold tracking-tight">{saludo}, {process.env.NEXT_PUBLIC_OPERATOR_NAME ?? "Operador"}</h1>
+            <h1 className="text-[26px] font-semibold tracking-tight">{saludo}, {operator.name}</h1>
             <p className="text-[13px] text-muted-foreground mt-1 flex items-center gap-1.5">
               <Sparkles className="h-3.5 w-3.5 text-primary shrink-0" /> {briefing}
             </p>

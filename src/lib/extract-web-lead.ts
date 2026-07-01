@@ -11,7 +11,7 @@
  * señales de intención/urgencia de una charla, sino la web de una empresa).
  */
 import { runClaudeVision, FAST_MODEL } from "@/lib/claude-subprocess";
-import { operator } from "@/lib/operator";
+import { getOperator, type Operator } from "@/lib/operator";
 
 export interface WebLeadExtract {
   isLead: boolean;
@@ -52,7 +52,7 @@ function clampScore(v: unknown): number {
   return Math.max(0, Math.min(100, Math.round(n)));
 }
 
-const PROMPT = `Sos ${operator.name}, de ${operator.company} (${operator.pitch}): staff augmentation de ingenieros de software SENIOR de LATAM. Colocás devs pre-vetteados en empresas (sobre todo startups/scaleups, muchas de EE.UU.) en ~48h. Competís contra recruiters, contratación in-house y plataformas tipo Ontop.
+const buildPrompt = (operator: Operator) => `Sos ${operator.name}, de ${operator.company} (${operator.pitch}): staff augmentation de ingenieros de software SENIOR de LATAM. Colocás devs pre-vetteados en empresas (sobre todo startups/scaleups, muchas de EE.UU.) en ~48h. Competís contra recruiters, contratación in-house y plataformas tipo Ontop.
 
 Te paso UNA captura de pantalla de la web (o landing/about/careers/perfil) de una empresa o startup. Tu trabajo: decidir si es CLIENTE POTENCIAL de ${operator.company} y extraer todo dato útil para contactarla.
 
@@ -91,7 +91,7 @@ Solo el JSON.`;
  */
 export async function extractWebLead(imagePath: string): Promise<WebLeadExtract | null> {
   try {
-    const raw = await runClaudeVision(PROMPT, imagePath, {
+    const raw = await runClaudeVision(buildPrompt(getOperator()), imagePath, {
       model: FAST_MODEL,
       // Visión vía subprocess: en pruebas Haiku tarda 7-15s. 90s deja margen de
       // sobra para colas del semáforo global (máx 2 claude concurrentes).
