@@ -5,6 +5,7 @@ import path from "path";
 import fs from "fs";
 import { operator } from "@/lib/operator";
 import { dbPath } from "@/lib/paths";
+import { logger } from "@/lib/logger";
 
 // Resuelto en @/lib/paths: CRM_DB_PATH > CRM_DATA_DIR/crm.db > cwd/data/crm.db.
 const DB_PATH = dbPath();
@@ -109,6 +110,27 @@ function initTables(db: Database.Database): void {
       result TEXT NOT NULL,
       expires_at INTEGER NOT NULL
     )`,
+    // Control de versiones de esquema (auditoria SaaS 2026-07-01, fase 1): una
+    // fila por migracion aplicada, para saber en que version esta una instalacion
+    // y evitar re-correr los ALTER en cada arranque. Ver el runner de migraciones.
+    `CREATE TABLE IF NOT EXISTS schema_migrations (
+      version INTEGER PRIMARY KEY,
+      applied_at INTEGER NOT NULL
+    )`,
+    // Audit log inmutable con hash-chain (auditoria SaaS 2026-07-01, fase 1).
+    // Ver src/lib/audit.ts: cada fila encadena el hash de la anterior.
+    `CREATE TABLE IF NOT EXISTS audit_log (
+      id TEXT PRIMARY KEY,
+      ts INTEGER NOT NULL,
+      actor TEXT NOT NULL,
+      action TEXT NOT NULL,
+      object_type TEXT,
+      object_id TEXT,
+      detail TEXT,
+      prev_hash TEXT NOT NULL,
+      hash TEXT NOT NULL
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_audit_log_ts ON audit_log(ts ASC, id ASC)`,
     `CREATE TABLE IF NOT EXISTS lead_candidates (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
@@ -508,18 +530,39 @@ function initTables(db: Database.Database): void {
     )`,
     `CREATE INDEX IF NOT EXISTS idx_bridge_status_log_checked ON bridge_status_log(checked_at DESC)`,
   ];
-  for (const sql of migrations) {
+  // Control de versiones (auditoria SaaS 2026-07-01, fase 1). Antes se re-corrian
+  // TODOS los ALTER en cada arranque (idempotentes, pero re-ejecutados) y un error
+  // no esperado se tragaba en silencio dejando la DB a medio migrar. Ahora:
+  //  - schema_migrations trackea el indice de la ultima migracion aplicada.
+  //  - solo se corren las nuevas (perf: cero ALTER en el arranque comun).
+  //  - "duplicate column"/"already exists" cuenta como aplicada (idempotencia:
+  //    instalaciones viejas ya tenian las columnas via el approach anterior).
+  //  - cualquier OTRO error se logea LOUD (logger.error, puede salir de la
+  //    maquina via ERROR_WEBHOOK_URL) y se corta: no se avanza la version, asi
+  //    reintenta el proximo arranque en vez de saltear migraciones fuera de orden.
+  const appliedRow = db
+    .prepare("SELECT MAX(version) AS v FROM schema_migrations")
+    .get() as { v: number | null } | undefined;
+  const applied = appliedRow?.v ?? 0; // version = cantidad de migraciones aplicadas
+  const record = db.prepare(
+    "INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (?, ?)"
+  );
+  for (let i = applied; i < migrations.length; i++) {
     try {
-      db.exec(sql);
+      db.exec(migrations[i]);
     } catch (e) {
-      // "duplicate column" / "already exists" es lo esperado en re-arranques.
-      // Cualquier OTRO error era invisible (auditoría 2026-06-09) y dejaba la
-      // DB a medio migrar sin diagnóstico posible.
       const msg = e instanceof Error ? e.message : String(e);
       if (!/duplicate column|already exists/i.test(msg)) {
-        console.error(`[db] migración falló: ${sql.slice(0, 70)}… → ${msg}`);
+        logger.error("db.migration", "migración falló, se corta hasta reintentar", {
+          index: i,
+          sql: migrations[i].slice(0, 70),
+          err: msg,
+        });
+        break; // no registrar esta version: reintenta el proximo arranque
       }
+      // benigno (columna ya existe): cuenta como aplicada, se registra abajo
     }
+    record.run(i + 1, Date.now());
   }
 }
 

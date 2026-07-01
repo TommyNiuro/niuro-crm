@@ -10,6 +10,12 @@ import crypto from "crypto";
 import Database from "better-sqlite3";
 import { dbPath } from "./paths";
 import { readSettings, writeSettings } from "./settings";
+import { appendAudit } from "./audit";
+
+/** Actor para el audit log: el email de la cuenta, o "operador" si no hay. */
+function actorEmail(): string {
+  return readSettings(["auth_email"]).auth_email ?? "operador";
+}
 
 const SCRYPT_KEYLEN = 64;
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 dias
@@ -42,6 +48,7 @@ export function hasAccount(): boolean {
 export function createAccount(email: string, password: string): void {
   if (hasAccount()) throw new Error("ya existe una cuenta en esta instalación");
   writeSettings({ auth_email: email, auth_password_hash: hashPassword(password) });
+  appendAudit({ actor: email, action: "auth.account_created" });
 }
 
 export function verifyAccountPassword(password: string): boolean {
@@ -51,10 +58,12 @@ export function verifyAccountPassword(password: string): boolean {
 
 export function changePassword(newPassword: string): void {
   writeSettings({ auth_password_hash: hashPassword(newPassword) });
+  appendAudit({ actor: actorEmail(), action: "auth.password_changed" });
 }
 
 /** Borra la credencial (no toca datos de negocio) y todas las sesiones. */
 export function deleteAccount(): void {
+  const actor = actorEmail(); // capturar antes de borrar la credencial
   const db = openDb();
   try {
     db.prepare("DELETE FROM crm_settings WHERE key IN ('auth_email', 'auth_password_hash')").run();
@@ -62,6 +71,7 @@ export function deleteAccount(): void {
   } finally {
     db.close();
   }
+  appendAudit({ actor, action: "auth.account_deleted" });
 }
 
 export function createSession(): string {
@@ -79,6 +89,7 @@ export function createSession(): string {
   } finally {
     db.close();
   }
+  appendAudit({ actor: actorEmail(), action: "auth.login" });
   return token;
 }
 
@@ -109,4 +120,5 @@ export function destroySession(token: string | undefined | null): void {
   } finally {
     db.close();
   }
+  appendAudit({ actor: actorEmail(), action: "auth.logout" });
 }
