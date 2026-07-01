@@ -97,6 +97,11 @@ de Apple Developer (firma + notarización); queda fuera de v1.
 - **Cambié algo y la app sigue con el bug viejo**: si arrastraste el `.app` a
   Aplicaciones, esa copia quedó congelada. Tras un rebuild, reemplazala: borrá la de
   `/Applications` y volvé a arrastrar la nueva desde `src-tauri/target/release/bundle/macos/`.
+- **"Internal Server Error" al abrir la app / `Failed to load external module
+  better-sqlite3-<hash>`**: es un bug de Next 16 con Turbopack en `output: standalone`
+  (le pone un nombre hasheado a los paquetes externos nativos y no resuelven dentro del
+  `.app`). Por eso el build desktop usa `next build --webpack` (ya está en
+  `scripts/build-desktop.sh`). Si armás el standalone a mano, NO omitas `--webpack`.
 - **"No se encontró el server embebido"**: corré `npm run desktop:build` (faltó el
   staging de `resources/server`).
 - **Ventana en blanco / no carga**: el server tardó más de 60s o el puerto 4555 está

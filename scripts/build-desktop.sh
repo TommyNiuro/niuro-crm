@@ -11,8 +11,14 @@ cd "$ROOT"
 
 SERVER_DIR="src-tauri/resources/server"
 
-echo "==> 1/4  Build de Next en modo standalone"
-BUILD_STANDALONE=1 npx next build
+echo "==> 1/4  Build de Next en modo standalone (webpack)"
+# --webpack es OBLIGATORIO acá: el build por defecto de Next 16 usa Turbopack, y
+# Turbopack en modo standalone le pone un nombre hasheado a los paquetes externos
+# nativos (ej. better-sqlite3-<hash>) que NO resuelve dentro del .app, tirando
+# "Failed to load external module ... Cannot find module" -> 500. Webpack +
+# serverExternalPackages los externaliza por su nombre real y el standalone los
+# resuelve bien. (bug upstream vercel/next.js #86652 / #87737)
+BUILD_STANDALONE=1 npx next build --webpack
 
 echo "==> 2/4  Staging del server standalone en $SERVER_DIR"
 rm -rf "$SERVER_DIR"
