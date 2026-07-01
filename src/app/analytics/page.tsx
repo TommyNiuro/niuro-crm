@@ -1,7 +1,6 @@
-import { db } from "@/db";
-import { contacts, stepTransitions, leadCandidates, tasks, groupOpportunities } from "@/db/schema";
 import { STAGES, STAGE_CFG } from "@/lib/crm-ui";
 import { formatCurrency } from "@/lib/constants";
+import { getAnalyticsData } from "@/lib/analytics-cache";
 import { TrendingDown, Filter, Clock } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -18,10 +17,10 @@ function lossCategory(reason: string | null): string {
 }
 
 export default function AnalyticsPage() {
-  const allContacts = db.select().from(contacts).all();
+  // Datasets crudos cacheados 60s (ver analytics-cache.ts); el cómputo va acá.
+  const { allContacts, transitions, allCandidates, allTasks, allOpps } = getAnalyticsData();
   const activeContacts = allContacts.filter((c) => !c.archived);
   const lostContacts = allContacts.filter((c) => c.archived);
-  const transitions = db.select().from(stepTransitions).all();
 
   const byStage = STAGES.map(stage => ({
     stage,
@@ -113,9 +112,6 @@ export default function AnalyticsPage() {
     const t = new Date(d).getTime();
     return t > now - week * (offset + 1) && t <= now - week * offset;
   };
-  const allCandidates = db.select({ createdAt: leadCandidates.createdAt }).from(leadCandidates).all();
-  const allTasks = db.select({ completedAt: tasks.completedAt, status: tasks.status }).from(tasks).all();
-  const allOpps = db.select({ status: groupOpportunities.status, updatedAt: groupOpportunities.updatedAt }).from(groupOpportunities).all();
   const wonAll = activeContacts.filter((c) => c.stage === "Cierre" || c.stage === "Expansion").length;
   const winRate = wonAll + lostContacts.length > 0 ? Math.round((wonAll / (wonAll + lostContacts.length)) * 100) : null;
   const kpis: { label: string; value: number | string; prev?: number }[] = [
