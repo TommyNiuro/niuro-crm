@@ -15,6 +15,7 @@
     "postinstall": "mkdir -p data",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
+    "backup": "bash scripts/backup-db.sh",
     "tauri": "tauri",
     "desktop:icon": "tauri icon src-tauri/app-icon.png",
     "desktop:build": "bash scripts/build-desktop.sh"
