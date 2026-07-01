@@ -31,15 +31,23 @@ export function readSettings(keys: string[]): Record<string, string> {
   return out;
 }
 
-/** Escribe varias claves (upsert). Lanza si la DB no se puede abrir en escritura. */
+/** Upsert de varias claves sobre una conexión YA ABIERTA por el caller (no la
+ * cierra). Para componer con otra escritura en la MISMA transacción, ej. un
+ * caller que también actualiza otra tabla y necesita atomicidad entre ambas
+ * (auditoría adversarial: writeSettings() con conexión propia había roto esa
+ * garantía en api/operator/route.ts). */
+export function writeSettingsOn(sqlite: Database.Database, pairs: Record<string, string>): void {
+  const stmt = sqlite.prepare("INSERT OR REPLACE INTO crm_settings (key, value) VALUES (?, ?)");
+  for (const [k, v] of Object.entries(pairs)) stmt.run(k, String(v));
+}
+
+/** Escribe varias claves (upsert), conexión propia. Lanza si la DB no se puede
+ * abrir en escritura. Si necesitás atomicidad con otra tabla, usá writeSettingsOn
+ * sobre tu propia conexión en vez de esta. */
 export function writeSettings(pairs: Record<string, string>): void {
   const sqlite = new Database(dbPath(), { timeout: 15000 });
   try {
-    const stmt = sqlite.prepare("INSERT OR REPLACE INTO crm_settings (key, value) VALUES (?, ?)");
-    const tx = sqlite.transaction((entries: [string, string][]) => {
-      for (const [k, v] of entries) stmt.run(k, String(v));
-    });
-    tx(Object.entries(pairs));
+    sqlite.transaction(() => writeSettingsOn(sqlite, pairs))();
   } finally {
     sqlite.close();
   }

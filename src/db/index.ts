@@ -338,6 +338,9 @@ function initTables(db: Database.Database): void {
     `CREATE INDEX IF NOT EXISTS idx_contacts_created ON contacts(created_at)`,
     // Radar ordena las oportunidades por created_at DESC (auditoria 2026-06-29).
     `CREATE INDEX IF NOT EXISTS idx_group_opportunities_created ON group_opportunities(created_at DESC)`,
+    // El home filtra por status='new' y ordena por score DESC sin índice: full
+    // table scan + sort en memoria en cada carga (code-audit 2026-06-30, hallazgo #6).
+    `CREATE INDEX IF NOT EXISTS idx_group_opportunities_status_score ON group_opportunities(status, score DESC)`,
     // Estado de generacion IA en background (agregado post-release, idempotente).
     `ALTER TABLE proposals ADD COLUMN gen_status TEXT`,
     `ALTER TABLE proposals ADD COLUMN gen_error TEXT`,

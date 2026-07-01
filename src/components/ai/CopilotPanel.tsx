@@ -28,13 +28,19 @@ interface ToolTraceEntry {
   error?: string;
 }
 
+type ActionStatus = "applying" | "applied" | "error" | "discarded";
+
 interface ChatTurn {
   role: Role;
   content: string;
   toolTrace?: ToolTraceEntry[];
   actions?: ProposedAction[];
-  // ids de acciones ya resueltas (aplicadas/descartadas) para ocultar los botones
-  resolved?: boolean;
+  // Estado POR ACCIÓN (mismo índice que actions), no un flag por turno: con 2+
+  // acciones propuestas, aplicarlas dispara requests en paralelo y la primera en
+  // resolver no puede decidir el estado de las demás (click-path-audit
+  // CLICK-PATH-002 — antes un turno con acciones en paralelo perdía en silencio
+  // la que fallara después de que la primera ya marcara todo "resuelto").
+  actionStatus?: (ActionStatus | undefined)[];
 }
 
 export const COPILOT_OPEN_EVENT = "copilot-open";
@@ -101,7 +107,19 @@ export function CopilotPanel() {
     }
   };
 
-  const applyAction = async (turnIdx: number, action: ProposedAction) => {
+  const setActionStatus = (turnIdx: number, actionIdx: number, status: ActionStatus) => {
+    setTurns((ts) =>
+      ts.map((t, i) => {
+        if (i !== turnIdx) return t;
+        const next = [...(t.actionStatus ?? new Array(t.actions?.length ?? 0).fill(undefined))];
+        next[actionIdx] = status;
+        return { ...t, actionStatus: next };
+      })
+    );
+  };
+
+  const applyAction = async (turnIdx: number, actionIdx: number, action: ProposedAction) => {
+    setActionStatus(turnIdx, actionIdx, "applying");
     try {
       const res = await fetch("/api/ai/execute-action", {
         method: "POST",
@@ -111,14 +129,15 @@ export function CopilotPanel() {
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Error al aplicar");
       toast.success(`Aplicado: ${action.objectName}`);
-      setTurns((ts) => ts.map((t, i) => (i === turnIdx ? { ...t, resolved: true } : t)));
+      setActionStatus(turnIdx, actionIdx, "applied");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Error al aplicar la accion");
+      setActionStatus(turnIdx, actionIdx, "error");
     }
   };
 
-  const discard = (turnIdx: number) => {
-    setTurns((ts) => ts.map((t, i) => (i === turnIdx ? { ...t, resolved: true } : t)));
+  const discardAction = (turnIdx: number, actionIdx: number) => {
+    setActionStatus(turnIdx, actionIdx, "discarded");
   };
 
   return (
@@ -172,29 +191,49 @@ export function CopilotPanel() {
                   </details>
                 )}
 
-                {t.role === "assistant" && t.actions && t.actions.length > 0 && !t.resolved && (
-                  <div className="space-y-2 rounded-lg border border-border p-2">
-                    <p className="text-xs font-medium text-muted-foreground">Cambios propuestos</p>
-                    {t.actions.map((a, i) => (
-                      <p key={i} className="text-xs">{actionLabel(a)}</p>
-                    ))}
-                    <div className="flex gap-2 pt-1">
-                      <Button
-                        size="sm"
-                        className="h-7 cursor-pointer"
-                        onClick={() => t.actions!.forEach((a) => applyAction(idx, a))}
-                      >
-                        <Check className="h-3.5 w-3.5" /> Aplicar
-                      </Button>
-                      <Button size="sm" variant="ghost" className="h-7 cursor-pointer" onClick={() => discard(idx)}>
-                        <X className="h-3.5 w-3.5" /> Descartar
-                      </Button>
+                {t.role === "assistant" && t.actions && t.actions.length > 0 && (() => {
+                  const statuses = t.actions.map((_, i) => t.actionStatus?.[i]);
+                  const anyPending = statuses.some((s) => s !== "applied" && s !== "discarded");
+                  if (!anyPending) return <p className="text-xs text-muted-foreground">Cambios resueltos.</p>;
+                  return (
+                    <div className="space-y-2 rounded-lg border border-border p-2">
+                      <p className="text-xs font-medium text-muted-foreground">Cambios propuestos</p>
+                      {t.actions.map((a, i) => {
+                        const status = statuses[i];
+                        return (
+                          <div key={i} className="flex items-center justify-between gap-2">
+                            <p className="text-xs flex-1">
+                              {actionLabel(a)}
+                              {status === "applied" && <span className="text-success"> · aplicado</span>}
+                              {status === "discarded" && <span className="text-muted-foreground"> · descartado</span>}
+                              {status === "error" && <span className="text-destructive"> · fallo, reintentá</span>}
+                              {status === "applying" && <span className="text-muted-foreground"> · aplicando…</span>}
+                            </p>
+                            {(status === undefined || status === "error") && (
+                              <div className="flex gap-1 shrink-0">
+                                <Button
+                                  size="icon-xs"
+                                  className="h-6 w-6 cursor-pointer"
+                                  onClick={() => applyAction(idx, i, a)}
+                                >
+                                  <Check className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                  size="icon-xs"
+                                  variant="ghost"
+                                  className="h-6 w-6 cursor-pointer"
+                                  onClick={() => discardAction(idx, i)}
+                                >
+                                  <X className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
-                  </div>
-                )}
-                {t.role === "assistant" && t.actions && t.actions.length > 0 && t.resolved && (
-                  <p className="text-xs text-muted-foreground">Cambios resueltos.</p>
-                )}
+                  );
+                })()}
               </div>
             </div>
           ))}

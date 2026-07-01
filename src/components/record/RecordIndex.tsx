@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { RotateCcw, Trash2, Download, Upload, Merge } from "lucide-react";
 import { RecordViewBar, type RecordView } from "./RecordViewBar";
@@ -99,12 +99,40 @@ export function RecordIndex({
     return config.listEndpoint;
   })();
 
+  // id -> timestamp (ms) de la última escritura CONFIRMADA por el servidor. Un
+  // poll silencioso (withSpinner=false) cuya respuesta sea más vieja que esto
+  // ignora esa fila en vez de pisarla: sin esto, un GET despachado antes de que
+  // un save() comitee podía revertir visualmente un cambio ya confirmado (ej.
+  // drag-and-drop en el kanban de proposals mientras otra fila está generándose
+  // con IA, que activa el poll de 3s). ponytail: ventana de POLL_INTERVAL_MS en
+  // vez de correlacionar requests exactos — alcanza porque el próximo poll (3s
+  // después) siempre trae el estado ya consistente. (click-path-audit CLICK-PATH-001)
+  const lastConfirmedWrite = useRef<Map<string, number>>(new Map());
+  const POLL_INTERVAL_MS = 3000;
+
   const fetchRows = useCallback(
     (withSpinner: boolean) => {
       if (withSpinner) setLoading(true);
       return fetch(listUrl)
         .then((r) => (r.ok ? r.json() : []))
-        .then((d) => setRows(Array.isArray(d) ? d : []))
+        .then((d) => {
+          const list: RecordRow[] = Array.isArray(d) ? d : [];
+          if (withSpinner) {
+            setRows(list);
+            return;
+          }
+          const now = Date.now();
+          setRows((prev) => {
+            const prevById = new Map(prev.map((r) => [r.id, r]));
+            return list.map((row) => {
+              const confirmedAt = lastConfirmedWrite.current.get(String(row.id));
+              if (confirmedAt && now - confirmedAt < POLL_INTERVAL_MS) {
+                return prevById.get(row.id) ?? row;
+              }
+              return row;
+            });
+          });
+        })
         .catch(() => withSpinner && setRows([]))
         .finally(() => withSpinner && setLoading(false));
     },
@@ -201,6 +229,7 @@ export function RecordIndex({
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const updated = await res.json();
         if (updated && typeof updated === "object" && updated.id) {
+          lastConfirmedWrite.current.set(String(id), Date.now());
           // merge solo sobreescribe las keys que el endpoint devuelve; preserva campos denormalizados (joins)
           setRows((rs) => rs.map((r) => (r.id === id ? { ...r, ...updated } : r)));
         }

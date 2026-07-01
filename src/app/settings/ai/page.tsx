@@ -102,7 +102,7 @@ export default function SettingsAIPage() {
       const res = await fetch("/api/ai/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: [{ role: "user", content: testInput }], system: editing.role }),
+        body: JSON.stringify({ messages: [{ role: "user", content: testInput }], system: editing.role, tools: editing.tools }),
       });
       const data = await res.json();
       setTestOutput(res.ok ? String(data.answer ?? "") : `Error: ${data?.error ?? "desconocido"}`);

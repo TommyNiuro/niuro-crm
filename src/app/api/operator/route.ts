@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Database from "better-sqlite3";
 import path from "path";
 import { getOperator } from "@/lib/operator";
+import { writeSettingsOn } from "@/lib/settings";
 import { assertLoopbackHttpUrl } from "@/lib/url-safety";
 
 export const dynamic = "force-dynamic";
@@ -47,26 +48,28 @@ export async function PUT(req: NextRequest) {
     }
   }
 
-  const settings: [string, string][] = [
-    ["operator_name", name],
-    ["operator_role", role || "Ventas"],
-    ["operator_email", email || "operador@example.com"],
-    ["company_name", company],
-    ["company_pitch", pitch || "una empresa de servicios"],
-    ["onboarding_completed", "1"],
-  ];
-  if (bridgeUrl) settings.push(["whatsapp_bridge_url", bridgeUrl]);
+  const settings: Record<string, string> = {
+    operator_name: name,
+    operator_role: role || "Ventas",
+    operator_email: email || "operador@example.com",
+    company_name: company,
+    company_pitch: pitch || "una empresa de servicios",
+    onboarding_completed: "1",
+  };
+  if (bridgeUrl) settings.whatsapp_bridge_url = bridgeUrl;
 
+  // Una sola conexion/transaccion para crm_settings + el UPDATE de agents: antes
+  // de la consolidacion sobre writeSettings() esto era atomico (auditoria
+  // adversarial detecto la regresion). writeSettingsOn compone sobre ESTA
+  // conexion en vez de abrir la suya propia.
   const sqlite = new Database(dbPath(), { timeout: 15000 });
   try {
-    const put = sqlite.prepare("INSERT OR REPLACE INTO crm_settings (key, value) VALUES (?, ?)");
-    // Deja el agente seed 'asistente' consistente con la identidad real.
-    const updAgent = sqlite.prepare(
-      "UPDATE agents SET name = ?, role = ?, email = ? WHERE id = 'asistente'"
-    );
     sqlite.transaction(() => {
-      for (const [k, v] of settings) put.run(k, v);
-      updAgent.run(name, role || "Ventas", email || null);
+      writeSettingsOn(sqlite, settings);
+      // Deja el agente seed 'asistente' consistente con la identidad real.
+      sqlite
+        .prepare("UPDATE agents SET name = ?, role = ?, email = ? WHERE id = 'asistente'")
+        .run(name, role || "Ventas", email || null);
     })();
   } finally {
     sqlite.close();

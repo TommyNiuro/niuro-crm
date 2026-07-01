@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
-import { contacts, leadCandidates, tasks, activities, groupOpportunities, crmSettings } from "@/db/schema";
+import { activities, crmSettings } from "@/db/schema";
 import { desc, eq, gt } from "drizzle-orm";
 import { getOperator } from "@/lib/operator";
+import { getDashboardData } from "@/lib/dashboard-cache";
 import {
   ArrowRight, Flame, MessageCircle, Sparkles, Target, TrendingUp,
   Clock, BarChart3, Radar, Trophy, Scale, ExternalLink, CalendarClock, AlertTriangle,
@@ -54,25 +55,24 @@ export default function HomePage() {
   const now = new Date();
   const weekAgo = new Date(now.getTime() - 7 * 86_400_000);
 
-  // ── Datos ──
-  const all = db.select().from(contacts).all();
+  // ── Datos (cacheados 15s: son agregados de KPIs, no tiene sentido recalcular
+  // un full scan en cada request de force-dynamic) ──
+  const dash = getDashboardData();
+  const all = dash.contacts;
   const active = all.filter((c) => !c.archived);
   const lost = all.filter((c) => c.archived);
 
-  const pending = db.select().from(leadCandidates).where(eq(leadCandidates.status, "pending")).orderBy(desc(leadCandidates.score)).all();
+  const pending = dash.pendingCandidates;
   const hotPending = pending.filter((p) => p.temperature === "hot");
   const warmPending = pending.filter((p) => p.temperature === "warm");
   const topCandidates = pending.filter((p) => p.temperature === "hot" || (p.temperature === "warm" && (p.score || 0) >= 55)).slice(0, 4);
 
-  const newOps = db.select().from(groupOpportunities)
-    .where(eq(groupOpportunities.status, "new"))
-    .orderBy(desc(groupOpportunities.score))
-    .all();
+  const newOps = dash.newOpportunities;
   const opsWA = newOps.filter((o) => o.source === "whatsapp");
   const opsExt = newOps.filter((o) => o.source !== "whatsapp");
   const topOps = newOps.slice(0, 4);
 
-  const openTasks = db.select().from(tasks).where(eq(tasks.status, "open")).all();
+  const openTasks = dash.openTasks;
   const endOfToday = new Date(now); endOfToday.setHours(23, 59, 59, 999);
   const dueToday = openTasks.filter((t) => t.dueAt && new Date(t.dueAt) <= endOfToday);
   const openTaskIds = new Set(openTasks.map((t) => t.contactId));

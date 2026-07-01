@@ -34,8 +34,13 @@ export async function POST(request: NextRequest) {
   const system = (body as { system?: unknown })?.system;
   const systemOverride = typeof system === "string" && system.trim() ? system : undefined;
 
+  // tools opcional: restringe que herramientas puede usar el copiloto en esta
+  // corrida (lo usa "Probar agente" para validar el subset configurado del agente).
+  const toolsRaw = (body as { tools?: unknown })?.tools;
+  const allowedTools = Array.isArray(toolsRaw) ? toolsRaw.filter((t): t is string => typeof t === "string") : undefined;
+
   try {
-    const result = await runCopilot(messages, systemOverride);
+    const result = await runCopilot(messages, systemOverride, allowedTools);
     return NextResponse.json(result);
   } catch (e) {
     const detail = e instanceof Error ? e.message : String(e);

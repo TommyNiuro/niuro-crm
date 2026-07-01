@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { rawDb } from "@/db";
 import { runClaudeCached } from "@/lib/claude-subprocess";
 import { assertPublicHttpUrl } from "@/lib/url-safety";
+import { OBJECTS } from "@/lib/ai/tools";
 
 // Motor de workflows in-process (b4-engine). Sin colas externas: runWorkflow corre
 // los steps en serie, crea un workflow_run, loguea cada paso y marca success/error.
@@ -39,38 +40,58 @@ interface LogEntry {
   at: number;
 }
 
-// Objetos del CRM con tabla real y columnas conocidas. Whitelist explícita:
-// objectName se interpola en el nombre de tabla del SQL crudo, así que NUNCA
-// puede venir de input sin validar (inyección). Cada entrada lista las columnas
-// escribibles (snake_case real de la tabla, no el camelCase de Drizzle).
-const RECORD_TABLES: Record<string, { cols: string[]; hasUpdatedAt: boolean }> = {
-  contacts: {
-    cols: ["name", "email", "phone", "company", "country", "source", "temperature", "score", "notes", "stage", "channel", "probability", "value_cents", "next_action", "agent_id", "tags", "archived"],
-    hasUpdatedAt: true,
-  },
-  deals: {
-    cols: ["title", "value", "stage_id", "contact_id", "expected_close", "probability", "notes"],
-    hasUpdatedAt: true,
-  },
-  companies: {
-    cols: ["name", "domain", "industry", "size", "country", "linkedin", "notes", "archived"],
-    hasUpdatedAt: true,
-  },
-  proposals: {
-    cols: ["contact_id", "deal_id", "mode", "status", "client", "role", "duration", "notes", "summary", "priority"],
-    hasUpdatedAt: true,
-  },
-  tickets: {
-    cols: ["code", "subject", "status", "priority", "sla", "agent_id", "contact_id"],
-    hasUpdatedAt: false,
-  },
-};
-
+// Objetos del CRM con tabla real y columnas escribibles: reusa el whitelist de
+// src/lib/ai/tools.ts (el copiloto) en vez de mantener una copia separada —
+// ambos necesitaban la misma info (tabla real, columnas escribibles,
+// hasUpdatedAt) y hasta hoy vivía duplicada con el riesgo de divergir.
 function assertObject(objectName: unknown): { table: string; cols: string[]; hasUpdatedAt: boolean } {
-  if (typeof objectName !== "string" || !(objectName in RECORD_TABLES)) {
+  if (typeof objectName !== "string" || !(objectName in OBJECTS)) {
     throw new Error(`objectName invalido o no soportado: ${String(objectName)}`);
   }
-  return { table: objectName, ...RECORD_TABLES[objectName] };
+  const def = OBJECTS[objectName];
+  return { table: def.table, cols: def.writableCols, hasUpdatedAt: def.hasUpdatedAt };
+}
+
+// Provenance de IA: qué claves del contexto vienen de un ai_step (texto
+// generado, no dato estructurado del trigger). Un write step que las use en
+// fields/recordId necesita opt-in explícito (allowAiOutput: true) — sin esto,
+// un ai_step armado desde contenido no confiable (ej. un mensaje de WhatsApp)
+// podía escribir directo a la DB sin la revisión humana que sí tiene el
+// copiloto de chat (propose_* -> confirmar -> ejecutar). Auditoría de
+// arquitectura de agentes 2026-06-30, hallazgo High.
+function taintedKeys(ctx: Ctx): string[] {
+  return Array.isArray(ctx.__aiTainted) ? (ctx.__aiTainted as string[]) : [];
+}
+
+// saveAs viene de la config del workflow (no confiable) y se interpola en un
+// RegExp: sin escapar, un saveAs con parentesis/corchetes desbalanceados tira
+// un SyntaxError confuso en vez del error de gate esperado (auditoria adversarial).
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+export function referencesTainted(value: unknown, tainted: string[]): boolean {
+  if (tainted.length === 0) return false;
+  if (typeof value === "string") {
+    return tainted.some((k) => new RegExp(`\\{\\{\\s*${escapeRegExp(k)}(\\.[\\w.]+)?\\s*\\}\\}`).test(value));
+  }
+  if (Array.isArray(value)) return value.some((v) => referencesTainted(v, tainted));
+  if (value && typeof value === "object") {
+    return Object.values(value).some((v) => referencesTainted(v, tainted));
+  }
+  return false;
+}
+
+function assertNoUnreviewedAiInput(step: Step, ctx: Ctx, ...values: unknown[]): void {
+  const tainted = taintedKeys(ctx);
+  if (values.some((v) => referencesTainted(v, tainted))) {
+    if (step.allowAiOutput === true) return;
+    throw new Error(
+      `${step.type}: usa salida de un ai_step (${tainted.map((k) => `{{${k}}}`).join(", ")}) sin ` +
+        `allowAiOutput: true en el step. Un write automático a partir de texto generado por IA (que ` +
+        `puede venir de contenido externo no confiable) necesita revisión explícita antes de ejecutarse.`
+    );
+  }
 }
 
 // Carga un registro por id desde un objeto whitelisteado. Lo usa el disparo
@@ -137,6 +158,7 @@ async function runStep(step: Step, ctx: Ctx): Promise<void> {
   switch (step.type) {
     case "create_record": {
       const { table, cols, hasUpdatedAt } = assertObject(step.objectName);
+      assertNoUnreviewedAiInput(step, ctx, step.fields);
       const fields = resolveFields(step.fields, ctx, cols);
       const id = crypto.randomUUID();
       const colNames = ["id", ...Object.keys(fields), "created_at", ...(hasUpdatedAt ? ["updated_at"] : [])];
@@ -149,6 +171,7 @@ async function runStep(step: Step, ctx: Ctx): Promise<void> {
     }
     case "update_record": {
       const { table, cols, hasUpdatedAt } = assertObject(step.objectName);
+      assertNoUnreviewedAiInput(step, ctx, step.fields, step.recordId);
       const recordId = resolve(step.recordId, ctx);
       if (typeof recordId !== "string" || !recordId) throw new Error("update_record: recordId vacio");
       const fields = resolveFields(step.fields, ctx, cols);
@@ -162,6 +185,7 @@ async function runStep(step: Step, ctx: Ctx): Promise<void> {
     }
     case "delete_record": {
       const { table } = assertObject(step.objectName);
+      assertNoUnreviewedAiInput(step, ctx, step.recordId);
       const recordId = resolve(step.recordId, ctx);
       if (typeof recordId !== "string" || !recordId) throw new Error("delete_record: recordId vacio");
       rawDb.prepare(`DELETE FROM ${table} WHERE id = ?`).run(recordId);
@@ -210,7 +234,13 @@ async function runStep(step: Step, ctx: Ctx): Promise<void> {
       if (!prompt) throw new Error("ai_step: prompt vacio");
       const output = await runClaudeCached(prompt);
       ctx.aiOutput = output;
-      if (typeof step.saveAs === "string") ctx[step.saveAs] = output;
+      const tainted = new Set(taintedKeys(ctx));
+      tainted.add("aiOutput");
+      if (typeof step.saveAs === "string") {
+        ctx[step.saveAs] = output;
+        tainted.add(step.saveAs);
+      }
+      ctx.__aiTainted = Array.from(tainted);
       break;
     }
     case "delay": {

@@ -33,8 +33,15 @@ export interface CopilotResult {
 
 const MAX_ITERATIONS = 5;
 
-function systemPrompt(): string {
+// Nombres canonicos de tools. El checkbox de Settings > IA guardaba una restriccion
+// que nunca se aplicaba en ningun lado (auditoria de arquitectura de agentes,
+// hallazgo Medium) — ahora runCopilot la recibe y la hace cumplir de verdad.
+export const ALL_TOOLS = ["query_records", "get_record", "count_records", "search", "propose_update", "propose_create"] as const;
+
+function systemPrompt(allowedTools: readonly string[]): string {
+  const restricted = allowedTools.length < ALL_TOOLS.length;
   return `Sos el copiloto IA de un CRM (Niuro). Respondes preguntas sobre los datos y propones cambios, SIEMPRE en espanol y sin guion largo.
+${restricted ? `\nHerramientas habilitadas para este agente: ${allowedTools.join(", ")}. Cualquier otra herramienta no esta disponible y te va a devolver un error — no la intentes.\n` : ""}
 
 Tenes estos objetos (tablas) con sus columnas:
 ${describeSchema()}
@@ -70,7 +77,33 @@ Reglas:
 
 // Ejecuta una read tool por nombre. Las write tools (propose_*) no se ejecutan
 // aca: devuelven una accion que se acumula y se entrega al usuario.
-function runReadTool(tool: string, args: Record<string, unknown>): unknown {
+// Valida y filtra las actions que la IA declaro en un turno final ({"answer":...,
+// "actions":[...]}). Es una via DISTINTA a la del tool-call explicito
+// ({"tool":"propose_update",...}) para proponer un write, asi que necesita el
+// MISMO gate de tools o un agente restringido a solo-lectura podia igual
+// proponer cambios saltandose la restriccion (auditoria adversarial).
+export function filterDeclaredActions(declared: unknown[], allowedTools: readonly string[]): ProposedAction[] {
+  const out: ProposedAction[] = [];
+  for (const a of declared) {
+    try {
+      const obj = a as Record<string, unknown>;
+      const kind = obj.kind ?? (obj.id ? "update" : "create");
+      const toolName = kind === "update" ? "propose_update" : "propose_create";
+      if (!allowedTools.includes(toolName)) continue;
+      out.push(
+        kind === "update"
+          ? propose_update(String(obj.objectName), String(obj.id), obj.fields)
+          : propose_create(String(obj.objectName), obj.fields)
+      );
+    } catch {
+      // accion mal formada: la ignoramos en silencio (no rompe la respuesta)
+    }
+  }
+  return out;
+}
+
+export function runReadTool(tool: string, args: Record<string, unknown>, allowedTools: readonly string[]): unknown {
+  if (!allowedTools.includes(tool)) throw new Error(`herramienta no habilitada para este agente: ${tool}`);
   switch (tool) {
     case "count_records":
       return count_records(String(args.objectName), args.filters);
@@ -104,9 +137,15 @@ function parseModelJSON(text: string): Record<string, unknown> {
 
 // systemOverride: si se pasa, se antepone al system prompt base (lo usa el
 // "Probar agente" de Settings IA para inyectar el rol/prompt de un ai_agent).
-export async function runCopilot(messages: ChatMessage[], systemOverride?: string): Promise<CopilotResult> {
+export async function runCopilot(
+  messages: ChatMessage[],
+  systemOverride?: string,
+  allowedTools?: string[]
+): Promise<CopilotResult> {
   const toolTrace: ToolTraceEntry[] = [];
   const actions: ProposedAction[] = [];
+  const tools: readonly string[] =
+    allowedTools && allowedTools.length > 0 ? allowedTools.filter((t) => (ALL_TOOLS as readonly string[]).includes(t)) : ALL_TOOLS;
 
   // Historial de conversacion + scratchpad del loop, todo en un solo prompt de
   // texto (el CLI no tiene roles de tool nativos). Reinyectamos resultados como
@@ -115,7 +154,7 @@ export async function runCopilot(messages: ChatMessage[], systemOverride?: strin
     .map((m) => `${m.role === "user" ? "Usuario" : "Asistente"}: ${m.content}`)
     .join("\n");
 
-  const sys = systemOverride ? `${systemOverride}\n\n${systemPrompt()}` : systemPrompt();
+  const sys = systemOverride ? `${systemOverride}\n\n${systemPrompt(tools)}` : systemPrompt(tools);
   let scratch = `${sys}\n\n--- Conversacion ---\n${history}\n\nResponde el siguiente paso (solo JSON):`;
 
   let badJsonRetries = 0;
@@ -145,22 +184,10 @@ export async function runCopilot(messages: ChatMessage[], systemOverride?: strin
     // Turno final.
     if ("answer" in parsed) {
       // Si la IA adjunto actions estructuradas, validalas via propose_* (re-filtra
-      // columnas); si no, usamos las que ya acumulamos en el loop.
+      // columnas y respeta el gate de tools); si no, usamos las que ya acumulamos.
       const declared = parsed.actions;
       if (Array.isArray(declared) && declared.length > 0) {
-        for (const a of declared) {
-          try {
-            const obj = a as Record<string, unknown>;
-            const kind = obj.kind ?? (obj.id ? "update" : "create");
-            if (kind === "update") {
-              actions.push(propose_update(String(obj.objectName), String(obj.id), obj.fields));
-            } else {
-              actions.push(propose_create(String(obj.objectName), obj.fields));
-            }
-          } catch {
-            // accion mal formada: la ignoramos en silencio (no rompe la respuesta)
-          }
-        }
+        actions.push(...filterDeclaredActions(declared, tools));
       }
       return { answer: String(parsed.answer ?? ""), actions, toolTrace };
     }
@@ -171,6 +198,11 @@ export async function runCopilot(messages: ChatMessage[], systemOverride?: strin
     // Write tools: generan una accion propuesta, no ejecutan. Las acumulamos y
     // le decimos a la IA que quedo registrada para que pase a {answer}.
     if (tool === "propose_update" || tool === "propose_create") {
+      if (!tools.includes(tool)) {
+        toolTrace.push({ tool, args, error: "herramienta no habilitada para este agente" });
+        scratch += `\n\nAsistente: ${raw.trim()}\nRESULTADO DE LA HERRAMIENTA: error -> herramienta '${tool}' no habilitada para este agente. Elegi otra o responde con {"answer":...}.`;
+        continue;
+      }
       try {
         const action =
           tool === "propose_update"
@@ -189,7 +221,7 @@ export async function runCopilot(messages: ChatMessage[], systemOverride?: strin
 
     // Read tools.
     try {
-      const result = runReadTool(tool, args);
+      const result = runReadTool(tool, args, tools);
       toolTrace.push({ tool, args, result });
       scratch += `\n\nAsistente: ${raw.trim()}\nRESULTADO DE LA HERRAMIENTA (${tool}): ${JSON.stringify(result)}\nContinua (solo JSON):`;
     } catch (e) {
