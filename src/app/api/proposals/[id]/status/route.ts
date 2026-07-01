@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { proposals } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { serializeProposal, applyStatusChange, PROPOSAL_STATUSES } from "@/lib/proposals";
+import { logger } from "@/lib/logger";
 
 // POST /api/proposals/[id]/status   body: { status }
 // Cambia el estado de la propuesta y MUEVE el pipeline del contacto/deal ligado
@@ -36,7 +37,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const result = applyStatusChange(existing, status);
     return NextResponse.json({ ...serializeProposal(result.proposal), pipeline: result.pipeline });
   } catch (e) {
-    console.error(`[proposals/status] error para ${id}:`, e);
+    logger.error("proposals.status", "error al cambiar status", {
+      proposalId: id,
+      status,
+      err: e instanceof Error ? e.message : String(e),
+    });
     return NextResponse.json(
       { error: `No se pudo cambiar el status: ${e instanceof Error ? e.message : "desconocido"}` },
       { status: 500 }

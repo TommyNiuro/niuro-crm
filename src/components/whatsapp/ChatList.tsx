@@ -66,6 +66,10 @@ export function ChatList({
   const [sortMode, setSortMode] = useState<SortMode>("priority");
   useEffect(() => {
     const stored = localStorage.getItem("wa_sort_mode") as SortMode | null;
+    // localStorage solo puede pasar client-side post-mount (SSR no tiene
+    // window); un lazy initializer rompe la primera render con "priority" y
+    // genera hydration mismatch.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (stored === "priority" || stored === "recent") setSortMode(stored);
   }, []);
   useEffect(() => {
@@ -79,6 +83,8 @@ export function ChatList({
   const RENDER_BATCH = 150;
   const [renderLimit, setRenderLimit] = useState(RENDER_BATCH);
   useEffect(() => {
+    // Resetea la ventana de render al cambiar filtros/orden, patron estandar de paginacion.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setRenderLimit(RENDER_BATCH);
   }, [search, filter, groupMode, sortMode]);
 
@@ -86,6 +92,9 @@ export function ChatList({
   useEffect(() => {
     const stored = localStorage.getItem("wa_group_mode") as GroupMode | null;
     if (stored === "hide" || stored === "show" || stored === "only") {
+      // Misma razon que wa_sort_mode arriba: localStorage es client-only, no
+      // se puede leer en un lazy initializer sin romper SSR/hydration.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setGroupMode(stored);
     }
   }, []);

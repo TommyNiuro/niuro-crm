@@ -36,6 +36,10 @@ export default function CalendarPage() {
     ]).then(([t, e]) => { setTasks(Array.isArray(t) ? t : []); setEvents(Array.isArray(e) ? e : []); }).finally(() => setLoading(false));
   };
 
+  // fetch-on-mount estandar (load() marca loading=true antes del fetch); no
+  // hay cascada real, el commit sincronico es la unica forma de mostrar el
+  // estado "cargando".
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { load(); }, []);
 
   const create = async () => {

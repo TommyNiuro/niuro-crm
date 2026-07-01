@@ -101,6 +101,14 @@ function initTables(db: Database.Database): void {
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL
     )`,
+    // Cache de runClaudeCached persistido (auditoria SaaS 2026-07-01): antes era
+    // un Map en memoria que se vaciaba en cada restart de launchd, perdiendo
+    // extracciones de 60-90s de latencia. TTL vive en expires_at, poda en el hit.
+    `CREATE TABLE IF NOT EXISTS ai_cache (
+      key TEXT PRIMARY KEY,
+      result TEXT NOT NULL,
+      expires_at INTEGER NOT NULL
+    )`,
     `CREATE TABLE IF NOT EXISTS lead_candidates (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,

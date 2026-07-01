@@ -37,6 +37,10 @@ export default function StatusPage() {
 
   // Una barra por hora de las últimas 24h: el color es el último estado
   // conocido ANTES o durante esa hora (log de transiciones, no de checks).
+  // Server Component con `force-dynamic`: se re-ejecuta por request, leer la
+  // hora real aca es el comportamiento correcto, no un problema de
+  // memoizacion/render puro.
+  // eslint-disable-next-line react-hooks/purity
   const now = Date.now();
   const buckets = Array.from({ length: HOURS }, (_, i) => {
     const bucketEnd = now - (HOURS - 1 - i) * 60 * 60 * 1000;

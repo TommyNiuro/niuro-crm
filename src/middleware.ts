@@ -11,8 +11,35 @@ const PUBLIC_PREFIXES = ["/api/auth", "/_next", "/favicon"];
 // igual que ya funcionaban antes de este gate.
 const TICK_PATHS = new Set(["/api/workflows/tick", "/api/sync/tick", "/api/whatsapp/tick"]);
 
+// Rate limiting basico por IP (auditoria SaaS 2026-07-01): ningun endpoint bajo
+// /api/ limitaba requests. Map en memoria, ventana fija de 60s.
+// ponytail: alcanza para single-process local/LAN; si esto se vuelve multi-instancia
+// detras de un balanceador, mover a un store compartido (Redis) para que el limite
+// sea por-cuenta y no por-proceso.
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const RATE_LIMIT_MAX = 120;
+const rateLimitBuckets = new Map<string, { count: number; resetAt: number }>();
+
+function isRateLimited(key: string): boolean {
+  const now = Date.now();
+  const bucket = rateLimitBuckets.get(key);
+  if (!bucket || bucket.resetAt <= now) {
+    rateLimitBuckets.set(key, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return false;
+  }
+  bucket.count++;
+  return bucket.count > RATE_LIMIT_MAX;
+}
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  if (pathname.startsWith("/api/") && !TICK_PATHS.has(pathname)) {
+    const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
+    if (isRateLimited(ip)) {
+      return NextResponse.json({ error: "Demasiadas solicitudes, intenta de nuevo en un minuto" }, { status: 429 });
+    }
+  }
 
   if (
     PUBLIC_PATHS.has(pathname) ||

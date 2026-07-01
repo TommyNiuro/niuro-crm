@@ -10,6 +10,10 @@ export function ThemeToggle() {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    // getTheme() lee localStorage, client-only; el gate `mounted` evita
+    // renderizar con un valor que no coincide con el SSR hasta despues del
+    // mount (anti hydration-mismatch).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsDark(getTheme() === "dark");
     setMounted(true);
     const handler = (e: Event) => setIsDark((e as CustomEvent<string>).detail === "dark");

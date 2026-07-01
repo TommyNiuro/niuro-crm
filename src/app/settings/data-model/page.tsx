@@ -117,6 +117,8 @@ export default function DataModelPage() {
 
   useEffect(() => loadObjects(), [loadObjects]);
   useEffect(() => {
+    // fetch-on-mount estandar (loadFields marca loadingFields=true antes del fetch).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (selected) loadFields(selected);
   }, [selected, loadFields]);
 

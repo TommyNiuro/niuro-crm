@@ -46,6 +46,8 @@ export function RecordDetailPanel({ config, row, onClose, onSave, onAction }: Pr
 
   useEffect(() => {
     if (!row || !needsDetail) return;
+    // Reset+fetch al cambiar de row (patron "alive" para evitar setState tras unmount/cambio).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setActivities(null);
     setDetail(null);
     let alive = true;
@@ -70,6 +72,8 @@ export function RecordDetailPanel({ config, row, onClose, onSave, onAction }: Pr
   // Timeline de auditoría genérico (b7): para objetos sin activities embebidas.
   useEffect(() => {
     if (!row || hasActivity || !hasTimeline) return;
+    // Reset+fetch al cambiar de row, mismo patron que el effect anterior.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setActivities(null);
     let alive = true;
     fetch(`/api/timeline?objectName=${encodeURIComponent(config.object)}&recordId=${encodeURIComponent(row.id)}`)

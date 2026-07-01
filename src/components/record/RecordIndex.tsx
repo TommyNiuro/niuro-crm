@@ -19,6 +19,11 @@ import { applyFilters, type Filter } from "./filters";
 import { parseTags } from "./FieldValue";
 import type { ColumnDef, RecordConfig, RecordRow, SelectOption } from "./types";
 
+// Referencia estable (auditoria SaaS 2026-07-01): un `?? []` en el cuerpo del
+// componente crea un array nuevo cada render, lo que invalidaba el useMemo de
+// `columns` (mas abajo) en cada render aunque nada hubiera cambiado.
+const EMPTY_GROUPS: SelectOption[] = [];
+
 /** Row de field_metadata tal como la devuelve GET /api/metadata/objects/[name]. */
 interface FieldMetaRow {
   name: string;
@@ -170,7 +175,7 @@ export function RecordIndex({
     };
   }, [config.boardGroupsEndpoint, config.boardGroupsMap]);
 
-  const groups = config.boardGroups ?? dynGroups ?? [];
+  const groups = config.boardGroups ?? dynGroups ?? EMPTY_GROUPS;
 
   // Inyecta las opciones dinámicas en la columna boardGroupKey (para el select inline
   // y el chip) y appendea los campos custom de la metadata al final.
@@ -262,7 +267,8 @@ export function RecordIndex({
   const toggleSelect = (id: string) =>
     setSelected((sel) => {
       const n = new Set(sel);
-      n.has(id) ? n.delete(id) : n.add(id);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
       return n;
     });
   const toggleAll = (ids: string[]) =>

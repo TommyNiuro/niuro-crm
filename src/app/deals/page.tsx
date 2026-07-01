@@ -15,6 +15,9 @@ function DealsInner() {
 
   // El command-K abre el alta con ?new=1.
   useEffect(() => {
+    // Sincroniza UI local con el query param de la URL (fuente externa a
+    // React), patron estandar.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (params.get("new") === "1") setShowForm(true);
   }, [params]);
 

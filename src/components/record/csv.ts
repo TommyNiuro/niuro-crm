@@ -110,6 +110,5 @@ if (process.env.NODE_ENV === "test" || process.argv?.[1]?.endsWith("csv.ts")) {
     out[1].join("|") === "x,1|y\n2|z\"q" &&
     out[2].join("|") === "last";
   if (!ok) throw new Error("parseCsv self-check fallo: " + JSON.stringify(out));
-  // eslint-disable-next-line no-console
   console.log("parseCsv OK");
 }

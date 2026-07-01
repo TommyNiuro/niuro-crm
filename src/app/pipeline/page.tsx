@@ -110,6 +110,10 @@ function ContactCard({
   onDragEnd?: () => void;
   onClick: () => void;
 }) {
+  // "vencido" debe reflejar la hora real en cada render (no hay React
+  // Compiler habilitado en este repo); congelar Date.now() en mount dejaria
+  // tarjetas "al dia" vencidas sin avisar.
+  // eslint-disable-next-line react-hooks/purity
   const overdue = !!c.nextStepDue && new Date(c.nextStepDue).getTime() < Date.now();
   const atRisk = !lost && (overdue || !c.nextAction);
   const temp = TEMP_CFG[c.temperature] ?? TEMP_CFG.cold;

@@ -29,7 +29,8 @@ export function RecordColumns({ columns, state, onChange }: Props) {
 
   const toggle = (key: string) => {
     const hidden = new Set(state.hidden);
-    hidden.has(key) ? hidden.delete(key) : hidden.add(key);
+    if (hidden.has(key)) hidden.delete(key);
+    else hidden.add(key);
     onChange({ ...state, hidden });
   };
 

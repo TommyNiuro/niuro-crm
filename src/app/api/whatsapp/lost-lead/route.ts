@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { contacts, activities, leadCandidates } from "@/db/schema";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { invalidateChatCache } from "@/lib/whatsapp";
 
 // Marca un chat como LEAD PERDIDO: hubo conversación comercial pero el contacto

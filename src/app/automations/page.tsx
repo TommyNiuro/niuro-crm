@@ -121,7 +121,7 @@ export default function AutomationsPage() {
       {loading ? (
         <div role="status" aria-busy="true" className="grid gap-3">{[...Array(3)].map((_, i) => <div key={i} className="h-16 bg-card rounded-xl animate-pulse" />)}</div>
       ) : items.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No hay workflows todavia. Crea el primero con "Nuevo workflow".</p>
+        <p className="text-sm text-muted-foreground">No hay workflows todavia. Crea el primero con &quot;Nuevo workflow&quot;.</p>
       ) : (
         <div className="grid gap-3">
           {items.map(w => (

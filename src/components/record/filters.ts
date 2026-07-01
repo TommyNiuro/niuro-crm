@@ -199,6 +199,5 @@ if (typeof process !== "undefined" && process.env.RUN_FILTER_DEMO) {
     ).length === 1,
     "AND combinado"
   );
-  // eslint-disable-next-line no-console
   console.log("filters.ts: todos los checks OK");
 }

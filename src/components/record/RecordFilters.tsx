@@ -30,10 +30,11 @@ export function RecordFilters({ columns, filters, onChange }: Props) {
 
   const add = (col: ColumnDef) => {
     const op = opsForType(col.type)[0].op;
-    onChange([
-      ...filters,
-      { id: `${col.key}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, key: col.key, op, value: "" },
-    ]);
+    // Corre solo en el click handler (linea 65), no durante render; la regla
+    // no distingue closures y marca el Date.now/Math.random igual.
+    // eslint-disable-next-line react-hooks/purity
+    const id = `${col.key}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    onChange([...filters, { id, key: col.key, op, value: "" }]);
   };
 
   return (

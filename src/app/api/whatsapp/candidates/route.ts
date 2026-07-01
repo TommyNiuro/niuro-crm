@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { leadCandidates, crmSettings, contacts } from "@/db/schema";
 import { eq, and, desc, inArray, sql } from "drizzle-orm";
 import { promoteCandidate, AUTO_PROMOTE_THRESHOLD } from "@/lib/promote-lead";
+import { logger } from "@/lib/logger";
 
 function isAutoPromoteEnabled(): boolean {
   const row = db.select().from(crmSettings).where(eq(crmSettings.key, "auto_promote_hot")).get();
@@ -195,7 +196,11 @@ export async function POST(request: NextRequest) {
         } catch (err) {
           // no romper la ingesta si una promocion falla — pero dejar registro
           // (auditoría 2026-06-09: antes reportaba éxito sin crear el contacto)
-          console.error(`[candidates] auto-promote falló para ${cand.name} (${cand.chatJid}):`, err);
+          logger.error("candidates.auto-promote", "auto-promote fallo", {
+            name: cand.name,
+            chatJid: cand.chatJid,
+            err: err instanceof Error ? err.message : String(err),
+          });
         }
       }
     }

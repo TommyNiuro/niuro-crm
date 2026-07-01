@@ -6,6 +6,7 @@ import { getMessages, dbExists } from "@/lib/whatsapp";
 import { scoreLead } from "@/lib/score-lead";
 import { getRubricConfig } from "@/lib/score-lead-server";
 import { extractLeadFromChat } from "@/lib/extract-lead";
+import { logger } from "@/lib/logger";
 
 /**
  * Re-analiza la conversación de WhatsApp de un contacto existente y refresca
@@ -39,7 +40,11 @@ export async function POST(
   try {
     extracted = await extractLeadFromChat(chatJid, contact.stage);
   } catch (err) {
-    console.error("[reanalyze] extractLeadFromChat error:", err);
+    logger.error("contacts.reanalyze", "extractLeadFromChat error", {
+      contactId: id,
+      chatJid,
+      err: err instanceof Error ? err.message : String(err),
+    });
   }
 
   if (!extracted || extracted.mode !== "ai") {

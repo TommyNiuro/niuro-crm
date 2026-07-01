@@ -16,8 +16,6 @@ import {
   Thermometer,
   Snowflake,
   Loader2,
-  Archive,
-  RotateCcw,
 } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -259,7 +257,8 @@ export function LeadCandidates() {
   const toggleSelect = (id: string) => {
     setSelected((prev) => {
       const n = new Set(prev);
-      n.has(id) ? n.delete(id) : n.add(id);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
       return n;
     });
   };

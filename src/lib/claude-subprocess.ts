@@ -3,7 +3,8 @@ import { writeFileSync, unlinkSync } from "fs";
 import { tmpdir } from "os";
 import { join, dirname, isAbsolute, resolve, sep } from "path";
 import crypto from "crypto";
-import { uploadsDir } from "@/lib/paths";
+import Database from "better-sqlite3";
+import { uploadsDir, dbPath } from "@/lib/paths";
 
 // Resolución del binario (auditoría 2026-06-09): la ruta clavada a una versión
 // de nvm mataba la IA en silencio al actualizar Node. Orden: env CLAUDE_BIN →
@@ -22,8 +23,43 @@ export const FAST_MODEL = "claude-haiku-4-5-20251001";
 // 60s: los logs mostraban timeouts recurrentes con 35s que degradaban a fallback
 const DEFAULT_TIMEOUT_MS = 60_000;
 
-// In-memory cache: cacheKey -> { result, expiresAt }
-const _cache = new Map<string, { result: string; expiresAt: number }>();
+// Cache persistido en SQLite (auditoria SaaS 2026-07-01): antes era un Map en
+// memoria que se vaciaba en cada restart de launchd. Conexion fresca por
+// llamada, mismo patron que lib/settings.ts (evita ciclo con @/db). Fallback
+// silencioso si la tabla/DB no esta lista aun (pre-init).
+function cacheGet(key: string): string | null {
+  try {
+    const sqlite = new Database(dbPath(), { readonly: true, timeout: 5000 });
+    try {
+      const row = sqlite
+        .prepare("SELECT result, expires_at FROM ai_cache WHERE key = ?")
+        .get(key) as { result: string; expires_at: number } | undefined;
+      if (row && row.expires_at > Date.now()) return row.result;
+      return null;
+    } finally {
+      sqlite.close();
+    }
+  } catch {
+    return null;
+  }
+}
+
+function cacheSet(key: string, result: string, expiresAt: number): void {
+  try {
+    const sqlite = new Database(dbPath(), { timeout: 15000 });
+    try {
+      sqlite
+        .prepare("INSERT OR REPLACE INTO ai_cache (key, result, expires_at) VALUES (?, ?, ?)")
+        .run(key, result, expiresAt);
+      // Poda de entradas expiradas (mismo comportamiento que el Map anterior).
+      sqlite.prepare("DELETE FROM ai_cache WHERE expires_at <= ?").run(Date.now());
+    } finally {
+      sqlite.close();
+    }
+  } catch {
+    // Cache best-effort: si falla, simplemente no se persiste.
+  }
+}
 
 function cacheKey(prompt: string): string {
   // Hash del prompt COMPLETO (auditoría 2026-06-09): truncar a 600 chars hacía
@@ -133,7 +169,8 @@ async function runClaudeOnce(
 
   const t0 = Date.now();
   return new Promise((resolve, reject) => {
-    const { ANTHROPIC_API_KEY: _drop, ...cleanEnv } = process.env;
+    const cleanEnv = { ...process.env };
+    delete cleanEnv.ANTHROPIC_API_KEY;
 
     // Usar Perl para cerrar TODOS los FDs heredados de Next.js (3..1023)
     // antes de exec-ar claude. Esto evita que el claude CLI (también Node.js)
@@ -226,14 +263,10 @@ export async function runClaudeCached(
   const ttlMs = opts?.ttlMs ?? 30 * 60 * 1000;
   const now = Date.now();
 
-  const hit = _cache.get(key);
-  if (hit && hit.expiresAt > now) return hit.result;
+  const hit = cacheGet(key);
+  if (hit !== null) return hit;
 
   const result = await runClaude(prompt, opts);
-  // Poda de entradas expiradas (auditoría: el cache nunca podaba y crecía sin límite)
-  for (const [k, v] of _cache) {
-    if (v.expiresAt <= now) _cache.delete(k);
-  }
-  _cache.set(key, { result, expiresAt: now + ttlMs });
+  cacheSet(key, result, now + ttlMs);
   return result;
 }

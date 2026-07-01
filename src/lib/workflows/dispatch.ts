@@ -1,5 +1,6 @@
 import { rawDb } from "@/db";
 import { runWorkflow, loadWorkflow } from "./engine";
+import { logger } from "@/lib/logger";
 
 // Dispatcher de workflows (b4-engine). Corre los workflows activos que matchean
 // un evento de registro o un schedule vencido. In-process, fire-and-forget desde
@@ -25,7 +26,7 @@ export function dispatchRecordEvent(objectName: string, event: RecordEvent, reco
   try {
     rows = activeByTrigger("record_event");
   } catch (e) {
-    console.error(`[workflow] dispatchRecordEvent query fallo: ${e instanceof Error ? e.message : String(e)}`);
+    logger.error("workflow.dispatch", "dispatchRecordEvent query fallo", { err: e instanceof Error ? e.message : String(e) });
     return;
   }
   for (const row of rows) {
@@ -34,12 +35,12 @@ export function dispatchRecordEvent(objectName: string, event: RecordEvent, reco
       if (cfg.objectName !== objectName || cfg.event !== event) continue;
       const wf = loadWorkflow(row);
       runWorkflow(wf, { record, recordId: record.id, objectName, event }).catch((e) => {
-        console.error(`[workflow] ${wf.name} fallo: ${e instanceof Error ? e.message : String(e)}`);
+        logger.error("workflow.run", "workflow fallo", { workflow: wf.name, err: e instanceof Error ? e.message : String(e) });
       });
     } catch (e) {
       // loadWorkflow/parse pueden tirar sincrónicamente: que un workflow roto no
       // tumbe al resto ni al caller. ponytail: swallow + log, igual que el .catch.
-      console.error(`[workflow] dispatch row ${String(row.id)} fallo: ${e instanceof Error ? e.message : String(e)}`);
+      logger.error("workflow.dispatch", "dispatch row fallo", { workflowId: String(row.id), err: e instanceof Error ? e.message : String(e) });
     }
   }
 }
@@ -66,7 +67,7 @@ export async function runScheduled(): Promise<{ ran: number }> {
       await runWorkflow(wf, { scheduledAt: nowSec });
       ran++;
     } catch (e) {
-      console.error(`[workflow] scheduled ${wf.name} fallo: ${e instanceof Error ? e.message : String(e)}`);
+      logger.error("workflow.scheduled", "workflow programado fallo", { workflow: wf.name, err: e instanceof Error ? e.message : String(e) });
     }
   }
   return { ran };
