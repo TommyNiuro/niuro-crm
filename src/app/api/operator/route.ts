@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import Database from "better-sqlite3";
 import path from "path";
 import { getOperator } from "@/lib/operator";
+import { assertLoopbackHttpUrl } from "@/lib/url-safety";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +35,16 @@ export async function PUT(req: NextRequest) {
   }
   if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
     return NextResponse.json({ error: "Email inválido" }, { status: 400 });
+  }
+  if (bridgeUrl) {
+    try {
+      assertLoopbackHttpUrl(bridgeUrl);
+    } catch (e) {
+      return NextResponse.json(
+        { error: e instanceof Error ? e.message : "URL de bridge inválida" },
+        { status: 400 }
+      );
+    }
   }
 
   const settings: [string, string][] = [

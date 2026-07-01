@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { rawDb } from "@/db";
 import { runClaudeCached } from "@/lib/claude-subprocess";
+import { assertPublicHttpUrl } from "@/lib/url-safety";
 
 // Motor de workflows in-process (b4-engine). Sin colas externas: runWorkflow corre
 // los steps en serie, crea un workflow_run, loguea cada paso y marca success/error.
@@ -170,6 +171,7 @@ async function runStep(step: Step, ctx: Ctx): Promise<void> {
       const method = (resolve(step.method, ctx) as string) || "GET";
       const url = resolve(step.url, ctx) as string;
       if (!url) throw new Error("http_request: url vacia");
+      assertPublicHttpUrl(url); // SSRF: sin esto, un workflow podía pegarle a red interna/metadata
       const headers = (resolve(step.headers, ctx) as Record<string, string>) || {};
       const body = step.body != null ? resolve(step.body, ctx) : undefined;
       const res = await fetch(url, {
