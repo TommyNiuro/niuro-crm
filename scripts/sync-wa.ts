@@ -9,15 +9,20 @@
  */
 
 import Database from "better-sqlite3";
-import path from "path";
 import fs from "fs";
 import { execFileSync } from "child_process";
+import { dbPath } from "../src/lib/paths";
+import { readSettings } from "../src/lib/settings";
 
-const CRM_DB = path.resolve(process.cwd(), "data/crm.db");
+// dbPath() resuelve CRM_DB_PATH > CRM_DATA_DIR/crm.db > cwd/data/crm.db (antes
+// esto era fijo a cwd/data/crm.db, rompia en la .app empaquetada donde el cwd
+// no es escribible ni es donde vive la DB real).
+const CRM_DB = dbPath();
+const waSettings = readSettings(["whatsapp_db_path", "whatsapp_store_db_path"]);
 const BRIDGE_DB =
-  process.env.WHATSAPP_DB_PATH || "./data/whatsapp/messages.db";
+  waSettings.whatsapp_db_path || process.env.WHATSAPP_DB_PATH || "./data/whatsapp/messages.db";
 const WHATSAPP_DB =
-  process.env.WHATSAPP_STORE_DB_PATH || "./data/whatsapp/whatsapp.db";
+  waSettings.whatsapp_store_db_path || process.env.WHATSAPP_STORE_DB_PATH || "./data/whatsapp/whatsapp.db";
 const SINCE = process.env.WHATSAPP_SINCE || "2024-12-01";
 const INCR = process.argv.includes("--incr");
 

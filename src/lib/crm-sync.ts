@@ -10,7 +10,7 @@
  */
 import Database from "better-sqlite3";
 import crypto from "crypto";
-import { getTableColumns } from "drizzle-orm";
+import { getTableColumns, type Table } from "drizzle-orm";
 import * as schema from "@/db/schema";
 import { readSettings } from "./settings";
 import { assertUserInstanceUrl } from "./url-safety";
@@ -60,7 +60,7 @@ export async function pullTable(table: SyncableTable): Promise<Record<string, un
 // /api/sync/tick: la logica vive una sola vez acá, cada caller solo maneja el
 // lock cross-process y el ciclo de vida de la conexion sqlite). ----
 
-const TABLE_DEFS: Record<SyncableTable, Record<string, unknown>> = {
+const TABLE_DEFS: Record<SyncableTable, Table> = {
   contacts: schema.contacts,
   companies: schema.companies,
   deals: schema.deals,
