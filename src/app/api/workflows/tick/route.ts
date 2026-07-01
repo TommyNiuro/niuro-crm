@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { runScheduled } from "@/lib/workflows/dispatch";
+import { drainJobs } from "@/lib/workflows/queue";
 
 // Tick de workflows 'scheduled' (b4-engine). Corre los que estén vencidos por
 // intervalMinutes. Diseñado para que lo pinche un scheduler externo cada minuto.
@@ -13,8 +14,11 @@ import { runScheduled } from "@/lib/workflows/dispatch";
 //     el motor al ciclo de vida de Next en dev.
 export async function POST() {
   try {
-    const result = await runScheduled();
-    return NextResponse.json(result);
+    // 1) Encolar los scheduled vencidos. 2) Drenar la cola: corre los recien
+    // encolados + reintentos con backoff vencidos + reclama jobs colgados.
+    const scheduled = await runScheduled();
+    const drained = await drainJobs();
+    return NextResponse.json({ scheduled, drained });
   } catch (e) {
     const detail = e instanceof Error ? e.message : String(e);
     return NextResponse.json({ error: detail }, { status: 500 });

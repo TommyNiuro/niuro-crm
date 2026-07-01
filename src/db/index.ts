@@ -498,6 +498,23 @@ function initTables(db: Database.Database): void {
     // ordena por started_at DESC para un workflow dado.
     `CREATE INDEX IF NOT EXISTS idx_workflows_trigger ON workflows(trigger_type, active)`,
     `CREATE INDEX IF NOT EXISTS idx_workflow_runs_workflow ON workflow_runs(workflow_id, started_at DESC)`,
+    // Cola durable de workflows (auditoria SaaS 2026-07-01, fase 3.3). Ver
+    // src/lib/workflows/queue.ts. status: pending|running|done|failed. run_after
+    // (epoch seg) para backoff de reintentos; locked_at para reclamar colgados.
+    `CREATE TABLE IF NOT EXISTS workflow_jobs (
+      id TEXT PRIMARY KEY,
+      workflow_id TEXT NOT NULL,
+      trigger_context TEXT NOT NULL DEFAULT '{}',
+      status TEXT NOT NULL DEFAULT 'pending',
+      attempts INTEGER NOT NULL DEFAULT 0,
+      max_attempts INTEGER NOT NULL DEFAULT 3,
+      run_after INTEGER NOT NULL,
+      locked_at INTEGER,
+      last_error TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_workflow_jobs_claimable ON workflow_jobs(status, run_after)`,
     // Sync (Fase A, solo lectura) con otra instancia de Niuro CRM via su API REST
     // (ver src/lib/crm-sync.ts, scripts/sync-crm.ts). Mapea un id remoto a su
     // copia local: los UUID se generan por app, asi que un mismo registro logico
