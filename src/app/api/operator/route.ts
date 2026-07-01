@@ -3,7 +3,7 @@ import Database from "better-sqlite3";
 import { getOperator } from "@/lib/operator";
 import { writeSettingsOn } from "@/lib/settings";
 import { dbPath } from "@/lib/paths";
-import { assertLoopbackHttpUrl } from "@/lib/url-safety";
+import { assertLoopbackHttpUrl, assertUserInstanceUrl } from "@/lib/url-safety";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +28,18 @@ export async function PUT(req: NextRequest) {
   const bridgeUrl = str(body.bridgeUrl, 200);
   const whatsappDbPath = str(body.whatsappDbPath, 400);
   const whatsappStoreDbPath = str(body.whatsappStoreDbPath, 400);
+  const crmSyncUrl = str(body.crmSyncUrl, 200);
+
+  if (crmSyncUrl) {
+    try {
+      assertUserInstanceUrl(crmSyncUrl);
+    } catch (e) {
+      return NextResponse.json(
+        { error: e instanceof Error ? e.message : "URL de sync inválida" },
+        { status: 400 }
+      );
+    }
+  }
 
   if (!name || !company) {
     return NextResponse.json({ error: "Nombre y empresa son requeridos" }, { status: 400 });
@@ -59,6 +71,7 @@ export async function PUT(req: NextRequest) {
   // usuario apunta a su propio bridge externo (ver docs/INTEGRATIONS.md).
   if (whatsappDbPath) settings.whatsapp_db_path = whatsappDbPath;
   if (whatsappStoreDbPath) settings.whatsapp_store_db_path = whatsappStoreDbPath;
+  if (crmSyncUrl) settings.crm_sync_url = crmSyncUrl;
 
   // Una sola conexion/transaccion para crm_settings + el UPDATE de agents: antes
   // de la consolidacion sobre writeSettings() esto era atomico (auditoria

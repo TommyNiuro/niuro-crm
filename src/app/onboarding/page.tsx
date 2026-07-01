@@ -25,6 +25,7 @@ export default function OnboardingPage() {
   const [bridgeUrl, setBridgeUrl] = useState("http://localhost:8080");
   const [whatsappDbPath, setWhatsappDbPath] = useState("");
   const [whatsappStoreDbPath, setWhatsappStoreDbPath] = useState("");
+  const [crmSyncUrl, setCrmSyncUrl] = useState("");
 
   const [wa, setWa] = useState<WaStatus | null>(null);
   const [testing, setTesting] = useState(false);
@@ -49,7 +50,9 @@ export default function OnboardingPage() {
       const r = await fetch("/api/operator", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, role, email, company, pitch, bridgeUrl, whatsappDbPath, whatsappStoreDbPath }),
+        body: JSON.stringify({
+          name, role, email, company, pitch, bridgeUrl, whatsappDbPath, whatsappStoreDbPath, crmSyncUrl,
+        }),
       });
       if (!r.ok) {
         const d = await r.json().catch(() => ({}));
@@ -169,6 +172,20 @@ export default function OnboardingPage() {
                 Dejalo vacío si el bridge corre en la ubicación default (./data/whatsapp/) o configuralo
                 después desde Ajustes. Necesario si corrés el CRM como app empaquetada.
               </p>
+
+              <div className="space-y-1.5 pt-3 border-t border-border">
+                <Label htmlFor="sync-url">Sincronizar con otra instancia de Niuro CRM (opcional)</Label>
+                <Input
+                  id="sync-url"
+                  value={crmSyncUrl}
+                  onChange={(e) => setCrmSyncUrl(e.target.value)}
+                  placeholder="http://localhost:3001"
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Trae contactos, empresas, deals, propuestas, tickets, actividades, tareas y radar
+                  desde esa instancia (solo lectura por ahora). Dejalo vacío para no sincronizar.
+                </p>
+              </div>
             </>
           )}
 

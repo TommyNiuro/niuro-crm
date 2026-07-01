@@ -29,6 +29,28 @@ Todas las integraciones son opcionales y van por variables de entorno en `.env.l
 
 **Dejar OFF (default).** No levantes el bridge. El inbox aparece vacío; nada más se rompe.
 
+## Sync con otra instancia de Niuro CRM
+
+**Qué hace.** Trae contactos, empresas, deals, propuestas, tickets, actividades, tareas y radar
+desde otra instancia tuya de Niuro CRM (ej. tu instalación "principal", corriendo en otra carpeta
+o máquina) — útil para tener una `.app` de escritorio con los mismos datos que tu CRM del navegador.
+**Fase A: solo lectura.** Esta instancia lee de la otra vía su API REST (las mismas rutas que usa
+su propio frontend); nunca escribe en la instancia remota ni toca su base de datos directamente.
+
+**Activar.**
+- `CRM_SYNC_URL` (o el campo equivalente en el onboarding/ajustes), ej. `http://localhost:3001`.
+- Corré `npx tsx scripts/sync-crm.ts` a mano, o disparalo periódicamente pegándole a
+  `POST /api/sync/tick` (mismo patrón que `/api/workflows/tick`).
+
+**Cómo evita duplicados.** Los ids se generan por app (UUID), así que un mismo registro lógico no
+comparte id entre instancias. La tabla `sync_mappings` guarda `remote_id -> local_id` para
+reconocer, en corridas siguientes, qué registro local corresponde a cuál remoto. Para tablas con
+`updatedAt` (contacts, companies, deals, proposals, radar de grupos) el sync aplica último-en-
+escribir-gana comparando timestamps; para las que no lo tienen (activities, tasks, tickets) solo
+inserta una vez y no vuelve a actualizar.
+
+**Dejar OFF (default).** No configures `CRM_SYNC_URL`. El sync queda desactivado, nada se rompe.
+
 ## Email digest diario (Resend)
 
 **Qué hace.** Envía un resumen diario por email.

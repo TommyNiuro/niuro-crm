@@ -468,6 +468,18 @@ function initTables(db: Database.Database): void {
     // ordena por started_at DESC para un workflow dado.
     `CREATE INDEX IF NOT EXISTS idx_workflows_trigger ON workflows(trigger_type, active)`,
     `CREATE INDEX IF NOT EXISTS idx_workflow_runs_workflow ON workflow_runs(workflow_id, started_at DESC)`,
+    // Sync (Fase A, solo lectura) con otra instancia de Niuro CRM via su API REST
+    // (ver src/lib/crm-sync.ts, scripts/sync-crm.ts). Mapea un id remoto a su
+    // copia local: los UUID se generan por app, asi que un mismo registro logico
+    // NO comparte id entre instancias.
+    `CREATE TABLE IF NOT EXISTS sync_mappings (
+      table_name TEXT NOT NULL,
+      local_id TEXT NOT NULL,
+      remote_id TEXT NOT NULL,
+      last_synced_at INTEGER NOT NULL,
+      PRIMARY KEY (table_name, remote_id)
+    )`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_sync_mappings_local ON sync_mappings(table_name, local_id)`,
   ];
   for (const sql of migrations) {
     try {
