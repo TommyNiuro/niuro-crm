@@ -8,9 +8,11 @@ queda, con los commits que lo respaldan.
 
 ## Estado en una línea
 
-Todo lo autoverificable del plan de endurecimiento está hecho, en verde (tsc 0, lint 0/0, build
-OK, **175 tests**), commiteado y mergeado a `main`. Lo único abierto: SQLCipher (en curso en la
-rama `feat/sqlcipher`) y búsqueda semántica con Voyage (bloqueada en la API key).
+Todo el plan de endurecimiento está hecho, en verde (tsc 0, lint 0/0, build OK, **177 tests**),
+commiteado y mergeado a `main` (incluida la rama `feat/sqlcipher`). Incluye SQLCipher (cifrado en
+reposo), que quedó **funcionando y verificado** tras arreglar dos bugs que lo dejaban en texto plano
+(ver Fase 2.1). Abierto: búsqueda semántica con Voyage (bloqueada en la API key) y la validación
+end-to-end del `.app` de SQLCipher (paso final del operador, requiere `npm run desktop:build` + GUI).
 
 ## Lo hecho (rama `feat/saas-hardening-2026-07-01`, mergeada a `main`)
 
@@ -21,6 +23,7 @@ rama `feat/sqlcipher`) y búsqueda semántica con Voyage (bloqueada en la API ke
 | 2.4 — Backup | `853005c` | Backup WAL-safe con rotación y hook off-site |
 | 3.4 — Performance | `3049841` | Analítica memoizada |
 | 3.3 — Durabilidad | `ebd0d83` | Cola durable de workflows en SQLite |
+| 2.1 — Cifrado | `7f61589` + `e3efe8b` | SQLCipher en reposo (llave en Keychain), verificado |
 
 ### Fase 0 — Quick wins (`6966e45`)
 - **Logging estructurado** (`src/lib/logger.ts`): una línea JSON por evento, con sink de errores
@@ -71,6 +74,19 @@ rama `feat/sqlcipher`) y búsqueda semántica con Voyage (bloqueada en la API ke
 - `db`/`runner` inyectables para tests. 4 tests: éxito→done, fallo→retry con backoff→failed tras
   max_attempts, reclamo de colgado, `run_after` futuro no se procesa.
 
+### Fase 2.1 — Cifrado en reposo con SQLCipher (`7f61589` + fix `e3efe8b`)
+- **Qué**: `crm.db` cifrada en reposo con `better-sqlite3-multiple-ciphers` (ChaCha20-Poly1305). La
+  llave vive en el macOS Keychain (no al lado de la DB), la provee el launcher Rust del `.app` vía
+  `CRM_DB_KEY`, con fallback a `security find-generic-password` para los scripts `tsx`. Apertura
+  central en `src/lib/db-open.ts` (`openDb`), ~18 call sites convertidos. Ver `docs/SQLCIPHER-2026-07-01.md`.
+- **Seguro por defecto**: sin llave (dev, CI en Linux, tests) la DB queda en texto plano, comportamiento
+  byte-idéntico al de antes. El cifrado solo se activa donde hay llave (el `.app` en la Mac del operador).
+- **Dos bugs encontrados por un smoke-test del cifrado real y arreglados** (`e3efe8b`): (1) el alias npm
+  no se había aplicado (el módulo instalado era el `better-sqlite3` regular, sin ciphers); (2) la
+  migración usaba `sqlcipher_export`, función de SQLCipher que NO existe en multiple-ciphers, así que
+  fallaba en silencio dejando la DB en texto plano. Reemplazada por `PRAGMA rekey` (in-place) con backup,
+  verificación de lectura y borrado del backup plano. Nuevo `db-open.test.ts` ejerce el cifrado REAL.
+
 ## Incidente de producción resuelto (repo `auto-crm`, cross-repo)
 
 Durante el endurecimiento saltó una alerta de health-check: el sync de WhatsApp de `auto-crm`
@@ -101,9 +117,10 @@ Durante el endurecimiento saltó una alerta de health-check: el sync de WhatsApp
 
 ## Abierto
 
-- **SQLCipher (cifrado en reposo)** — decidido con la llave en macOS Keychain. **En curso** en la rama
-  `feat/sqlcipher` (`src/lib/db-open.ts` centraliza la apertura con llave + migración de texto plano a
-  cifrado). Verificación requiere buildear la `.app` de Tauri.
 - **Búsqueda semántica (Voyage AI)** — decidida. Bloqueada: necesita la API key de Voyage y el backfill
   de embeddings sobre el historial de WhatsApp.
-- **Merge de `feat/sqlcipher` a `main`** cuando esté verificada.
+- **SQLCipher — validación del `.app`**: el cifrado está verificado a nivel código (migración in-place,
+  lectura con/sin llave, 177 tests, smoke-tests). Falta el flujo end-to-end del `.app` empaquetado
+  (launcher Rust escribe la llave en Keychain → la app la lee y cifra): `npm run desktop:build` + lanzar
+  la `.app`. Es el paso final del operador (requiere GUI + permiso de Keychain). Todo lo demás de SQLCipher
+  está hecho, verificado y mergeado a `main`.

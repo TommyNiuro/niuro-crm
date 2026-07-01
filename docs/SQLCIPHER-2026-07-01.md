@@ -66,27 +66,25 @@ usar el mismo mecanismo que el fallback de Node.
 
 ### Migracion idempotente de una DB existente
 
-SQLCipher no puede abrir una DB en texto plano con `PRAGMA key`, hay que
-exportarla. `migrateToEncryptedIfNeeded(file, key)`:
+`better-sqlite3-multiple-ciphers` cifra una DB plana existente IN-PLACE con
+`PRAGMA rekey` (este binario NO tiene `sqlcipher_export`, que es especifico de
+SQLCipher clasico; ver "Correcciones 2026-07-01" abajo). `migrateToEncryptedIfNeeded(file, key)`:
 
 1. Si el archivo no existe, no hace nada (una DB nueva nace cifrada al primer
    `PRAGMA key`).
 2. Lee los primeros 16 bytes. Si son `SQLite format 3\0`, la DB esta en texto
    plano y hay que migrarla. Si no, ya esta cifrada (o header desconocido) y no
-   se toca. Esta deteccion por header es lo que hace la operacion idempotente: el
-   segundo arranque ve la DB opaca y no re-keya.
-3. Dobla el WAL sobre el archivo principal, abre un tmp cifrado con
-   `ATTACH ... KEY`, vuelca todo con `sqlcipher_export`, y reemplaza el original
-   de forma atomica.
-4. Seguridad ante fallo: el original se conserva como `crm.db.plain-bak` y el tmp
-   solo reemplaza al original si el export termino OK. Un corte a mitad deja el
-   original intacto y reintenta el proximo arranque.
+   se toca. Esta deteccion por header hace la operacion idempotente: el segundo
+   arranque ve la DB opaca y no re-keya.
+3. Copia el plano a `crm.db.plain-bak` (red de seguridad), dobla el WAL sobre el
+   archivo principal, y corre `PRAGMA rekey = '<llave>'`, que cifra la DB in-place.
+4. Verifica que la DB cifrada abre y lee con la llave. Si el rekey falla o la DB
+   resultante es ilegible, restaura desde `crm.db.plain-bak`. Si todo sale bien,
+   BORRA el `.plain-bak` automaticamente (no deja una copia sin cifrar de los
+   datos al lado de la cifrada).
 
 Se dispara de forma perezosa una vez por proceso desde `openDb` (cubre el caso de
 que el primer opener sea readonly, que por si solo no podria migrar).
-
-**Nota:** una vez verificado que la app abre bien la DB cifrada, se puede borrar
-`crm.db.plain-bak` a mano. Es una copia en texto plano de tus datos.
 
 ## Call sites convertidos
 
@@ -114,30 +112,52 @@ Scripts y herramientas (corren por `tsx`, usan el fallback de Keychain):
   cifrado). Se deja intacto.
 - **Tests** (`:memory:` y DBs tmp): sin llave por el gate de Vitest.
 
-## Pasos requeridos en tu Mac
+## Correcciones 2026-07-01 (post-implementacion, verificado en la Mac)
 
-El alias de `better-sqlite3` cambio en `package.json` pero **el `package-lock.json`
-no se regenero** (hacerlo en Linux/CI daba una resolucion divergente que ademas
-ensuciaba el diff). Antes de nada, en tu Mac:
+Un smoke-test del cifrado real (crear DB plana, migrar, chequear header + lectura
+con/sin llave) revelo que **la DB quedaba en TEXTO PLANO** pese a "activar" el
+cifrado. Dos bugs, ambos arreglados:
+
+1. **El alias no estaba instalado.** `node_modules/better-sqlite3` era el modulo
+   REGULAR (name `better-sqlite3`, `sqlite3mc_version()` inexistente, `PRAGMA cipher`
+   vacio): `npm install` habia respetado un `package-lock.json` que aun apuntaba al
+   paquete regular. Se forzo el alias real y ahora es
+   `better-sqlite3-multiple-ciphers` 12.11.1 (SQLite3 Multiple Ciphers 2.3.5). El
+   `package-lock.json` quedo regenerado y commiteado.
+
+2. **`sqlcipher_export` no existe en multiple-ciphers.** La migracion original lo
+   usaba via `ATTACH ... KEY` + `SELECT sqlcipher_export('encrypted')`, que fallaba
+   con "no such function: sqlcipher_export" (se tragaba en silencio → DB plana). Se
+   reemplazo por `PRAGMA rekey` (mecanismo nativo, cifra in-place), con backup previo,
+   verificacion de lectura con llave, y borrado del backup plano al terminar.
+
+Por que no lo atraparon los tests: usaban `:memory:` sin llave (gate de Vitest), asi
+que nunca ejercian el path cifrado. Se agrego `src/lib/__tests__/db-open.test.ts` que
+migra una DB plana real, verifica que queda cifrada, lee con llave y bloquea sin llave.
+
+## Verificacion (hecha, en verde)
 
 ```bash
-npm install          # regenera el lock y compila el prebuild nativo de multiple-ciphers
+npm install                 # alias multiple-ciphers instalado (lock commiteado)
+npx tsc --noEmit            # OK
+npm test                    # 177 tests, incluye db-open.test.ts (cifrado REAL)
+npm run build               # OK
 ```
 
-Commiteá el `package-lock.json` resultante: CI corre `npm ci` y necesita el lock
-en sync con `package.json`, si no falla.
+Smoke-tests manuales (con CRM_DB_KEY): DB nueva nace cifrada; DB plana migra a
+cifrada in-place; lectura con llave OK; lectura sin llave falla; `.plain-bak`
+borrado. **Todo verde.**
 
-## Verificacion
+### Pendiente (solo requiere tu Mac + interaccion)
 
 ```bash
-npm install                 # imprescindible primero (ver arriba)
-npx tsc --noEmit            # typecheck
-npm test                    # 169 tests, deben seguir en verde (sin cifrado, gate de Vitest)
-npm run build               # build de Next
-npm run desktop:build       # build nativo de la .app: SIN esto no esta probado de verdad
+npm run desktop:build       # build nativo de la .app
 ```
 
-Con la `.app` construida, la prueba real:
+Esto valida el flujo end-to-end del `.app` empaquetado: el launcher Rust
+(`main.rs`) crea/lee la llave en el Keychain y la inyecta como `CRM_DB_KEY`. No se
+puede validar sin GUI (el Keychain pide permiso al usuario). Con la `.app` construida,
+la prueba real:
 
 - Abrir la app: debe crear/abrir `crm.db` sin errores.
 - Migracion: si ya tenias una `crm.db` en texto plano, tras el primer arranque
@@ -160,9 +180,9 @@ unico lugar donde el cifrado se ejercita end to end.
   salvo el escenario "copian el .db pero no la llave". Vale la pena porque la
   llave esta en Keychain, no al lado de la DB.
 - Si perdes la entrada del Keychain (borrar el llavero, cambiar de maquina sin
-  migrar), la `crm.db` cifrada es irrecuperable. El `.plain-bak` (si existe) es la
-  unica copia en claro, y hay que borrarlo una vez verificado el cifrado. Un
-  backup cifrado aparte (Fase 2.4) mitiga esto.
+  migrar), la `crm.db` cifrada es irrecuperable. La migracion borra el `.plain-bak`
+  al terminar OK, asi que no queda una copia en claro colgada; un backup cifrado
+  aparte (Fase 2.4) es la red de recuperacion.
 - Los scripts de analisis readonly (ej. `precalif-export`) disparan la migracion
   perezosa si encuentran una DB plana y hay llave. Es esperado, pero significa que
   el primer script que corras contra una DB plana la migra.
