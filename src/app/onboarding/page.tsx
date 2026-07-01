@@ -23,6 +23,8 @@ export default function OnboardingPage() {
   const [company, setCompany] = useState("");
   const [pitch, setPitch] = useState("");
   const [bridgeUrl, setBridgeUrl] = useState("http://localhost:8080");
+  const [whatsappDbPath, setWhatsappDbPath] = useState("");
+  const [whatsappStoreDbPath, setWhatsappStoreDbPath] = useState("");
 
   const [wa, setWa] = useState<WaStatus | null>(null);
   const [testing, setTesting] = useState(false);
@@ -47,7 +49,7 @@ export default function OnboardingPage() {
       const r = await fetch("/api/operator", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, role, email, company, pitch, bridgeUrl }),
+        body: JSON.stringify({ name, role, email, company, pitch, bridgeUrl, whatsappDbPath, whatsappStoreDbPath }),
       });
       if (!r.ok) {
         const d = await r.json().catch(() => ({}));
@@ -142,8 +144,30 @@ export default function OnboardingPage() {
                 </div>
               )}
               <p className="text-[11px] text-muted-foreground">
-                El emparejamiento por QR lo hace el bridge (whatsmeow), no el CRM. La prueba usa la URL por
-                defecto del server; la que ingreses acá se guarda al terminar.
+                El emparejamiento por QR lo hace el bridge (whatsmeow), no el CRM. Si ya tenés el bridge
+                corriendo y vinculado en otra máquina/carpeta, no hace falta escanear nada de nuevo.
+              </p>
+              <div className="space-y-1.5 pt-1">
+                <Label htmlFor="wa-db">Ruta a messages.db del bridge (opcional)</Label>
+                <Input
+                  id="wa-db"
+                  value={whatsappDbPath}
+                  onChange={(e) => setWhatsappDbPath(e.target.value)}
+                  placeholder="/ruta/a/whatsapp-bridge/store/messages.db"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="wa-store">Ruta a whatsapp.db del bridge (opcional)</Label>
+                <Input
+                  id="wa-store"
+                  value={whatsappStoreDbPath}
+                  onChange={(e) => setWhatsappStoreDbPath(e.target.value)}
+                  placeholder="/ruta/a/whatsapp-bridge/store/whatsapp.db"
+                />
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Dejalo vacío si el bridge corre en la ubicación default (./data/whatsapp/) o configuralo
+                después desde Ajustes. Necesario si corrés el CRM como app empaquetada.
               </p>
             </>
           )}

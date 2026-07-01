@@ -13,16 +13,20 @@
  * el backfill de group_opportunities.
  */
 import Database from "better-sqlite3";
+import { readSettings } from "./settings";
 
-const BRIDGE_WA_DB =
-  process.env.WHATSAPP_STORE_DB_PATH ||
-  "./data/whatsapp/whatsapp.db";
+function getStoreDbPath(): string {
+  // Prioridad: crm_settings (onboarding) > env > default, mismo patrón que
+  // getDbPath() en whatsapp.ts.
+  const fromDb = readSettings(["whatsapp_store_db_path"]).whatsapp_store_db_path;
+  return fromDb || process.env.WHATSAPP_STORE_DB_PATH || "./data/whatsapp/whatsapp.db";
+}
 
 let lidDb: Database.Database | null = null;
 function getLidDb(): Database.Database | null {
   if (lidDb) return lidDb;
   try {
-    lidDb = new Database(BRIDGE_WA_DB, { readonly: true, timeout: 5000 });
+    lidDb = new Database(getStoreDbPath(), { readonly: true, timeout: 5000 });
     return lidDb;
   } catch {
     return null; // bridge no disponible: degradar sin romper

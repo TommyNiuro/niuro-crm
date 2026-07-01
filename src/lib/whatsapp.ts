@@ -42,7 +42,11 @@ function isSynced(): boolean {
 }
 
 export function getDbPath(): string {
-  return process.env.WHATSAPP_DB_PATH || DEFAULT_DB_PATH;
+  // Prioridad: crm_settings (onboarding) > env > default. Sin esto, la .app
+  // empaquetada (que no comparte cwd con el bridge externo) no tenía forma de
+  // apuntar a la DB real del bridge salvo hardcodeando el path en el launcher.
+  const fromDb = readSettings(["whatsapp_db_path"]).whatsapp_db_path;
+  return fromDb || process.env.WHATSAPP_DB_PATH || DEFAULT_DB_PATH;
 }
 
 export function getBridgeUrl(): string {

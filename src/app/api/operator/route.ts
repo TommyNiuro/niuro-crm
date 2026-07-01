@@ -26,6 +26,8 @@ export async function PUT(req: NextRequest) {
   const company = str(body.company, 120);
   const pitch = str(body.pitch, 400);
   const bridgeUrl = str(body.bridgeUrl, 200);
+  const whatsappDbPath = str(body.whatsappDbPath, 400);
+  const whatsappStoreDbPath = str(body.whatsappStoreDbPath, 400);
 
   if (!name || !company) {
     return NextResponse.json({ error: "Nombre y empresa son requeridos" }, { status: 400 });
@@ -53,6 +55,10 @@ export async function PUT(req: NextRequest) {
     onboarding_completed: "1",
   };
   if (bridgeUrl) settings.whatsapp_bridge_url = bridgeUrl;
+  // Rutas locales (no URLs): sin validación de red, son paths de archivo que el
+  // usuario apunta a su propio bridge externo (ver docs/INTEGRATIONS.md).
+  if (whatsappDbPath) settings.whatsapp_db_path = whatsappDbPath;
+  if (whatsappStoreDbPath) settings.whatsapp_store_db_path = whatsappStoreDbPath;
 
   // Una sola conexion/transaccion para crm_settings + el UPDATE de agents: antes
   // de la consolidacion sobre writeSettings() esto era atomico (auditoria
