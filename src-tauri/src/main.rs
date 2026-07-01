@@ -76,15 +76,24 @@ fn boot_server(app: &AppHandle) {
     let _ = std::fs::create_dir_all(&data_dir);
     let db_path = data_dir.join("crm.db");
 
-    let child = Command::new(&node)
-        .arg("server.js")
+    let mut cmd = Command::new(&node);
+    cmd.arg("server.js")
         .current_dir(&server_dir)
         .env("PORT", PORT.to_string())
         .env("HOSTNAME", "127.0.0.1")
         .env("NODE_ENV", "production")
         .env("CRM_DATA_DIR", data_dir.to_string_lossy().to_string())
-        .env("CRM_DB_PATH", db_path.to_string_lossy().to_string())
-        .spawn();
+        .env("CRM_DB_PATH", db_path.to_string_lossy().to_string());
+
+    // Cifrado en reposo (SQLCipher): la llave vive en el Keychain de macOS, no al
+    // lado de la DB. Se lee/crea aca y se le pasa al server por env (CRM_DB_KEY),
+    // que la aplica al abrir crm.db (ver src/lib/db-open.ts). Si no se puede
+    // obtener/persistir la llave, arrancamos sin cifrado en vez de brickear.
+    if let Some(key) = get_or_create_db_key() {
+        cmd.env("CRM_DB_KEY", key);
+    }
+
+    let child = cmd.spawn();
 
     match child {
         Ok(c) => {
@@ -112,6 +121,91 @@ fn boot_server(app: &AppHandle) {
             "El server no respondio a tiempo. Revisa los logs o reabri la app.",
         );
     }
+}
+
+/// Service/account de la llave de cifrado en el Keychain. Coincide con el
+/// identifier de la app (tauri.conf.json) y con lo que lee src/lib/db-open.ts.
+const KEYCHAIN_SERVICE: &str = "io.niuro.crm";
+const KEYCHAIN_ACCOUNT: &str = "db-key";
+
+/// Llave de cifrado de la DB (hex de 32 bytes). La lee del Keychain de macOS; si
+/// no existe, genera una y la guarda. Devuelve None si no se puede obtener ni
+/// persistir (ej. no-macOS o acceso denegado): en ese caso el server arranca sin
+/// cifrado, igual que hoy, en vez de dejar la DB inaccesible.
+///
+/// Usa el CLI `security` en vez de un crate de Keychain: cero dependencias
+/// nuevas, cero cambios en Cargo.lock, y el mismo mecanismo que el fallback de
+/// Node para los scripts (`security find-generic-password`).
+fn get_or_create_db_key() -> Option<String> {
+    if !cfg!(target_os = "macos") {
+        return None;
+    }
+    if let Some(k) = keychain_read_key() {
+        return Some(k);
+    }
+    let key = random_hex_32()?;
+    if keychain_write_key(&key) {
+        Some(key)
+    } else {
+        // No se pudo persistir: no arriesgar una llave efimera que bloquearia la
+        // DB en el proximo arranque. Degradar a sin-cifrado.
+        None
+    }
+}
+
+/// Lee la llave del Keychain. None si la entrada no existe o `security` falla.
+fn keychain_read_key() -> Option<String> {
+    let out = Command::new("security")
+        .args([
+            "find-generic-password",
+            "-s",
+            KEYCHAIN_SERVICE,
+            "-a",
+            KEYCHAIN_ACCOUNT,
+            "-w",
+        ])
+        .output()
+        .ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    let key = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    if key.is_empty() {
+        None
+    } else {
+        Some(key)
+    }
+}
+
+/// Guarda (o actualiza, -U) la llave en el Keychain. true si quedo persistida.
+fn keychain_write_key(key: &str) -> bool {
+    Command::new("security")
+        .args([
+            "add-generic-password",
+            "-s",
+            KEYCHAIN_SERVICE,
+            "-a",
+            KEYCHAIN_ACCOUNT,
+            "-w",
+            key,
+            "-U",
+        ])
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
+}
+
+/// 32 bytes de /dev/urandom, en hex (64 chars). None si no se puede leer.
+fn random_hex_32() -> Option<String> {
+    use std::io::Read;
+    let mut f = std::fs::File::open("/dev/urandom").ok()?;
+    let mut buf = [0u8; 32];
+    f.read_exact(&mut buf).ok()?;
+    let mut s = String::with_capacity(64);
+    for b in buf {
+        s.push_str(&format!("{b:02x}"));
+    }
+    Some(s)
 }
 
 /// Busca un binario de node usable. Importante en macOS: las apps lanzadas desde

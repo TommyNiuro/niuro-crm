@@ -3,8 +3,8 @@ import { writeFileSync, unlinkSync } from "fs";
 import { tmpdir } from "os";
 import { join, dirname, isAbsolute, resolve, sep } from "path";
 import crypto from "crypto";
-import Database from "better-sqlite3";
 import { uploadsDir, dbPath } from "@/lib/paths";
+import { openDb } from "@/lib/db-open";
 
 // Resolución del binario (auditoría 2026-06-09): la ruta clavada a una versión
 // de nvm mataba la IA en silencio al actualizar Node. Orden: env CLAUDE_BIN →
@@ -29,7 +29,7 @@ const DEFAULT_TIMEOUT_MS = 60_000;
 // silencioso si la tabla/DB no esta lista aun (pre-init).
 function cacheGet(key: string): string | null {
   try {
-    const sqlite = new Database(dbPath(), { readonly: true, timeout: 5000 });
+    const sqlite = openDb(dbPath(), { readonly: true, timeout: 5000 });
     try {
       const row = sqlite
         .prepare("SELECT result, expires_at FROM ai_cache WHERE key = ?")
@@ -46,7 +46,7 @@ function cacheGet(key: string): string | null {
 
 function cacheSet(key: string, result: string, expiresAt: number): void {
   try {
-    const sqlite = new Database(dbPath(), { timeout: 15000 });
+    const sqlite = openDb(dbPath(), { timeout: 15000 });
     try {
       sqlite
         .prepare("INSERT OR REPLACE INTO ai_cache (key, result, expires_at) VALUES (?, ?, ?)")

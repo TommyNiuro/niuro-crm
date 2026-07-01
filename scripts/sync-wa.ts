@@ -8,7 +8,7 @@
  * Usa SQLite ATTACH para copiar en bulk en una sola transacción.
  */
 
-import Database from "better-sqlite3";
+import { openDb } from "../src/lib/db-open";
 import fs from "fs";
 import { execFileSync } from "child_process";
 import { dbPath } from "../src/lib/paths";
@@ -111,7 +111,7 @@ function main() {
 }
 
 function runSync() {
-  const crm = new Database(CRM_DB);
+  const crm = openDb(CRM_DB);
   crm.pragma("journal_mode = WAL");
   crm.pragma("synchronous = NORMAL");
   crm.pragma("busy_timeout = 10000");
@@ -172,9 +172,9 @@ function runSync() {
   // (`file:...?mode=ro`), pero better-sqlite3 compila sin SQLITE_USE_URI y trata
   // la URI como nombre literal. Mitigación: este script solo ejecuta SELECT
   // sobre bridge.* / wastore.* — nunca escribir en esas DBs.
-  crm.exec(`ATTACH DATABASE '${BRIDGE_DB}' AS bridge`);
+  crm.exec(`ATTACH DATABASE '${BRIDGE_DB}' AS bridge KEY ''`);
   if (fs.existsSync(WHATSAPP_DB)) {
-    crm.exec(`ATTACH DATABASE '${WHATSAPP_DB}' AS wastore`);
+    crm.exec(`ATTACH DATABASE '${WHATSAPP_DB}' AS wastore KEY ''`);
   }
 
   try {

@@ -15,7 +15,7 @@
  *
  * Forzar ventana más amplia: npx tsx scripts/scan-external-jobs.ts --since-days 14
  */
-import Database from "better-sqlite3";
+import { openDb } from "../src/lib/db-open";
 import path from "path";
 import { execFileSync } from "child_process";
 import { operator } from "../src/lib/operator";
@@ -101,7 +101,7 @@ async function fetchPage(page: number): Promise<Job[]> {
 }
 
 async function main() {
-  const db = new Database(CRM_DB);
+  const db = openDb(CRM_DB);
   db.pragma("journal_mode = WAL");
   db.pragma("busy_timeout = 60000");
 

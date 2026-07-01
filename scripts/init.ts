@@ -16,6 +16,7 @@
 
 import crypto from "crypto";
 import Database from "better-sqlite3";
+import { openDb } from "../src/lib/db-open";
 import path from "path";
 import fs from "fs";
 
@@ -31,7 +32,7 @@ if (!fs.existsSync(dataDir)) {
 console.log("Initializing Auto-CRM...");
 console.log(`Database: ${DB_PATH}`);
 
-const sqlite = new Database(DB_PATH);
+const sqlite = openDb(DB_PATH);
 sqlite.pragma("journal_mode = WAL");
 sqlite.pragma("foreign_keys = ON");
 

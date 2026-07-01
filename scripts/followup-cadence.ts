@@ -16,7 +16,7 @@
  * Corre diario 08:15 vía launchd (com.niuro.followup-cadence).
  * Uso manual: npx tsx scripts/followup-cadence.ts
  */
-import Database from "better-sqlite3";
+import { openDb } from "../src/lib/db-open";
 import path from "path";
 
 const CRM_DB = path.resolve(process.cwd(), "data/crm.db");
@@ -40,7 +40,7 @@ type ContactRow = {
   last_interaction_at: number | null;
 };
 
-const db = new Database(CRM_DB);
+const db = openDb(CRM_DB);
 db.pragma("journal_mode = WAL");
 db.pragma("busy_timeout = 60000");
 

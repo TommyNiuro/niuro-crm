@@ -8,7 +8,7 @@
  *
  * Uso: npx tsx scripts/precalif-import.ts
  */
-import Database from "better-sqlite3";
+import { openDb } from "../src/lib/db-open";
 import path from "path";
 import fs from "fs";
 
@@ -40,7 +40,7 @@ function recencyFactor(dsl: number): number {
 }
 const clamp = (v: unknown, max: number) => Math.min(max, Math.max(0, Number(v) || 0));
 
-const db = new Database(CRM_DB);
+const db = openDb(CRM_DB);
 db.pragma("journal_mode = WAL");
 db.pragma("busy_timeout = 60000");
 

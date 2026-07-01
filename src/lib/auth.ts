@@ -9,6 +9,7 @@
 import crypto from "crypto";
 import Database from "better-sqlite3";
 import { dbPath } from "./paths";
+import { openDb as openEncrypted } from "./db-open";
 import { readSettings, writeSettings } from "./settings";
 import { appendAudit } from "./audit";
 
@@ -37,7 +38,7 @@ export function verifyPassword(password: string, stored: string): boolean {
 }
 
 function openDb(): Database.Database {
-  return new Database(dbPath(), { timeout: 15000 });
+  return openEncrypted(dbPath(), { timeout: 15000 });
 }
 
 export function hasAccount(): boolean {

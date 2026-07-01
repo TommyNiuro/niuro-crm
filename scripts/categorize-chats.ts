@@ -11,7 +11,7 @@
  * el resto cae a reglas con aviso visible (protege la cuota en --force).
  */
 
-import Database from "better-sqlite3";
+import { openDb } from "../src/lib/db-open";
 import path from "path";
 import { existsSync } from "fs";
 import { execFileSync } from "child_process";
@@ -122,7 +122,7 @@ async function main() {
   console.log(`\nModo: ${useAI ? `Claude (${CATEGORIZE_MODEL})` : "reglas (claude CLI no disponible)"}`);
   if (useAI) console.log(`Binario: ${CLAUDE_BIN} | tope IA: ${AI_MAX_CHATS} chats/corrida\n`);
 
-  const db = new Database(CRM_DB);
+  const db = openDb(CRM_DB);
   db.pragma("journal_mode = WAL");
   db.pragma("busy_timeout = 60000");
   db.pragma("synchronous = NORMAL");

@@ -18,7 +18,7 @@
  * Primera corrida: si no hay watermark, arranca 7 días atrás.
  * Forzar re-escaneo: npx tsx scripts/scan-groups.ts --since-days 14
  */
-import Database from "better-sqlite3";
+import { openDb } from "../src/lib/db-open";
 import path from "path";
 import { execFileSync } from "child_process";
 import { runClaude, DEFAULT_MODEL } from "../src/lib/claude-subprocess";
@@ -49,7 +49,7 @@ function notify(msg: string) {
 }
 
 async function main() {
-  const db = new Database(CRM_DB);
+  const db = openDb(CRM_DB);
   db.pragma("journal_mode = WAL");
   db.pragma("busy_timeout = 60000");
 

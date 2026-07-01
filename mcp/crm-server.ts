@@ -22,6 +22,7 @@
 
 import crypto from "crypto";
 import Database from "better-sqlite3";
+import { openDb } from "../src/lib/db-open";
 import path from "path";
 import fs from "fs";
 
@@ -32,7 +33,7 @@ if (!fs.existsSync(DB_PATH)) {
   process.exit(1);
 }
 
-const db = new Database(DB_PATH, { readonly: false, timeout: 5000 });
+const db = openDb(DB_PATH, { readonly: false, timeout: 5000 });
 db.pragma("journal_mode = WAL");
 db.pragma("foreign_keys = ON");
 

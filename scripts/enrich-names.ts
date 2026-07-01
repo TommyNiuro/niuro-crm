@@ -11,7 +11,7 @@
  * Uso:  npx tsx scripts/enrich-names.ts            (todos los pendientes)
  *       MAX_BATCHES=3 npx tsx scripts/enrich-names.ts  (limitar corrida)
  */
-import Database from "better-sqlite3";
+import { openDb } from "../src/lib/db-open";
 import path from "path";
 import { runClaude, DEFAULT_MODEL } from "../src/lib/claude-subprocess";
 import { operator } from "../src/lib/operator";
@@ -23,7 +23,7 @@ const MAX_BATCHES = Math.max(1, Number(process.env.MAX_BATCHES) || 99);
 type Chat = { jid: string };
 type Msg = { content: string | null; is_from_me: number };
 
-const db = new Database(CRM_DB);
+const db = openDb(CRM_DB);
 db.pragma("journal_mode = WAL");
 db.pragma("busy_timeout = 60000");
 

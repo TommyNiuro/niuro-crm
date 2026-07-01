@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import Database from "better-sqlite3";
 import { getOperator } from "@/lib/operator";
 import { writeSettingsOn } from "@/lib/settings";
 import { dbPath } from "@/lib/paths";
+import { openDb } from "@/lib/db-open";
 import { assertLoopbackHttpUrl, assertUserInstanceUrl } from "@/lib/url-safety";
 
 export const dynamic = "force-dynamic";
@@ -77,7 +77,7 @@ export async function PUT(req: NextRequest) {
   // de la consolidacion sobre writeSettings() esto era atomico (auditoria
   // adversarial detecto la regresion). writeSettingsOn compone sobre ESTA
   // conexion en vez de abrir la suya propia.
-  const sqlite = new Database(dbPath(), { timeout: 15000 });
+  const sqlite = openDb(dbPath(), { timeout: 15000 });
   try {
     sqlite.transaction(() => {
       writeSettingsOn(sqlite, settings);

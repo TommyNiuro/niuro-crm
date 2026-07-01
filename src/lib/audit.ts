@@ -15,6 +15,7 @@
 import crypto from "crypto";
 import Database from "better-sqlite3";
 import { dbPath } from "./paths";
+import { openDb } from "./db-open";
 
 export interface AuditEntry {
   actor: string;
@@ -64,7 +65,7 @@ function computeHash(row: Omit<AuditRow, "hash">): string {
  */
 export function appendAudit(entry: AuditEntry): void {
   try {
-    const sqlite = new Database(dbPath(), { timeout: 15000 });
+    const sqlite = openDb(dbPath(), { timeout: 15000 });
     try {
       const insert = sqlite.transaction((e: AuditEntry) => {
         const last = sqlite
@@ -105,7 +106,7 @@ export function appendAudit(entry: AuditEntry): void {
 export function verifyAuditChain(
   sqlite?: Database.Database
 ): { ok: true; count: number } | { ok: false; brokenAt: string; count: number } {
-  const own = sqlite ?? new Database(dbPath(), { readonly: true, timeout: 5000 });
+  const own = sqlite ?? openDb(dbPath(), { readonly: true, timeout: 5000 });
   try {
     const rows = own
       .prepare("SELECT * FROM audit_log ORDER BY ts ASC, id ASC")

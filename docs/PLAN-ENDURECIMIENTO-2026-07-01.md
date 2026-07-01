@@ -71,10 +71,17 @@ Alto valor, bajo riesgo, aditivo, compatible con local-first. Se puede hacer ya.
 
 Reales y valiosas, pero cada una bloqueada por una elección que es tuya.
 
-### 2.1 Cifrado en reposo (SQLCipher)
-- **Decisión que falta:** ¿dónde vive la llave? Si vive en `.env.local` al lado de
-  la DB, el cifrado es teatro. La versión real usa el **macOS Keychain** (via el
-  lado Rust de Tauri), lo que toca el empaquetado nativo.
+### 2.1 Cifrado en reposo (SQLCipher) — EN PROGRESO (rama feat/sqlcipher, 2026-07-01)
+- **Decisión tomada:** la llave vive en el **macOS Keychain**, provista por el
+  launcher Rust (`security` CLI, sin crates nuevos) e inyectada al server como
+  `CRM_DB_KEY`. Fallback de lectura en Node (tambien via `security`) para que los
+  scripts `tsx` funcionen. Cifrado ChaCha20 por defecto. Diseño e implementacion
+  documentados en `docs/SQLCIPHER-2026-07-01.md`.
+- **Hecho:** alias npm a better-sqlite3-multiple-ciphers, helper central
+  `src/lib/db-open.ts` (openDb + resolveKey + migracion idempotente plana->cifrada),
+  ~18 call sites convertidos, launcher Rust cableado.
+- **Pendiente en la Mac:** `npm install` (regenerar lock + prebuild nativo), luego
+  `tsc` + `npm test` + `npm run desktop:build` para validar end to end.
 - **Nota honesta:** en un Mac con FileVault, el cifrado a nivel-app agrega
   fragilidad por seguridad marginal salvo que el modelo de amenaza sea "copian el
   archivo .db pero no la llave". Vale la pena solo con la llave en Keychain.

@@ -5,13 +5,14 @@
  */
 import Database from "better-sqlite3";
 import { dbPath } from "./paths";
+import { openDb } from "./db-open";
 
 /** Lee varias claves de una. Devuelve solo las presentes (value != null). */
 export function readSettings(keys: string[]): Record<string, string> {
   const out: Record<string, string> = {};
   if (keys.length === 0) return out;
   try {
-    const sqlite = new Database(dbPath(), { readonly: true, timeout: 5000 });
+    const sqlite = openDb(dbPath(), { readonly: true, timeout: 5000 });
     try {
       const q = sqlite.prepare("SELECT value FROM crm_settings WHERE key = ?");
       for (const k of keys) {
@@ -41,7 +42,7 @@ export function writeSettingsOn(sqlite: Database.Database, pairs: Record<string,
  * abrir en escritura. Si necesitás atomicidad con otra tabla, usá writeSettingsOn
  * sobre tu propia conexión en vez de esta. */
 export function writeSettings(pairs: Record<string, string>): void {
-  const sqlite = new Database(dbPath(), { timeout: 15000 });
+  const sqlite = openDb(dbPath(), { timeout: 15000 });
   try {
     sqlite.transaction(() => writeSettingsOn(sqlite, pairs))();
   } finally {

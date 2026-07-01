@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import Database from "better-sqlite3";
 import crypto from "crypto";
 import { getStatus } from "@/lib/whatsapp";
 import { dbPath } from "@/lib/paths";
+import { openDb } from "@/lib/db-open";
 
 // Tick del bridge de WhatsApp para /status (mismo patron que /api/workflows/tick
 // y /api/sync/tick: pensado para que lo dispare un poller/cron). Loguea una
@@ -18,7 +18,7 @@ export async function POST() {
         ? "DB del bridge encontrada pero el bridge no responde"
         : "DB del bridge no encontrada";
 
-    const db = new Database(dbPath(), { timeout: 15000 });
+    const db = openDb(dbPath(), { timeout: 15000 });
     try {
       const last = db
         .prepare("SELECT status FROM bridge_status_log ORDER BY checked_at DESC LIMIT 1")

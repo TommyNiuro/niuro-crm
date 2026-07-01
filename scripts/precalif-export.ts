@@ -11,7 +11,7 @@
  *
  * Uso: npx tsx scripts/precalif-export.ts
  */
-import Database from "better-sqlite3";
+import { openDb } from "../src/lib/db-open";
 import path from "path";
 import fs from "fs";
 import { scoreLead } from "../src/lib/score-lead";
@@ -28,7 +28,7 @@ const MAX_MSG_CHARS = 280;
 type Row = { jid: string; name: string | null; last_message_time: string | null };
 type MsgRow = { content: string | null; is_from_me: number; timestamp: string | null; media_type: string | null };
 
-const db = new Database(CRM_DB, { readonly: true });
+const db = openDb(CRM_DB, { readonly: true });
 
 // Archivados (dismissed) y aprobados quedan FUERA: archivado se queda archivado.
 const chats = db.prepare(`

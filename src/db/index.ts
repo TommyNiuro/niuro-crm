@@ -5,6 +5,7 @@ import path from "path";
 import fs from "fs";
 import { operator } from "@/lib/operator";
 import { dbPath } from "@/lib/paths";
+import { openDb } from "@/lib/db-open";
 import { logger } from "@/lib/logger";
 
 // Resuelto en @/lib/paths: CRM_DB_PATH > CRM_DATA_DIR/crm.db > cwd/data/crm.db.
@@ -17,7 +18,9 @@ if (!fs.existsSync(dataDir)) {
 }
 
 function createDatabase(): Database.Database {
-  const db = new Database(DB_PATH, { timeout: 15000 });
+  // openDb aplica la llave de cifrado (si hay) y, en el primer opener del
+  // proceso, migra crm.db de texto plano a cifrado una sola vez. Ver db-open.ts.
+  const db = openDb(DB_PATH, { timeout: 15000 });
 
   // Set pragmas individually with error handling
   try {

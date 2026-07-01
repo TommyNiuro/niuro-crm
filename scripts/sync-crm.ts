@@ -7,7 +7,7 @@
  * Requiere CRM_SYNC_URL (env) o crm_settings.crm_sync_url ya configurado
  * (ver onboarding). Sin eso, no hace nada (sync desactivado).
  */
-import Database from "better-sqlite3";
+import { openDb } from "../src/lib/db-open";
 import fs from "fs";
 import { dbPath } from "../src/lib/paths";
 import { runFullSync } from "../src/lib/crm-sync";
@@ -72,7 +72,7 @@ async function main() {
   }
 
   try {
-    const db = new Database(dbPath(), { timeout: 15000 });
+    const db = openDb(dbPath(), { timeout: 15000 });
     try {
       db.pragma("busy_timeout = 15000");
       const results = await runFullSync(db);

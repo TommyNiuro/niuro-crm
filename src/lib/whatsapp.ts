@@ -14,13 +14,14 @@ import Database from "better-sqlite3";
 import fs from "fs";
 import { readSettings } from "./settings";
 import { dbPath } from "./paths";
+import { openDb } from "./db-open";
 
 const DEFAULT_DB_PATH = "./data/whatsapp/messages.db";
 const DEFAULT_BRIDGE_URL = "http://localhost:8080";
 
 function openCrm(): Database.Database {
   // crm.db (fuente principal después del sync), resuelto en @/lib/paths.
-  const db = new Database(dbPath(), { readonly: true, fileMustExist: true, timeout: 3000 });
+  const db = openDb(dbPath(), { readonly: true, fileMustExist: true, timeout: 3000 });
   db.pragma("busy_timeout = 3000");
   return db;
 }
