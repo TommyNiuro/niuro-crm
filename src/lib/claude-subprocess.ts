@@ -3,6 +3,7 @@ import { writeFileSync, unlinkSync } from "fs";
 import { tmpdir } from "os";
 import { join, dirname, isAbsolute, resolve, sep } from "path";
 import crypto from "crypto";
+import { uploadsDir } from "@/lib/paths";
 
 // Resolución del binario (auditoría 2026-06-09): la ruta clavada a una versión
 // de nvm mataba la IA en silencio al actualizar Node. Orden: env CLAUDE_BIN →
@@ -100,7 +101,7 @@ function assertSafeImagePath(imagePath: string): void {
     throw new Error(`imagePath inseguro: contiene traversal '..' (${imagePath})`);
   }
   // Debe vivir bajo un directorio esperado: uploads del CRM o el tmpdir del SO.
-  const allowedRoots = [join(process.cwd(), "uploads"), tmpdir()];
+  const allowedRoots = [uploadsDir(), tmpdir()];
   const resolved = resolve(imagePath);
   const ok = allowedRoots.some(
     (root) => resolved === root || resolved.startsWith(root + sep),

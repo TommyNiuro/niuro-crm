@@ -4,9 +4,10 @@ import * as schema from "./schema";
 import path from "path";
 import fs from "fs";
 import { operator } from "@/lib/operator";
+import { dbPath } from "@/lib/paths";
 
-// CRM_DB_PATH permite apuntar a una copia en desarrollo (no mutar la DB de prod).
-const DB_PATH = process.env.CRM_DB_PATH || path.join(process.cwd(), "data", "crm.db");
+// Resuelto en @/lib/paths: CRM_DB_PATH > CRM_DATA_DIR/crm.db > cwd/data/crm.db.
+const DB_PATH = dbPath();
 
 // Ensure data directory exists
 const dataDir = path.dirname(DB_PATH);

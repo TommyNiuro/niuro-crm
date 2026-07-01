@@ -66,14 +66,15 @@ fn boot_server(app: &AppHandle) {
         }
     };
 
-    // DB en una carpeta escribible del usuario (el .app es de solo lectura).
-    let db_path = match app.path().app_data_dir() {
-        Ok(dir) => {
-            let _ = std::fs::create_dir_all(&dir);
-            dir.join("crm.db")
-        }
-        Err(_) => server_dir.join("data").join("crm.db"),
+    // Carpeta de datos escribible del usuario. El server standalone hace
+    // process.chdir(__dirname) y ese dir es de SOLO LECTURA dentro del .app, asi
+    // que toda escritura (DB, uploads, recovery) debe ir aca via CRM_DATA_DIR.
+    let data_dir = match app.path().app_data_dir() {
+        Ok(dir) => dir,
+        Err(_) => server_dir.join("data"),
     };
+    let _ = std::fs::create_dir_all(&data_dir);
+    let db_path = data_dir.join("crm.db");
 
     let child = Command::new(&node)
         .arg("server.js")
@@ -81,6 +82,7 @@ fn boot_server(app: &AppHandle) {
         .env("PORT", PORT.to_string())
         .env("HOSTNAME", "127.0.0.1")
         .env("NODE_ENV", "production")
+        .env("CRM_DATA_DIR", data_dir.to_string_lossy().to_string())
         .env("CRM_DB_PATH", db_path.to_string_lossy().to_string())
         .spawn();
 

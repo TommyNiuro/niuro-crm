@@ -4,11 +4,7 @@
  * operator.ts <-> db/index.ts). Fallback silencioso si la DB no existe todavía.
  */
 import Database from "better-sqlite3";
-import path from "path";
-
-function dbPath(): string {
-  return process.env.CRM_DB_PATH || path.join(process.cwd(), "data", "crm.db");
-}
+import { dbPath } from "./paths";
 
 /** Lee varias claves de una. Devuelve solo las presentes (value != null). */
 export function readSettings(keys: string[]): Record<string, string> {

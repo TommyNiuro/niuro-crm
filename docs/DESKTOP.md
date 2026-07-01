@@ -66,6 +66,15 @@ npx tauri dev
 (El launcher también acepta `NIURO_SERVER_DIR` y `NIURO_NODE_BIN` por env para apuntar
 a un server o node específico durante el desarrollo.)
 
+## Dónde viven los datos
+
+La app guarda todo (la base SQLite, uploads de imágenes, recovery de propuestas) en
+`~/Library/Application Support/io.niuro.crm/`, una carpeta escribible del usuario. Esto
+es necesario porque el server standalone de Next hace `process.chdir(__dirname)` y ese
+directorio, dentro del `.app`, es de solo lectura: escribir ahí daba un 500. El launcher
+setea `CRM_DATA_DIR` (y `CRM_DB_PATH`) a esa carpeta, y toda la app resuelve sus rutas
+por `src/lib/paths.ts`. Para mover los datos, seteá `CRM_DATA_DIR` a otra carpeta.
+
 ## Primera apertura (Gatekeeper)
 
 El `.app` no está firmado ni notarizado. La primera vez, macOS lo va a bloquear:

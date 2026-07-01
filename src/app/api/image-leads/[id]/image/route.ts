@@ -4,8 +4,9 @@ import { imageLeads } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { readFile } from "fs/promises";
 import path from "path";
+import { uploadsDir } from "@/lib/paths";
 
-const UPLOADS_DIR = path.join(process.cwd(), "data", "uploads");
+const UPLOADS_DIR = uploadsDir();
 
 const MIME_BY_EXT: Record<string, string> = {
   png: "image/png",

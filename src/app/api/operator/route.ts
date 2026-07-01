@@ -1,15 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import Database from "better-sqlite3";
-import path from "path";
 import { getOperator } from "@/lib/operator";
 import { writeSettingsOn } from "@/lib/settings";
+import { dbPath } from "@/lib/paths";
 import { assertLoopbackHttpUrl } from "@/lib/url-safety";
 
 export const dynamic = "force-dynamic";
-
-function dbPath(): string {
-  return process.env.CRM_DB_PATH || path.join(process.cwd(), "data", "crm.db");
-}
 
 /** Identidad resuelta (crm_settings > env > default) para que el cliente la lea en runtime. */
 export function GET() {

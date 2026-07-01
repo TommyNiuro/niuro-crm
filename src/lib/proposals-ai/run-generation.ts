@@ -11,6 +11,7 @@
  */
 import { writeFileSync, mkdirSync } from "fs";
 import { join } from "path";
+import { recoveryDir } from "@/lib/paths";
 import { db } from "@/db";
 import { proposals } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -68,7 +69,7 @@ export async function runProposalGeneration(id: string): Promise<void> {
     // obliga a re-generar (varios min de Sonnet). Best-effort.
     if (err && err.rawContent !== undefined) {
       try {
-        const dir = join(process.cwd(), "data", "recovery");
+        const dir = recoveryDir();
         mkdirSync(dir, { recursive: true });
         const p = join(dir, `proposal-${id}-raw.json`);
         const raw = err.rawContent;

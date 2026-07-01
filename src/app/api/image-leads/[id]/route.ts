@@ -4,8 +4,9 @@ import { imageLeads } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { unlink } from "fs/promises";
 import path from "path";
+import { uploadsDir } from "@/lib/paths";
 
-const UPLOADS_DIR = path.join(process.cwd(), "data", "uploads");
+const UPLOADS_DIR = uploadsDir();
 
 // DELETE /api/image-leads/[id] → borra la fila y el archivo de imagen del disco.
 export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {

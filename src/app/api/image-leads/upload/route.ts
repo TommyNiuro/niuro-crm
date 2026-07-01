@@ -4,9 +4,10 @@ import { imageLeads } from "@/db/schema";
 import { runImageLeadAnalysis } from "@/lib/analyze-image-lead";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
+import { uploadsDir } from "@/lib/paths";
 import crypto from "crypto";
 
-const UPLOADS_DIR = path.join(process.cwd(), "data", "uploads");
+const UPLOADS_DIR = uploadsDir();
 
 // mime → extensión segura. La imagen se guarda como <uuid>.<ext> (SIN espacios)
 // porque la @mención del CLI claude corta el path en el primer whitespace.

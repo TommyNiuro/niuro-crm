@@ -4,8 +4,9 @@ import { attachments } from "@/db/schema";
 import { and, eq, desc } from "drizzle-orm";
 import { readFile, writeFile, unlink, mkdir } from "fs/promises";
 import path from "path";
+import { uploadsDir } from "@/lib/paths";
 
-const UPLOADS_DIR = path.join(process.cwd(), "data", "uploads");
+const UPLOADS_DIR = uploadsDir();
 const MAX_BYTES = 25 * 1024 * 1024; // 25MB
 
 // Comprueba que una ruta guardada vive dentro de UPLOADS_DIR (anti path-traversal).
