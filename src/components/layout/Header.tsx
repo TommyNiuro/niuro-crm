@@ -1,12 +1,18 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { MobileNav } from "./MobileNav";
 
+const CHROME_LESS_ROUTES = new Set(["/login", "/setup-account"]);
+
 /** Barra superior SOLO en móvil. En desktop cada vista maneja su propio header. */
 export function Header() {
+  const pathname = usePathname();
+  if (CHROME_LESS_ROUTES.has(pathname)) return null;
+
   return (
     <header className="md:hidden sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-border bg-card px-4">
       <Sheet>

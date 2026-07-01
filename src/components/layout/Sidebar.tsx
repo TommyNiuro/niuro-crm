@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   Home,
   MessageCircle,
@@ -23,6 +23,8 @@ import {
   X,
   Sparkles,
   Boxes,
+  Activity,
+  LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { COPILOT_OPEN_EVENT } from "@/components/ai/CopilotPanel";
@@ -53,6 +55,7 @@ export const NAV_ITEMS = [
   { href: "/automations", label: "Automatizaciones", icon: Zap },
   { href: "/analytics", label: "Analitica", icon: BarChart3 },
   { href: "/integrations", label: "Integraciones", icon: Plug },
+  { href: "/status", label: "Estado", icon: Activity },
   { href: "/settings", label: "Ajustes", icon: Settings },
 ] as const;
 
@@ -61,8 +64,11 @@ function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(href + "/") || pathname.startsWith(href);
 }
 
+const CHROME_LESS_ROUTES = new Set(["/login", "/setup-account"]);
+
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const [counts, setCounts] = useState<{ leads: number; opportunities: number }>({
     leads: 0,
     opportunities: 0,
@@ -147,6 +153,8 @@ export function Sidebar() {
     if (href === "/opportunities") return counts.opportunities;
     return 0;
   };
+
+  if (CHROME_LESS_ROUTES.has(pathname)) return null;
 
   return (
     <aside className="hidden md:flex md:w-[220px] md:flex-col bg-sidebar text-sidebar-foreground min-h-screen border-r border-sidebar-border shrink-0">
@@ -277,6 +285,18 @@ export function Sidebar() {
             aria-label={isDark ? "Cambiar a modo claro" : "Cambiar a modo oscuro"}
           >
             {isDark ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
+          </button>
+          <button
+            onClick={async () => {
+              await fetch("/api/auth/logout", { method: "POST" });
+              router.push("/login");
+              router.refresh();
+            }}
+            className="p-2 rounded-md hover:bg-[var(--hover)] text-muted-foreground hover:text-sidebar-foreground transition-colors cursor-pointer shrink-0"
+            title="Cerrar sesión"
+            aria-label="Cerrar sesión"
+          >
+            <LogOut className="h-3.5 w-3.5" />
           </button>
         </div>
       </div>

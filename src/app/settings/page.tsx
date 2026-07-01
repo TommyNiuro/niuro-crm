@@ -17,12 +17,14 @@ import {
   SlidersHorizontal,
   Palette,
   Database,
+  KeyRound,
 } from "lucide-react";
 import { toast } from "sonner";
 import { NotificationToggle } from "@/components/shared/NotificationToggle";
 import { AutoPromoteToggle } from "@/components/shared/AutoPromoteToggle";
 import { RubricEditor } from "@/components/shared/RubricEditor";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
+import { AccountSection } from "@/components/shared/AccountSection";
 import type { CrmConfig } from "@/types";
 
 export default function SettingsPage() {
@@ -290,6 +292,19 @@ export default function SettingsPage() {
           </CardHeader>
           <CardContent>
             <ThemeToggle />
+          </CardContent>
+        </Card>
+
+        {/* Cuenta */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <KeyRound className="h-4 w-4" />
+              Cuenta
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <AccountSection />
           </CardContent>
         </Card>
 

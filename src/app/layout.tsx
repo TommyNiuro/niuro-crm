@@ -9,6 +9,7 @@ import { CopilotPanel } from "@/components/ai/CopilotPanel";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
 import { NotificationChecker } from "@/components/shared/NotificationChecker";
+import { BridgeStatusPoller } from "@/components/shared/BridgeStatusPoller";
 
 const inter = Inter({
   variable: "--font-sans",
@@ -44,6 +45,7 @@ export default function RootLayout({
             </div>
             <Toaster />
             <NotificationChecker />
+            <BridgeStatusPoller />
             <CommandPalette />
             <CopilotPanel />
           </TooltipProvider>

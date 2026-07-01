@@ -480,6 +480,25 @@ function initTables(db: Database.Database): void {
       PRIMARY KEY (table_name, remote_id)
     )`,
     `CREATE UNIQUE INDEX IF NOT EXISTS idx_sync_mappings_local ON sync_mappings(table_name, local_id)`,
+    // Auth de una sola cuenta por instalacion (ver src/lib/auth.ts). La credencial
+    // en si vive en crm_settings (auth_email/auth_password_hash); esta tabla es
+    // solo las sesiones activas, para poder invalidarlas por logout real.
+    `CREATE TABLE IF NOT EXISTS auth_sessions (
+      id TEXT PRIMARY KEY,
+      token_hash TEXT NOT NULL UNIQUE,
+      created_at INTEGER NOT NULL,
+      expires_at INTEGER NOT NULL
+    )`,
+    // Historial del bridge de WhatsApp para /status (ver src/app/api/whatsapp/tick).
+    // Una fila por TRANSICION de estado, no por check — evita miles de filas
+    // identicas si el poller corre cada minuto y el bridge esta estable.
+    `CREATE TABLE IF NOT EXISTS bridge_status_log (
+      id TEXT PRIMARY KEY,
+      status TEXT NOT NULL,
+      detail TEXT,
+      checked_at INTEGER NOT NULL
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_bridge_status_log_checked ON bridge_status_log(checked_at DESC)`,
   ];
   for (const sql of migrations) {
     try {
