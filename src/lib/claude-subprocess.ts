@@ -1,5 +1,5 @@
 import { spawn } from "child_process";
-import { writeFileSync, unlinkSync } from "fs";
+import { writeFileSync, unlinkSync, createReadStream } from "fs";
 import { tmpdir } from "os";
 import { join, dirname, isAbsolute, resolve, sep } from "path";
 import crypto from "crypto";
@@ -179,13 +179,36 @@ async function runClaudeOnce(
     const addDirFlag = imagePath ? ` --add-dir "${dirname(imagePath)}"` : "";
     const shellCmd = `perl -MPOSIX -e 'for my $i (3..1023){ POSIX::close($i) }; exec @ARGV' -- "${CLAUDE_BIN}" -p --output-format json --input-format text --model "${model}" --dangerously-skip-permissions --tools ""${addDirFlag} < "${tmpFile}"`;
 
-    const child = spawn("/bin/sh", ["-c", shellCmd], {
-      env: cleanEnv,
-      stdio: ["ignore", "pipe", "pipe"],
-      // cwd neutro: con cwd=$HOME cada llamada cargaba el CLAUDE.md del usuario
-      // como contexto y acumulaba sesiones en ~/.claude/projects (auditoría)
-      cwd: tmpdir(),
-    });
+    // Windows no tiene /bin/sh ni perl: spawn directo del CLI (claude.exe en el
+    // PATH, o CLAUDE_BIN apuntando al .exe) con el prompt piped a stdin. El hack
+    // perl de FD-closing arregla un fd-leak de unix (sockets heredados de Next);
+    // en Windows no aplica. ponytail: best effort, sin validar contra el CLI
+    // real de Windows todavía; si falla, el error se propaga limpio como en unix.
+    const winArgs = [
+      "-p", "--output-format", "json", "--input-format", "text",
+      "--model", model, "--dangerously-skip-permissions", "--tools", "",
+      ...(imagePath ? ["--add-dir", dirname(imagePath)] : []),
+    ];
+    const child =
+      process.platform === "win32"
+        ? spawn(CLAUDE_BIN, winArgs, {
+            env: cleanEnv,
+            stdio: ["pipe", "pipe", "pipe"],
+            cwd: tmpdir(),
+          })
+        : spawn("/bin/sh", ["-c", shellCmd], {
+            env: cleanEnv,
+            stdio: ["ignore", "pipe", "pipe"],
+            // cwd neutro: con cwd=$HOME cada llamada cargaba el CLAUDE.md del usuario
+            // como contexto y acumulaba sesiones en ~/.claude/projects (auditoría)
+            cwd: tmpdir(),
+          });
+    if (child.stdin) {
+      child.stdin.on("error", () => { /* EPIPE si el child muere antes de leer todo */ });
+      const rs = createReadStream(tmpFile);
+      rs.on("error", () => { /* el close handler ya reporta el fallo del child */ });
+      rs.pipe(child.stdin);
+    }
 
     let stdout = "";
     let stderr = "";

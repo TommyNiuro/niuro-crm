@@ -13,7 +13,7 @@
     "seed": "npx tsx src/db/seed.ts",
     "local": "npm run build && npm run init && npm start",
     "mcp": "npx tsx mcp/crm-server.ts",
-    "postinstall": "mkdir -p data",
+    "postinstall": "node -e \"require('fs').mkdirSync('data',{recursive:true})\"",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "backup": "bash scripts/backup-db.sh",
