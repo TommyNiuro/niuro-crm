@@ -33,21 +33,27 @@ que es a la que apunta `WHATSAPP_DB_PATH`.
 - `WHATSAPP_STORE_DB_PATH` (ruta a la `whatsapp.db` del bridge, el store de sesión/contactos)
 - `WHATSAPP_SINCE` (fecha desde la cual sincronizar, ej. `2024-12-01`)
 
-**Flujo completo de conexión (importante, el QR NO lo muestra el CRM):**
+**Flujo de conexión (todo dentro de la app, sin terminal):**
 
-1. Levantá el bridge (repo whatsapp-mcp, carpeta `whatsapp-bridge`): la **terminal del
-   bridge** muestra el QR y lo escaneás desde WhatsApp en el teléfono (Dispositivos
-   vinculados). El bridge descarga el historial que WhatsApp entrega a un dispositivo
-   nuevo y lo va guardando en su `messages.db`.
-2. En el CRM, configurá las rutas de arriba (el onboarding las pide en el paso de
-   WhatsApp, o después en `/settings`).
-3. Sincronizá el historial al CRM: `npm run sync:wa` (primera vez, full). Para
-   actualizaciones incrementales: `npm run sync:wa -- --incr`, a mano o agendado
-   (launchd/cron). El inbox muestra los chats con los nombres que da WhatsApp
-   (contactos y push names del store del bridge; un chat sin nombre muestra el número).
-4. La **detección y categorización de leads con IA** sobre esas conversaciones es parte
-   de la integración de IA (CLI `claude`, sección de arriba): sin el CLI, el inbox
-   funciona igual pero sin sugerencias ni extracción automática.
+1. Una sola vez, compilá el bridge: `npm run bridge:build` (requiere [Go](https://go.dev/dl/)
+   instalado). Deja el binario en `bridge/`. La app de escritorio (Tauri) lo trae ya
+   compilado adentro, así que ahí ni esto hace falta.
+2. En el CRM, entrá a **WhatsApp** en el menú y tocá **Conectar WhatsApp**. La app
+   arranca el bridge sola y te muestra el **QR dentro de la pantalla**. Escanealo desde
+   el teléfono (WhatsApp > Dispositivos vinculados > Vincular dispositivo).
+3. Al vincular, la app empieza a **descargar tu historial** (lo que WhatsApp entrega a un
+   dispositivo nuevo) y lo sincroniza al CRM automáticamente. El inbox se va poblando con
+   los chats y sus nombres (los que da WhatsApp: contactos y push names; un chat sin
+   nombre muestra el número).
+4. La **categorización de leads con IA** sobre esas conversaciones es parte de la
+   integración de IA (CLI `claude`, sección de arriba): sin el CLI, el inbox funciona
+   igual pero sin sugerencias ni extracción automática.
+
+> Bajo el capó: el binario del bridge es un fork de
+> [whatsapp-mcp](https://github.com/lharries/whatsapp-mcp) (MIT) vendorizado en `bridge/`,
+> con un endpoint extra `/api/qr` para exponer el código a la UI. Escucha solo en
+> `127.0.0.1`. Si preferís correrlo a mano (o agendar el sync incremental con
+> launchd/cron), el comando sigue siendo `npm run sync:wa` (full) / `npm run sync:wa -- --incr`.
 
 **Dejar OFF (default).** No levantes el bridge. El inbox aparece vacío; nada más se rompe.
 

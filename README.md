@@ -24,8 +24,10 @@ Niuro CRM es un CRM local-first para un solo operador, con la UX y la paridad de
 - No usa API key: aprovecha tu sesión del CLI ya autenticada.
 
 **WhatsApp**
-- Inbox de WhatsApp opcional, alimentado por un bridge HTTP local.
-- Sin el bridge, el inbox simplemente queda vacío (el resto del CRM funciona igual).
+- Inbox de WhatsApp integrado: entrás a la pantalla WhatsApp, tocás **Conectar**, escaneás
+  el QR (que se muestra dentro de la app) y tu historial se descarga y sincroniza solo.
+- Sin conectar, el resto del CRM funciona igual. El bridge se compila una vez con
+  `npm run bridge:build` (requiere Go); la app de Mac lo trae adentro.
 
 **Import / Export**
 - Import/export CSV desde las vistas.

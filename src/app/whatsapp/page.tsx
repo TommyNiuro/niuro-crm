@@ -1,5 +1,10 @@
 import { WhatsAppInbox } from "@/components/whatsapp/WhatsAppInbox";
+import { ConnectWhatsApp } from "@/components/whatsapp/ConnectWhatsApp";
 
 export default function WhatsAppPage() {
-  return <WhatsAppInbox />;
+  return (
+    <ConnectWhatsApp>
+      <WhatsAppInbox />
+    </ConnectWhatsApp>
+  );
 }

@@ -26,11 +26,18 @@ jobs:
           node-version: 24
           cache: npm
 
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
       - name: Install dependencies
         run: npm ci
 
       - name: Módulo nativo cifrado (prebuild correcto para esta plataforma)
         run: node -e "const db=require('better-sqlite3')(':memory:'); console.log('cipher:', db.prepare('SELECT sqlite3mc_version() v').get().v); db.close()"
+
+      - name: Bridge de WhatsApp compila (Go, esta plataforma)
+        run: npm run bridge:build
 
       - name: Typecheck
         run: npx tsc --noEmit
