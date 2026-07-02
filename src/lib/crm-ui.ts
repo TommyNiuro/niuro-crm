@@ -42,6 +42,36 @@ export const STAGE_CFG: Record<
   Expansion: { text: "#FFD166", bg: "rgba(255,209,102,0.14)", order: 6, task: "QBR de expansion", sla: "30 y 60 dias", dueInDays: 30, probability: 90 },
 };
 
+// Pipeline de INGENIEROS (contact_type='engineer'): separado del de ventas.
+// Reclutamiento tech para el pool de Niuro, no venta consultiva.
+export const ENGINEER_STAGES = [
+  "Contactado",
+  "Entrevista",
+  "Evaluacion",
+  "Disponible",
+  "Colocado",
+] as const;
+export type EngineerStage = (typeof ENGINEER_STAGES)[number];
+
+export const ENGINEER_STAGE_CFG: Record<
+  string,
+  { text: string; bg: string; order: number; task: string; sla: string; dueInDays: number; probability: number }
+> = {
+  Contactado: { text: "#64748b", bg: "rgba(148,163,184,0.12)", order: 0, task: "Primer contacto con el ingeniero", sla: "48h", dueInDays: 2, probability: 10 },
+  Entrevista: { text: "#3B5FE5", bg: "rgba(59,95,229,0.14)", order: 1, task: "Entrevista inicial / screening", sla: "3 dias", dueInDays: 3, probability: 30 },
+  Evaluacion: { text: "#D4940A", bg: "rgba(212,148,10,0.14)", order: 2, task: "Evaluacion tecnica", sla: "5 dias", dueInDays: 5, probability: 55 },
+  Disponible: { text: "#06b6d4", bg: "rgba(6,182,212,0.14)", order: 3, task: "Validado, listo para el pool", sla: "", dueInDays: 7, probability: 75 },
+  Colocado: { text: "#16A34A", bg: "rgba(22,163,74,0.14)", order: 4, task: "Asignado a un cliente", sla: "", dueInDays: 30, probability: 100 },
+};
+
+export const ENGINEER_EMPTY_HINT: Record<string, string> = {
+  Contactado: "Marca ingenieros desde Conversaciones y entran aca.",
+  Entrevista: "Llega cuando agendes la primera entrevista.",
+  Evaluacion: "Llega cuando pases el screening.",
+  Disponible: "Ingenieros validados, listos para colocar.",
+  Colocado: "Ingenieros ya asignados a un cliente.",
+};
+
 export const CHANNEL_CFG: Record<string, { label: string; color: string }> = {
   whatsapp: { label: "WhatsApp", color: "#25D366" },
   instagram: { label: "Instagram", color: "#E4405F" },

@@ -9,6 +9,7 @@ export const contacts = sqliteTable("contacts", {
   phone: text("phone"),
   company: text("company"),
   source: text("source").notNull().default("otro"),
+  contactType: text("contact_type").notNull().default("lead"), // 'lead' | 'engineer'
   temperature: text("temperature").notNull().default("cold"),
   score: integer("score").notNull().default(0),
   notes: text("notes"),

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { UserPlus, UserX, ExternalLink, X, Loader2, Pencil } from "lucide-react";
+import { UserPlus, UserX, ExternalLink, X, Loader2, Pencil, HardHat } from "lucide-react";
 import { toast } from "sonner";
 import { Avatar, Tag } from "@/components/ds";
 import { STAGES, STAGE_CFG } from "@/lib/crm-ui";
@@ -151,6 +151,7 @@ function InsightPanel({
   const [error, setError] = useState<string | null>(null);
   const [dismissing, setDismissing] = useState(false);
   const [losing, setLosing] = useState(false);
+  const [markingEng, setMarkingEng] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -235,6 +236,34 @@ function InsightPanel({
       toast.error(err instanceof Error ? err.message : "No se pudo registrar");
     } finally {
       setLosing(false);
+    }
+  };
+
+  // Ingeniero: no es lead de venta, es candidato para el pool. Va al pipeline de
+  // ingenieros (arranca en Contactado) y sale del inbox de Conversaciones.
+  const handleEngineer = async () => {
+    if (markingEng) return;
+    setMarkingEng(true);
+    try {
+      const res = await fetch("/api/whatsapp/save-engineer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chatJid: chat.jid,
+          name: chat.name || jidToPhone(chat.jid),
+          phone: "+" + jidToPhone(chat.jid),
+        }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.error || `HTTP ${res.status}`);
+      }
+      toast.success("Guardado en el pipeline de Ingenieros 👷");
+      onDismissed();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "No se pudo marcar");
+    } finally {
+      setMarkingEng(false);
     }
   };
 
@@ -341,6 +370,15 @@ function InsightPanel({
           >
             <UserPlus className="h-4 w-4 mr-1.5" />
             Guardar como lead
+          </button>
+          <button
+            onClick={handleEngineer}
+            disabled={markingEng}
+            title="No es venta: es un ingeniero para el pool. Va al pipeline de Ingenieros."
+            className={cn(buttonVariants({ variant: "secondary", size: "sm" }), "w-full cursor-pointer text-cyan-400")}
+          >
+            {markingEng ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <HardHat className="h-4 w-4 mr-1.5" />}
+            Es un ingeniero 👷
           </button>
           <button
             onClick={handleLost}

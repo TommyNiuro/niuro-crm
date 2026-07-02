@@ -22,6 +22,7 @@ const CREATE_TABLES = [
     phone TEXT,
     company TEXT,
     source TEXT NOT NULL DEFAULT 'otro',
+    contact_type TEXT NOT NULL DEFAULT 'lead',
     temperature TEXT NOT NULL DEFAULT 'cold',
     score INTEGER NOT NULL DEFAULT 0,
     notes TEXT,

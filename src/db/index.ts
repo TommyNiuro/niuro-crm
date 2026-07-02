@@ -338,6 +338,10 @@ function initTables(db: Database.Database): void {
     `ALTER TABLE contacts ADD COLUMN score_breakdown TEXT`,
     `ALTER TABLE contacts ADD COLUMN job_description TEXT`,
     `ALTER TABLE contacts ADD COLUMN sales_intel TEXT`,
+    // Clasificación de contacto: 'lead' (venta) vs 'engineer' (ingeniero que
+    // contactamos para el pool). Separa el pipeline de ventas del de ingenieros.
+    `ALTER TABLE contacts ADD COLUMN contact_type TEXT NOT NULL DEFAULT 'lead'`,
+    `CREATE INDEX IF NOT EXISTS idx_contacts_type ON contacts(contact_type)`,
     // Radar v2: oportunidades de fuentes externas (job boards) además de grupos.
     `ALTER TABLE group_opportunities ADD COLUMN source TEXT NOT NULL DEFAULT 'whatsapp'`,
     `ALTER TABLE group_opportunities ADD COLUMN url TEXT`,
