@@ -10,6 +10,8 @@
 
 import { openDb } from "../src/lib/db-open";
 import fs from "fs";
+import { tmpdir } from "os";
+import { join } from "path";
 import { execFileSync } from "child_process";
 import { dbPath } from "../src/lib/paths";
 import { readSettings } from "../src/lib/settings";
@@ -30,7 +32,8 @@ const INCR = process.argv.includes("--incr");
 // write-lock de SQLite. Tomamos un lockfile exclusivo con el PID adentro. Si el
 // lockfile existe pero su proceso ya murió (corrida anterior que crasheó sin
 // limpiar), lo reclamamos; si el proceso sigue vivo, salimos temprano.
-const LOCK_PATH = "/tmp/niuro-sync.lock";
+// tmpdir() y no /tmp literal: en Windows /tmp no existe y el lock reventaba el sync.
+const LOCK_PATH = join(tmpdir(), "niuro-sync.lock");
 
 function processAlive(pid: number): boolean {
   try {

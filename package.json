@@ -11,6 +11,7 @@
     "init": "npx tsx scripts/init.ts",
     "init:seed": "npx tsx scripts/init.ts --seed",
     "seed": "npx tsx src/db/seed.ts",
+    "sync:wa": "npx tsx scripts/sync-wa.ts",
     "local": "npm run build && npm run init && npm start",
     "mcp": "npx tsx mcp/crm-server.ts",
     "postinstall": "node -e \"require('fs').mkdirSync('data',{recursive:true})\"",

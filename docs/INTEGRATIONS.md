@@ -33,6 +33,22 @@ que es a la que apunta `WHATSAPP_DB_PATH`.
 - `WHATSAPP_STORE_DB_PATH` (ruta a la `whatsapp.db` del bridge, el store de sesión/contactos)
 - `WHATSAPP_SINCE` (fecha desde la cual sincronizar, ej. `2024-12-01`)
 
+**Flujo completo de conexión (importante, el QR NO lo muestra el CRM):**
+
+1. Levantá el bridge (repo whatsapp-mcp, carpeta `whatsapp-bridge`): la **terminal del
+   bridge** muestra el QR y lo escaneás desde WhatsApp en el teléfono (Dispositivos
+   vinculados). El bridge descarga el historial que WhatsApp entrega a un dispositivo
+   nuevo y lo va guardando en su `messages.db`.
+2. En el CRM, configurá las rutas de arriba (el onboarding las pide en el paso de
+   WhatsApp, o después en `/settings`).
+3. Sincronizá el historial al CRM: `npm run sync:wa` (primera vez, full). Para
+   actualizaciones incrementales: `npm run sync:wa -- --incr`, a mano o agendado
+   (launchd/cron). El inbox muestra los chats con los nombres que da WhatsApp
+   (contactos y push names del store del bridge; un chat sin nombre muestra el número).
+4. La **detección y categorización de leads con IA** sobre esas conversaciones es parte
+   de la integración de IA (CLI `claude`, sección de arriba): sin el CLI, el inbox
+   funciona igual pero sin sugerencias ni extracción automática.
+
 **Dejar OFF (default).** No levantes el bridge. El inbox aparece vacío; nada más se rompe.
 
 ## Sync con otra instancia de Niuro CRM
