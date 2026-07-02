@@ -15,7 +15,10 @@ import { dataDir } from "@/lib/paths";
 import { writeSettings } from "@/lib/settings";
 import { getSince } from "@/lib/whatsapp";
 
-const BRIDGE_PORT = process.env.BRIDGE_PORT || "8080";
+// Puerto propio y poco común: el 8080 (http-alt) lo usan mil servicios (incluida
+// la instancia de producción auto-crm en la misma Mac), y si está ocupado el
+// bridge no bindea y la conexión queda colgada. Override con BRIDGE_PORT.
+const BRIDGE_PORT = process.env.BRIDGE_PORT || "8790";
 const BRIDGE_URL = `http://127.0.0.1:${BRIDGE_PORT}`;
 
 /** Carpeta de trabajo del bridge (cwd): ahí vive su store/. */
