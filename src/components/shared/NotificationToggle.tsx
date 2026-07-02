@@ -33,7 +33,7 @@ export function NotificationToggle() {
         toast.success("Notificaciones activadas");
 
         // Show test notification
-        new Notification("Auto-CRM", {
+        new Notification("Niuro CRM", {
           body: "Las notificaciones estan activas. Te avisaremos de seguimientos pendientes.",
         });
       } else {

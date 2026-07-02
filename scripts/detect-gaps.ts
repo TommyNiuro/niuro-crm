@@ -16,8 +16,8 @@
  *   npx tsx scripts/detect-gaps.ts --only-known     # solo chats que son contacto/lead
  *   npx tsx scripts/detect-gaps.ts --json           # salida JSON para encadenar con backfill
  */
-import Database from "better-sqlite3";
-import { join } from "path";
+import { openDb } from "../src/lib/db-open";
+import { dbPath } from "../src/lib/paths";
 
 // ── args ──────────────────────────────────────────────────────────────────
 const args = process.argv.slice(2);
@@ -31,8 +31,7 @@ const MIN_GAP_DAYS = Number(opt("min-gap", "4"));
 const ONLY_KNOWN = flag("only-known");
 const AS_JSON = flag("json");
 
-const dbPath = join(process.env.HOME || "", "niuro/auto-crm/data/crm.db");
-const db = new Database(dbPath, { readonly: true });
+const db = openDb(dbPath(), { readonly: true });
 
 // ── chats individuales (no grupos, no broadcast) ────────────────────────────
 interface Row { chat_jid: string; ts: string }

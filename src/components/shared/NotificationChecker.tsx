@@ -15,7 +15,7 @@ export function NotificationChecker() {
       const overdueCount = data.overdue?.length || 0;
 
       if (overdueCount > 0) {
-        new Notification("Auto-CRM", {
+        new Notification("Niuro CRM", {
           body: `Tienes ${overdueCount} seguimiento${overdueCount > 1 ? "s" : ""} vencido${overdueCount > 1 ? "s" : ""}`,
           icon: "/favicon.ico",
           tag: "crm-followup", // Prevents duplicate notifications

@@ -4,7 +4,7 @@
  * Port literal de NIURO_VOICE (propuestas-niuro/src/lib/ai/voice-prompt.ts).
  *
  * En propuestas-niuro la voz era configurable por organizacion (tabla
- * organizations.voice_rules en Postgres, con cache Redis). El CRM (auto-crm) no
+ * organizations.voice_rules en Postgres, con cache Redis). Este CRM no
  * tiene multi-org ni esa tabla, asi que aqui la voz es una constante: la voz
  * Niuro hardcodeada que el origen usaba como fallback. getVoiceRules queda como
  * helper sincrono que siempre la devuelve, para mantener la firma de los

@@ -41,7 +41,7 @@ npm install
 npm run local   # build + init de la DB + start
 ```
 
-Abrí `http://localhost:3000`. La base SQLite se crea sola en la primera corrida (`./data/crm.db`), no hay paso de migración manual.
+Abrí `http://localhost:3000`. La base SQLite se crea sola en la primera corrida (`./data/crm.db`), no hay paso de migración manual. El primer arranque te pide crear tu **cuenta local** (email y contraseña, guardados solo en tu máquina) y después un onboarding corto (tu nombre, tu empresa, WhatsApp opcional).
 
 Para desarrollo con hot-reload: `npm run dev`. Tests: `npm test`.
 
@@ -61,6 +61,12 @@ La app funciona sin ninguna configurada. Cada integración se activa por variabl
 Detalle de cada una en [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md). Lista completa de variables en `.env.example`.
 
 > Importante: **no** configures `ANTHROPIC_API_KEY`. Interfiere con la autenticación del CLI `claude` que usa la IA.
+
+## Datos, cuenta y cifrado
+
+- **Tus datos**: un único archivo SQLite local (`./data/crm.db`). Backup WAL-safe con `npm run backup` (ver [docs/BACKUP.md](docs/BACKUP.md)).
+- **Cuenta local**: una sola cuenta por instalación (email + contraseña, hash scrypt en tu DB). Sin servidor externo. Si la olvidás: `npx tsx scripts/reset-account.ts` (resetea credenciales, no borra datos).
+- **Cifrado en reposo (opcional)**: si hay una llave disponible, la DB se cifra sola en el próximo arranque (SQLCipher vía `better-sqlite3-multiple-ciphers`). La app de Mac genera y guarda la llave en el Keychain automáticamente. Corriendo por npm se activa con la variable `CRM_DB_KEY`, o creando la entrada del Keychain de macOS: `security add-generic-password -s io.niuro.crm -a db-key -w "tu-llave-larga"`. Sin llave, la DB queda en texto plano (default en dev, Linux y CI). Ojo: si perdés la llave, los datos cifrados no se recuperan.
 
 ## Plataforma
 

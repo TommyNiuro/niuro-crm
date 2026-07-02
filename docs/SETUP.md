@@ -57,11 +57,15 @@ npm run local
 
 `npm run local` hace tres cosas: `build` + `init` (crea/inicializa la DB) + `start`. La base SQLite se crea sola en la primera corrida en `./data/crm.db` (con `CREATE TABLE IF NOT EXISTS` + seeds), no hay migración manual.
 
-Abrí `http://localhost:3000`. El **primer arranque abre un onboarding** que te pide tu
-nombre, tu empresa (qué hace) y, opcional, la conexión de WhatsApp. Eso se guarda en la DB
-en runtime: no hace falta editar `.env.local` ni rebuildear para cambiar nombre/empresa (lo
-podés reconfigurar después desde `/settings`). Las `OPERATOR_*` / `COMPANY_*` del `.env` son
-solo un pre-seed opcional.
+Abrí `http://localhost:3000`. El primer arranque tiene dos pasos:
+
+1. **Crear tu cuenta local** en `/setup-account` (email y contraseña). Es una sola cuenta
+   por instalación, guardada con hash scrypt en tu DB local; no hay servidor externo ni
+   verificación por email.
+2. Un **onboarding** que te pide tu nombre, tu empresa (qué hace) y, opcional, la conexión
+   de WhatsApp. Eso se guarda en la DB en runtime: no hace falta editar `.env.local` ni
+   rebuildear para cambiar nombre/empresa (lo podés reconfigurar después desde `/settings`).
+   Las `OPERATOR_*` / `COMPANY_*` del `.env` son solo un pre-seed opcional.
 
 Para desarrollo con hot-reload usá `npm run dev` en vez de `npm run local`.
 
@@ -88,3 +92,18 @@ PORT=3100 npm start
 2. **No** tener seteada `ANTHROPIC_API_KEY` (interfiere con la auth del CLI).
 
 Si el binario no está en el PATH, apuntalo con `CLAUDE_BIN=/ruta/al/claude` en `.env.local`.
+
+**Olvidé mi contraseña.** La cuenta es local, no hay "recuperar por email". Ejecutá:
+
+```bash
+npx tsx scripts/reset-account.ts
+```
+
+Resetea email, contraseña y sesiones (los datos del CRM quedan intactos); el próximo
+arranque vuelve a pedir crear la cuenta en `/setup-account`.
+
+**¿Cifrado de la base?** Opcional. Si existe la variable `CRM_DB_KEY` o la entrada del
+Keychain de macOS (`security add-generic-password -s io.niuro.crm -a db-key -w "tu-llave"`),
+la DB se cifra sola en el próximo arranque (SQLCipher). La app de Mac (Tauri) genera y
+guarda esa llave en el Keychain automáticamente. Si perdés la llave, esos datos no se
+recuperan. Detalle técnico en [SQLCIPHER-2026-07-01.md](SQLCIPHER-2026-07-01.md).

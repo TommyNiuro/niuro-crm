@@ -66,6 +66,11 @@ gh repo edit TommyNiuro/niuro-crm --visibility public --accept-visibility-change
 
 ## Estado verificado de este fork
 
+- 2026-07-02: **verificación de arranque limpio (paso 4) ejecutada contra GitHub**: clon
+  fresco de `TommyNiuro/niuro-crm`, `npm install` instala el módulo cifrado correcto
+  (Multiple Ciphers 2.3.5), build OK, init crea la DB sola, server arriba; `/` redirige a
+  `/setup-account` y las rutas protegidas exigen sesión. Además: `tsc` limpio, 177/177
+  tests, `npm run build` OK. Reporte: [AUDITORIA-READINESS-2026-07-02.md](AUDITORIA-READINESS-2026-07-02.md).
 - Sanitización: 0 hits de nombre/email/paths personales, key `re_`, ni nombres de clientes reales.
 - Persona genérica por env (`OPERATOR_*` / `COMPANY_*`), default "Operador".
 - `tsc --noEmit`: limpio. Suite de tests: verde en la última corrida sobre macOS.

@@ -5,7 +5,7 @@
 // Este script queda solo para el bootstrap inicial de una instalación nueva.
 
 /**
- * Auto-CRM initialization script.
+ * Niuro CRM initialization script.
  * Creates the database, seeds default pipeline stages,
  * and optionally seeds demo data.
  *
@@ -29,7 +29,7 @@ if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
 
-console.log("Initializing Auto-CRM...");
+console.log("Initializing Niuro CRM...");
 console.log(`Database: ${DB_PATH}`);
 
 const sqlite = openDb(DB_PATH);
@@ -180,6 +180,6 @@ if (shouldSeed) {
   cp.execSync("npx tsx src/db/seed.ts", { stdio: "inherit", cwd: process.cwd() });
 }
 
-console.log("\nAuto-CRM initialized successfully!");
+console.log("\nNiuro CRM initialized successfully!");
 console.log("Run 'npm run dev' to start the development server.");
 console.log("Open http://localhost:3000 to access your CRM.");

@@ -1,5 +1,5 @@
 /**
- * WhatsApp integration for Auto-CRM.
+ * WhatsApp integration for Niuro CRM.
  *
  * Reads the WhatsApp message history directly from the Go bridge's SQLite
  * database (read-only) and sends messages by proxying to the bridge's local
