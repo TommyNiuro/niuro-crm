@@ -29,11 +29,40 @@ export async function POST() {
           "INSERT INTO bridge_status_log (id, status, detail, checked_at) VALUES (?, ?, ?, ?)"
         ).run(crypto.randomUUID(), newStatus, detail, now);
       }
+      // Mantenimiento del radar de leads (mismo tick, cero cron extra):
+      // 1) Decay: un candidato pending sin actividad en 30 dias ya se enfrio;
+      //    auto-dismiss para que el radar muestre senal y no un backlog eterno.
+      //    Si el contacto revive, el scoring lo vuelve a generar.
+      // (columnas Drizzle mode:"timestamp" = unix SEGUNDOS, no ms)
+      const nowSec = Math.floor(now / 1000);
+      const cutoffSec = nowSec - 30 * 86400;
+      const decayed = db
+        .prepare(
+          `UPDATE lead_candidates SET status = 'dismissed', updated_at = ?
+           WHERE status = 'pending' AND COALESCE(last_message_at, created_at) < ?`
+        )
+        .run(nowSec, cutoffSec).changes;
+      // 2) Recalibrar temperatura por percentil del batch pendiente: con umbral
+      //    fijo todo termina "Caliente" y el ranking no discrimina. Top 10% =
+      //    hot (con piso de score 60), 60-90% = warm, resto cold.
+      db.prepare(
+        `WITH ranked AS (
+           SELECT id, PERCENT_RANK() OVER (ORDER BY score) AS pr
+           FROM lead_candidates WHERE status = 'pending'
+         )
+         UPDATE lead_candidates SET temperature = CASE
+             WHEN (SELECT pr FROM ranked WHERE ranked.id = lead_candidates.id) >= 0.9
+                  AND score >= 60 THEN 'hot'
+             WHEN (SELECT pr FROM ranked WHERE ranked.id = lead_candidates.id) >= 0.6 THEN 'warm'
+             ELSE 'cold'
+           END
+         WHERE status = 'pending'`
+      ).run();
+
+      return NextResponse.json({ status: newStatus, detail, decayed });
     } finally {
       db.close();
     }
-
-    return NextResponse.json({ status: newStatus, detail });
   } catch (e) {
     const detail = e instanceof Error ? e.message : String(e);
     return NextResponse.json({ error: detail }, { status: 500 });

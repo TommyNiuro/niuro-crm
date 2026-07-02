@@ -49,6 +49,14 @@ export async function POST(request: NextRequest) {
       );
     }
   }
+  // Mismo telefono con otro jid (lid vs jid, o importado sin WhatsApp): tambien
+  // es el mismo contacto. Sin esto se duplica el directorio.
+  if (phone?.trim()) {
+    const existingByPhone = db.select().from(contacts).where(eq(contacts.phone, phone.trim())).get();
+    if (existingByPhone) {
+      return NextResponse.json({ contact: existingByPhone, alreadyExists: true }, { status: 200 });
+    }
+  }
 
   // 1) Trae los mensajes recientes (para scoring + para guardar la conversación como actividad).
   const messages =

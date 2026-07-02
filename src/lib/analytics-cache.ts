@@ -12,6 +12,8 @@
  */
 import { db } from "@/db";
 import { contacts, stepTransitions, leadCandidates, tasks, groupOpportunities } from "@/db/schema";
+import { openDb } from "./db-open";
+import { dbPath } from "./paths";
 
 const TTL_MS = 60_000;
 
@@ -22,6 +24,35 @@ interface AnalyticsData {
   allCandidates: Pick<typeof leadCandidates.$inferSelect, "createdAt">[];
   allTasks: Pick<typeof tasks.$inferSelect, "completedAt" | "status">[];
   allOpps: Pick<typeof groupOpportunities.$inferSelect, "status" | "updatedAt">[];
+  /** Mediana en minutos de la primera respuesta nuestra a un mensaje entrante (30d). null sin datos. */
+  medianResponseMinutes: number | null;
+}
+
+/** Mediana de minutos entrante->respuesta nuestra por chat, últimos 30 días.
+ * SQL crudo sobre wa_messages (tabla fuera de Drizzle, la crea el sync). */
+function medianResponseMinutes(): number | null {
+  let conn: ReturnType<typeof openDb> | null = null;
+  try {
+    conn = openDb(dbPath(), { readonly: true });
+    const rows = conn.prepare(
+      `SELECT mins FROM (
+         SELECT m.is_from_me,
+                LEAD(m.is_from_me) OVER w AS nf,
+                CAST((julianday(LEAD(m.timestamp) OVER w) - julianday(m.timestamp)) * 1440 AS INTEGER) AS mins
+         FROM wa_messages m
+         WHERE m.timestamp >= datetime('now', '-30 days')
+         WINDOW w AS (PARTITION BY m.chat_jid ORDER BY m.timestamp)
+       )
+       WHERE is_from_me = 0 AND nf = 1 AND mins BETWEEN 0 AND 4320
+       ORDER BY mins`
+    ).pluck().all() as number[];
+    if (!rows.length) return null;
+    return rows[Math.floor(rows.length / 2)];
+  } catch {
+    return null; // instalación sin sync todavía: sin la tabla o vacía
+  } finally {
+    conn?.close();
+  }
 }
 
 let cache: AnalyticsData | null = null;
@@ -41,6 +72,7 @@ export function getAnalyticsData(): AnalyticsData {
       .select({ status: groupOpportunities.status, updatedAt: groupOpportunities.updatedAt })
       .from(groupOpportunities)
       .all(),
+    medianResponseMinutes: medianResponseMinutes(),
   };
   return cache;
 }

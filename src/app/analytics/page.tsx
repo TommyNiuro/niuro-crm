@@ -18,7 +18,7 @@ function lossCategory(reason: string | null): string {
 
 export default function AnalyticsPage() {
   // Datasets crudos cacheados 60s (ver analytics-cache.ts); el cómputo va acá.
-  const { allContacts, transitions, allCandidates, allTasks, allOpps } = getAnalyticsData();
+  const { allContacts, transitions, allCandidates, allTasks, allOpps, medianResponseMinutes } = getAnalyticsData();
   const activeContacts = allContacts.filter((c) => !c.archived);
   const lostContacts = allContacts.filter((c) => c.archived);
 
@@ -120,6 +120,14 @@ export default function AnalyticsPage() {
     { label: "Tareas completadas (7d)", value: allTasks.filter((t) => t.status === "completed" && inWindow(t.completedAt, 0)).length, prev: allTasks.filter((t) => t.status === "completed" && inWindow(t.completedAt, 1)).length },
     { label: "Radar contactadas (7d)", value: allOpps.filter((o) => o.status === "contacted" && inWindow(o.updatedAt, 0)).length, prev: allOpps.filter((o) => o.status === "contacted" && inWindow(o.updatedAt, 1)).length },
     { label: "Win rate", value: winRate != null ? `${winRate}%` : "—" },
+    {
+      label: "Respuesta mediana (30d)",
+      value: medianResponseMinutes == null
+        ? "—"
+        : medianResponseMinutes < 60
+          ? `${medianResponseMinutes} min`
+          : `${Math.round(medianResponseMinutes / 60)} h`,
+    },
   ];
 
   return (
@@ -127,7 +135,7 @@ export default function AnalyticsPage() {
       <h1 className="text-lg font-semibold tracking-tight mb-6">Analitica</h1>
 
       {/* KPIs semanales */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-5">
+      <div className="grid grid-cols-2 lg:grid-cols-6 gap-3 mb-5">
         {kpis.map((k) => {
           const delta = k.prev != null && typeof k.value === "number" ? k.value - k.prev : null;
           return (

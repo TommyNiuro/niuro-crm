@@ -14,6 +14,7 @@ import {
   pipelineStages,
   stepTransitions,
   activities,
+  tasks,
 } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import type { Proposal } from "@/db/schema";
@@ -318,6 +319,19 @@ export function applyStatusChange(proposal: Proposal, status: string): StatusCha
         tx.update(deals).set({ stageId: target.id, updatedAt: now }).where(eq(deals.id, deal.id)).run();
       }
     }
+    // Follow-up automatico: una propuesta enviada sin seguimiento se enfria.
+    // 72h es el plazo de cortesia estandar antes de insistir.
+    tx.insert(tasks)
+      .values({
+        contactId: contact.id,
+        title: `Follow-up propuesta: ${contact.name}`,
+        stepName: target.name,
+        dueAt: new Date(now.getTime() + 72 * 3600000),
+        status: "open",
+        createdAt: now,
+      })
+      .run();
+
     return {
       proposal: updated,
       pipeline: { moved: true, type: "sent", contactId: contact.id, toStage: target.name, archived: false },
