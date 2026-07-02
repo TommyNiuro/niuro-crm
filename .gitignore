@@ -75,3 +75,6 @@ __pycache__/
 /src-tauri/gen/
 /src-tauri/icons/
 /src-tauri/resources/server/
+# El binario del bridge (30MB, lo compila build-desktop.sh); el dir se conserva con .keep
+/src-tauri/resources/bridge/*
+!/src-tauri/resources/bridge/.keep
