@@ -93,6 +93,14 @@ fn boot_server(app: &AppHandle) {
         cmd.env("CRM_DB_KEY", key);
     }
 
+    // Bridge de WhatsApp embebido: le pasamos su ruta al server (BRIDGE_BIN) para
+    // que la conexion in-app (boton Conectar + QR) funcione sin que el usuario
+    // instale Go ni compile nada. Si no esta (build sin Go), el CRM anda igual y
+    // la pantalla de WhatsApp solo no podra arrancar el bridge.
+    if let Some(bridge) = find_bridge_bin(app) {
+        cmd.env("BRIDGE_BIN", bridge.to_string_lossy().to_string());
+    }
+
     let child = cmd.spawn();
 
     match child {
@@ -306,6 +314,26 @@ fn find_server_dir(app: &AppHandle) -> Option<PathBuf> {
     // Fallback de desarrollo: el build standalone dentro del repo.
     let dev = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../.next/standalone");
     if dev.join("server.js").exists() {
+        return Some(dev);
+    }
+    None
+}
+
+/// Resuelve el binario del bridge de WhatsApp embebido en los resources del .app.
+/// None si el .app se armo sin Go (build sin bridge): el CRM arranca igual.
+fn find_bridge_bin(app: &AppHandle) -> Option<PathBuf> {
+    if let Ok(res) = app.path().resource_dir() {
+        // Tauri puede aplanar el glob a res/bridge/ o res/resources/bridge/.
+        for sub in ["bridge/whatsapp-bridge", "resources/bridge/whatsapp-bridge"] {
+            let p = res.join(sub);
+            if p.exists() {
+                return Some(p);
+            }
+        }
+    }
+    // Fallback de desarrollo: el binario compilado en el repo.
+    let dev = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../bridge/whatsapp-bridge");
+    if dev.exists() {
         return Some(dev);
     }
     None

@@ -34,7 +34,7 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "resources": ["resources/server"],
+    "resources": ["resources/server", "resources/bridge/*"],
     "category": "Business",
     "shortDescription": "CRM local-first con UX estilo Twenty",
     "longDescription": "Niuro CRM corre entero en tu Mac sobre Next.js + SQLite, con IA opcional via el CLI claude. Empaquetado como app nativa con Tauri."

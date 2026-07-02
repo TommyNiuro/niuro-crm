@@ -29,10 +29,27 @@ mkdir -p "$SERVER_DIR/.next"
 cp -R .next/static "$SERVER_DIR/.next/static"
 if [ -d public ]; then cp -R public "$SERVER_DIR/public"; fi
 
-echo "==> 3/4  Generando iconos de la app"
+echo "==> 3/5  Compilando el bridge de WhatsApp (Go) y empaquetandolo"
+# El bridge va DENTRO del .app para que el usuario conecte WhatsApp sin instalar
+# Go ni correr nada a mano (el launcher le pasa la ruta por BRIDGE_BIN).
+# El dir siempre tiene al menos .keep: el glob "resources/bridge/*" de Tauri FALLA
+# el build si no matchea ningun archivo (aun cuando el bridge sea opcional).
+rm -rf src-tauri/resources/bridge
+mkdir -p src-tauri/resources/bridge
+touch src-tauri/resources/bridge/.keep
+if command -v go >/dev/null 2>&1; then
+  npm run bridge:build
+  cp bridge/whatsapp-bridge src-tauri/resources/bridge/whatsapp-bridge
+  chmod +x src-tauri/resources/bridge/whatsapp-bridge
+else
+  echo "    AVISO: Go no esta instalado; el .app se arma SIN el bridge embebido."
+  echo "    La conexion de WhatsApp in-app no funcionara hasta compilarlo (ver docs/INTEGRATIONS.md)."
+fi
+
+echo "==> 4/5  Generando iconos de la app"
 npx tauri icon src-tauri/app-icon.png >/dev/null
 
-echo "==> 4/4  Tauri build (.app + .dmg)"
+echo "==> 5/5  Tauri build (.app + .dmg)"
 npx tauri build
 
 echo ""
