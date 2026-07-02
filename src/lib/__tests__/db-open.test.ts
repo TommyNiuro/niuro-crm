@@ -34,11 +34,14 @@ describe("cifrado en reposo (db-open)", () => {
     expect((d2.prepare("SELECT x FROM t").get() as { x: string }).x).toBe("secreto-de-cliente");
     d2.close();
 
-    // sin llave, cualquier lectura falla
-    expect(() => {
-      const d3 = new Database(p);
-      d3.prepare("SELECT x FROM t").get();
-    }).toThrow();
+    // sin llave, cualquier lectura falla. El handle se cierra igual: en Windows
+    // un handle abierto bloquea el rmSync de abajo (EPERM, lo detecto el CI).
+    const d3 = new Database(p);
+    try {
+      expect(() => d3.prepare("SELECT x FROM t").get()).toThrow();
+    } finally {
+      d3.close();
+    }
 
     fs.rmSync(p, { force: true });
   });

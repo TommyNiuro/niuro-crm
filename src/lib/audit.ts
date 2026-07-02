@@ -68,8 +68,12 @@ export function appendAudit(entry: AuditEntry): void {
     const sqlite = openDb(dbPath(), { timeout: 15000 });
     try {
       const insert = sqlite.transaction((e: AuditEntry) => {
+        // Orden por rowid (orden fisico de insercion): ts es Date.now() en ms y
+        // dos appends pueden compartir milisegundo; desempatar por id (UUID
+        // aleatorio) hacia el orden no deterministico y "rompia" la cadena en
+        // maquinas rapidas (lo detecto el runner de CI en macOS ARM).
         const last = sqlite
-          .prepare("SELECT hash FROM audit_log ORDER BY ts DESC, id DESC LIMIT 1")
+          .prepare("SELECT hash FROM audit_log ORDER BY rowid DESC LIMIT 1")
           .get() as { hash: string } | undefined;
         const base: Omit<AuditRow, "hash"> = {
           id: crypto.randomUUID(),
@@ -109,7 +113,7 @@ export function verifyAuditChain(
   const own = sqlite ?? openDb(dbPath(), { readonly: true, timeout: 5000 });
   try {
     const rows = own
-      .prepare("SELECT * FROM audit_log ORDER BY ts ASC, id ASC")
+      .prepare("SELECT * FROM audit_log ORDER BY rowid ASC")
       .all() as AuditRow[];
     let prev = GENESIS;
     for (const r of rows) {
