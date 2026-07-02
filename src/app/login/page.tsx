@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -62,11 +63,17 @@ export default function LoginPage() {
           {error && <p className="text-sm text-destructive">{error}</p>}
         </CardContent>
 
-        <CardFooter>
+        <CardFooter className="flex-col gap-3">
           <Button onClick={submit} disabled={saving || !password} className="w-full">
             {saving ? <Loader2 className="animate-spin" /> : null}
             Entrar <ArrowRight />
           </Button>
+          <p className="text-sm text-muted-foreground">
+            ¿Primera vez?{" "}
+            <Link href="/setup-account" className="font-medium text-primary hover:underline">
+              Creá tu cuenta
+            </Link>
+          </p>
         </CardFooter>
       </Card>
     </div>

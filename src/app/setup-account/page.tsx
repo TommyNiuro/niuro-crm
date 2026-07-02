@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,6 +32,12 @@ export default function SetupAccountPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
+      if (r.status === 409) {
+        // Ya hay cuenta en esta instalación: no se crea otra, se entra.
+        router.push("/login");
+        router.refresh();
+        return;
+      }
       if (!r.ok) {
         const d = await r.json().catch(() => ({}));
         throw new Error(d.error || "No se pudo crear la cuenta");
@@ -94,11 +101,17 @@ export default function SetupAccountPage() {
           {error && <p className="text-sm text-destructive">{error}</p>}
         </CardContent>
 
-        <CardFooter>
+        <CardFooter className="flex-col gap-3">
           <Button onClick={submit} disabled={saving || !canSubmit} className="w-full">
             {saving ? <Loader2 className="animate-spin" /> : null}
             Crear cuenta y continuar <ArrowRight />
           </Button>
+          <p className="text-sm text-muted-foreground">
+            ¿Ya tenés cuenta?{" "}
+            <Link href="/login" className="font-medium text-primary hover:underline">
+              Iniciá sesión
+            </Link>
+          </p>
         </CardFooter>
       </Card>
     </div>
