@@ -111,11 +111,53 @@ Pasos del operador (Tomás):
 Qué esperar en su primera corrida: crear cuenta local, onboarding, CRM vacío listo para
 cargar datos (o `npm run init:seed` para datos demo).
 
-## 7. Pendientes conocidos (no bloquean el share)
+## 7. Compatibilidad multi-plataforma (agregado 2026-07-02, mismo día)
+
+Pedido: que el CRM se pueda usar en cualquier Mac y en Windows. Verificación en hardware
+real de GitHub Actions (workflow `compat.yml`, corrida 28595722039; es manual,
+`workflow_dispatch`, porque los runners macOS facturan minutos 10x):
+
+| Plataforma | Resultado |
+|---|---|
+| macOS Apple Silicon (`macos-latest`) | OK completo en 1m48s |
+| macOS Intel (`macos-15-intel`) | OK completo en 3m18s |
+| Windows x64 (`windows-latest`, Server 2025) | OK completo en 4m46s |
+| Linux x64 (`ubuntu-latest`, ci.yml en cada push) | OK completo |
+
+"OK completo" = `npm ci` instala el binario precompilado correcto del módulo cifrado
+(sqlite3mc 2.3.5; hay prebuilds win32/darwin/linux, x64 y arm64, para el ABI de Node 24),
+typecheck, 177/177 tests, `next build`, init de la DB y arranque real del server con el
+gate de cuenta respondiendo.
+
+Bugs de plataforma que esta verificación encontró y se arreglaron:
+
+1. `postinstall` usaba `mkdir -p` (bashismo): en Windows creaba una carpeta basura `-p`.
+   Ahora usa `node -e mkdirSync` (portable).
+2. La IA por subprocess dependía de `/bin/sh` + `perl`, que no existen en Windows: nueva
+   rama win32 con spawn directo del CLI y prompt por stdin. Best effort: sin validar
+   contra el CLI real de Windows todavía; si falla, degrada con error limpio (el resto
+   del CRM no se afecta).
+3. `audit.ts` ordenaba el hash-chain por `ts` (milisegundos) con desempate por UUID
+   aleatorio: dos entradas en el mismo milisegundo hacían el orden no determinístico y
+   la verificación fallaba en máquinas rápidas (flaky que el runner macOS ARM destapó).
+   Ahora ordena por `rowid` (orden físico de inserción).
+4. Dos tests no portables: asserts con separador `/` hardcodeado (Windows usa `\`) y un
+   handle de SQLite sin cerrar dentro de un `toThrow` (en Windows bloquea el `rmSync`
+   del cleanup con EPERM; en unix pasaba desapercibido).
+
+Límites conocidos en Windows (documentados en el README): `npm run backup` y
+`desktop:build` son scripts bash (Git Bash o WSL), la app de escritorio y el Keychain
+son solo macOS (el cifrado en Windows/Linux se activa con `CRM_DB_KEY`), la IA es best
+effort, y el bridge de WhatsApp requiere compilar Go con CGO (documentado por el
+proyecto del bridge).
+
+## 8. Pendientes conocidos (no bloquean el share)
 
 - **Validación GUI del Keychain en la .app**: el código y el empaquetado del cifrado están
   verificados; falta el paso manual del operador de lanzar la .app y aceptar el permiso de
   Keychain la primera vez.
 - **Búsqueda semántica (Voyage AI)**: decidida, sin empezar. Necesita API key de Voyage.
-- **Windows**: sin probar (documentado en README).
+- **IA en Windows**: la rama win32 del subprocess quedó best effort, falta validarla
+  contra el CLI `claude` real de Windows (el core del CRM en Windows sí está verificado,
+  ver sección 7).
 - **Desktop v2** (roadmap): bundlear Node, firma + notarización, auto-update.

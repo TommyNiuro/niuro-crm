@@ -1,6 +1,6 @@
 # Setup
 
-Cómo descargar y correr Niuro CRM en tu propia máquina. Pensado para macOS, pero el core corre igual en Linux.
+Cómo descargar y correr Niuro CRM en tu propia máquina. Pensado para macOS, pero el core corre igual en Linux y Windows (verificado en CI; en Windows los comandos npm funcionan desde PowerShell o cmd, y los scripts bash como `npm run backup` requieren Git Bash o WSL).
 
 ## 1. Instalar Node 24
 

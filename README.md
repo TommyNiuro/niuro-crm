@@ -70,7 +70,12 @@ Detalle de cada una en [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md). Lista compl
 
 ## Plataforma
 
-macOS-first. El core de la app corre bien en **Linux**. **Windows** está sin probar. El deploy de producción always-on usa launchd (`com.niuro.autocrm`, puerto 3001), que es solo macOS; para uso normal alcanza con `npm run local` y no necesitás launchd.
+Verificado en CI sobre hardware real (2026-07-02, workflow `compat.yml`): **macOS Apple Silicon**, **macOS Intel**, **Windows** y **Linux** corren la app completa (install con binarios precompilados del módulo cifrado, typecheck, 177 tests, build y arranque del server con su gate de cuenta).
+
+- **macOS** (Intel o Apple Silicon): experiencia completa, incluida la app de escritorio (Tauri) y la llave de cifrado en el Keychain.
+- **Linux**: core completo (el CI de cada push corre acá). Cifrado opt-in via `CRM_DB_KEY`.
+- **Windows**: core completo (CRM, objetos custom, workflows, import/export). Notas: `npm run backup` y `npm run desktop:build` son scripts bash (usalos desde Git Bash o WSL); la IA por CLI `claude` es best effort (necesita `claude.exe` en el PATH o `CLAUDE_BIN`, sin validar contra el CLI real de Windows todavía); el bridge de WhatsApp en Windows requiere compilar Go con CGO (ver el README del bridge). Cifrado opt-in via `CRM_DB_KEY` (no hay Keychain).
+- El deploy always-on con launchd (`com.niuro.autocrm`, puerto 3001) es solo macOS y opcional; para uso normal alcanza `npm run local`.
 
 ## Arquitectura
 
