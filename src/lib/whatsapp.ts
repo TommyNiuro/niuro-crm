@@ -8,7 +8,7 @@
  *
  * Configure via env (optional — sensible defaults below):
  *   WHATSAPP_DB_PATH       absolute path to whatsapp-bridge/store/messages.db
- *   WHATSAPP_BRIDGE_URL    base URL of the Go bridge (default http://localhost:8080)
+ *   WHATSAPP_BRIDGE_URL    base URL of the Go bridge (default http://localhost:$BRIDGE_PORT u 8790)
  */
 import Database from "better-sqlite3";
 import fs from "fs";
@@ -17,7 +17,10 @@ import { dbPath } from "./paths";
 import { openDb } from "./db-open";
 
 const DEFAULT_DB_PATH = "./data/whatsapp/messages.db";
-const DEFAULT_BRIDGE_URL = "http://localhost:8080";
+// Mismo default que bridge-manager.ts: sin esto, el health check pre-pairing
+// apuntaba al 8080 (puerto que usan mil servicios) y podia reportar
+// bridgeUp=true por un bridge ajeno.
+const DEFAULT_BRIDGE_URL = `http://localhost:${process.env.BRIDGE_PORT || "8790"}`;
 
 function openCrm(): Database.Database {
   // crm.db (fuente principal después del sync), resuelto en @/lib/paths.
