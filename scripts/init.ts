@@ -17,10 +17,14 @@
 import crypto from "crypto";
 import Database from "better-sqlite3";
 import { openDb } from "../src/lib/db-open";
+import { dbPath } from "../src/lib/paths";
 import path from "path";
 import fs from "fs";
 
-const DB_PATH = path.join(process.cwd(), "data", "crm.db");
+// Misma resolucion que el server (CRM_DB_PATH > CRM_DATA_DIR/crm.db > cwd/data):
+// hardcodear cwd/data/crm.db hacia que init escribiera en un lado y el server
+// (src/db/index.ts, que usa dbPath()) leyera de otro cuando hay CRM_DATA_DIR.
+const DB_PATH = dbPath();
 const shouldSeed = process.argv.includes("--seed");
 
 // Ensure data directory
