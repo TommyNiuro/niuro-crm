@@ -387,7 +387,12 @@ function InsightPanel({
             className={cn(
               buttonVariants({ variant: isEngineer ? "default" : "secondary", size: "sm" }),
               "w-full cursor-pointer",
-              isEngineer ? "order-first" : "order-2 text-cyan-400"
+              // text-cyan-400 quedaba ilegible sobre el gris claro del botón
+              // secundario (tono pensado para fondo oscuro). Fondo tintado +
+              // texto saturado + borde: mismo lenguaje que los chips de arriba.
+              isEngineer
+                ? "order-first"
+                : "order-2 bg-cyan-500/10 hover:bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 border border-cyan-500/30"
             )}
           >
             {markingEng ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <HardHat className="h-4 w-4 mr-1.5" />}
@@ -411,7 +416,10 @@ function InsightPanel({
             onClick={handleLost}
             disabled={losing}
             title="Era un prospecto real pero no quiso o no necesita. Queda contabilizado en Perdidos del pipeline."
-            className={cn(buttonVariants({ variant: "secondary", size: "sm" }), "w-full cursor-pointer text-amber-300 order-3")}
+            className={cn(
+              buttonVariants({ variant: "secondary", size: "sm" }),
+              "w-full cursor-pointer order-3 bg-amber-500/10 hover:bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30"
+            )}
           >
             {losing ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <UserX className="h-4 w-4 mr-1.5" />}
             Lead perdido (no quiso)
@@ -419,7 +427,7 @@ function InsightPanel({
           <button
             onClick={handleDismiss}
             disabled={dismissing}
-            className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "w-full cursor-pointer text-meta order-4")}
+            className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "w-full cursor-pointer text-muted-foreground hover:text-foreground order-4")}
           >
             {dismissing ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <X className="h-4 w-4 mr-1.5" />}
             No es de ventas (archivar)
