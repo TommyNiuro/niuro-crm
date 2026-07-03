@@ -15,7 +15,7 @@ import fs from "fs";
 import { readSettings } from "./settings";
 import { dbPath } from "./paths";
 import { openDb } from "./db-open";
-import { canonicalJid, equivalentJids } from "./lid";
+import { canonicalJid, equivalentJids, phonebookNames } from "./lid";
 
 const DEFAULT_DB_PATH = "./data/whatsapp/messages.db";
 // Mismo default que bridge-manager.ts: sin esto, el health check pre-pairing
@@ -232,17 +232,24 @@ export function listChats(opts: { query?: string; limit?: number; includeArchive
     ensureIndexes();
     const db = open();
     try {
+      // Ranking por el timestamp REAL del último mensaje, NO por
+      // chats.last_message_time: el history sync del pairing escribe esa
+      // columna en TANDAS con horas falsas (500-768 chats con el mismo
+      // minuto), lo que inundaba el top del inbox con chats fantasma y
+      // sepultaba las conversaciones reales. Un chat sin filas en messages
+      // no tiene nada que mostrar y queda afuera (el archivo lo cubre si
+      // tiene historia). Nota: con búsqueda, este lado solo cubre los :limit
+      // chats con mensajes más recientes; el archivo busca el resto.
       const whereFilter = query
-        ? "AND (LOWER(c.name) LIKE LOWER(:q) OR c.jid LIKE :q)"
+        ? "WHERE (LOWER(c.name) LIKE LOWER(:q) OR t.jid LIKE :q)"
         : "";
       const sql = `
         WITH top AS (
-          SELECT jid, name, last_message_time
-          FROM chats c
-          WHERE c.jid NOT LIKE '%@broadcast'
-            AND c.last_message_time >= :since
-            ${whereFilter}
-          ORDER BY c.last_message_time DESC
+          SELECT m.chat_jid AS jid, MAX(m.timestamp) AS last_msg
+          FROM messages m
+          WHERE m.timestamp >= :since AND m.chat_jid NOT LIKE '%@broadcast'
+          GROUP BY m.chat_jid
+          ORDER BY last_msg DESC
           LIMIT :limit
         ),
         latest AS (
@@ -250,12 +257,13 @@ export function listChats(opts: { query?: string; limit?: number; includeArchive
                  ROW_NUMBER() OVER (PARTITION BY m.chat_jid ORDER BY m.timestamp DESC) AS rn
           FROM messages m
           INNER JOIN top t ON m.chat_jid = t.jid
-          WHERE m.timestamp >= :since
         )
-        SELECT t.jid, t.name, t.last_message_time AS lastMessageTime,
+        SELECT t.jid, c.name, t.last_msg AS lastMessageTime,
                l.content AS lastMessage, l.media_type AS lastMediaType, l.is_from_me AS lastIsFromMe
         FROM top t
+        LEFT JOIN chats c ON c.jid = t.jid
         LEFT JOIN latest l ON l.chat_jid = t.jid AND l.rn = 1
+        ${whereFilter}
       `;
       const params: Record<string, unknown> = { limit, since };
       if (query) params.q = `%${query}%`;
@@ -277,32 +285,24 @@ export function listChats(opts: { query?: string; limit?: number; includeArchive
     }
   }
 
-  // Chats archivados ("no es de ventas"): set canónico, para que el descarte
-  // hecho sobre el jid viejo (teléfono) también oculte el chat nuevo (@lid).
-  // EXCEPCIÓN: si el chat pertenece a un contacto del CRM (ingeniero, cliente
-  // o lead), NO se oculta. Marcar "Es un ingeniero" descarta el candidate de
-  // venta, pero la conversación con esa persona tiene que seguir visible.
+  // Chats fuera del inbox de ventas, por decisión del operador (pasó horas
+  // triageando y eso se respeta): descartados ("no es de ventas") y también
+  // los contactos tipo ingeniero: el inbox es para posibles clientes; el
+  // ingeniero vive en su pipeline. Todo por jid canónico, para que la marca
+  // hecha sobre el jid viejo (teléfono) también aplique al chat nuevo (@lid).
   const dismissed = new Set<string>();
   if (!includeArchived) {
     try {
       const db = openCrm();
       try {
-        const contactJids = new Set<string>();
-        try {
-          const cs = db
-            .prepare("SELECT whatsapp_jid FROM contacts WHERE whatsapp_jid IS NOT NULL AND deleted_at IS NULL")
-            .all() as { whatsapp_jid: string }[];
-          for (const c of cs) contactJids.add(canonicalJid(c.whatsapp_jid));
-        } catch {
-          // esquema viejo sin deleted_at: sin excepción de contactos
-        }
         const rows = db
           .prepare("SELECT chat_jid FROM lead_candidates WHERE status = 'dismissed'")
           .all() as { chat_jid: string }[];
-        for (const r of rows) {
-          const canon = canonicalJid(r.chat_jid);
-          if (!contactJids.has(canon)) dismissed.add(canon);
-        }
+        for (const r of rows) dismissed.add(canonicalJid(r.chat_jid));
+        const engineers = db
+          .prepare("SELECT whatsapp_jid FROM contacts WHERE contact_type = 'engineer' AND whatsapp_jid IS NOT NULL")
+          .all() as { whatsapp_jid: string }[];
+        for (const c of engineers) dismissed.add(canonicalJid(c.whatsapp_jid));
       } finally {
         db.close();
       }
@@ -338,6 +338,43 @@ export function listChats(opts: { query?: string; limit?: number; includeArchive
       lastIsFromMe: newer ? r.lastIsFromMe : prev.lastIsFromMe,
       phone: null,
     });
+  }
+
+  // Nombres: un chat que solo vino del store puede traer name null o el número
+  // como "nombre" (jid @lid no dice nada). Fuentes en orden: agenda del
+  // teléfono (whatsmeow_contacts), nombre histórico del archivo (wa_chats),
+  // contacto del CRM. Todo por jid canónico.
+  const isNamed = (n: string | null) => !!n && /[a-zA-Z]/.test(n);
+  const unnamed = Array.from(merged.entries()).filter(([, r]) => !isNamed(r.name));
+  if (unnamed.length) {
+    const pb = phonebookNames();
+    for (const [canon, r] of unnamed) {
+      const n = pb.get(canon);
+      if (n) r.name = n;
+    }
+    const still = unnamed.filter(([, r]) => !isNamed(r.name));
+    if (still.length && isSynced()) {
+      try {
+        const db = openCrm();
+        try {
+          const fromWa = db.prepare("SELECT name FROM wa_chats WHERE jid = ?");
+          const fromContact = db.prepare("SELECT name FROM contacts WHERE whatsapp_jid = ? AND name IS NOT NULL LIMIT 1");
+          for (const [canon, r] of still) {
+            const wa = fromWa.get(canon) as { name: string | null } | undefined;
+            if (wa?.name && /[a-zA-Z]/.test(wa.name)) {
+              r.name = wa.name;
+              continue;
+            }
+            const ct = fromContact.get(canon) as { name: string } | undefined;
+            if (ct?.name && /[a-zA-Z]/.test(ct.name)) r.name = ct.name;
+          }
+        } finally {
+          db.close();
+        }
+      } catch {
+        // sin crm.db: quedan agenda + store
+      }
+    }
   }
 
   const result: WaChat[] = Array.from(merged.entries())

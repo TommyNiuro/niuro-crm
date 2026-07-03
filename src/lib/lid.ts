@@ -103,6 +103,30 @@ export function canonicalJid(jid: string): string {
   return jid;
 }
 
+let _pb: { at: number; map: Map<string, string> } | null = null;
+
+/** Agenda del teléfono sincronizada por whatsmeow: nombre real por jid canónico
+ * (pn@s.whatsapp.net). Es la mejor fuente de nombres para chats @lid cuyo
+ * store trae el número como "nombre". */
+export function phonebookNames(): Map<string, string> {
+  if (_pb && Date.now() - _pb.at < MAPS_TTL_MS) return _pb.map;
+  const map = new Map<string, string>();
+  const db = getLidDb();
+  if (db) {
+    try {
+      const rows = db
+        .prepare("SELECT their_jid, full_name, push_name FROM whatsmeow_contacts")
+        .all() as { their_jid: string; full_name: string | null; push_name: string | null }[];
+      for (const r of rows) {
+        const name = (r.full_name || r.push_name || "").trim();
+        if (name && /[a-zA-Z]/.test(name)) map.set(r.their_jid, name);
+      }
+    } catch { /* tabla ausente o lock: agenda vacía */ }
+  }
+  _pb = { at: Date.now(), map };
+  return map;
+}
+
 /** Jids equivalentes de un chat (él mismo + su alias lid/teléfono si existe). */
 export function equivalentJids(jid: string): string[] {
   const at = jid.indexOf("@");

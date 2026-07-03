@@ -40,7 +40,7 @@ interface ChatListProps {
   onSelect: (chat: WaChat) => void;
   onRefresh: () => void;
   onArchive?: (chat: WaChat) => void;
-  statusFor?: (jid: string) => ChatStatus;
+  statusFor?: (jid: string, phone?: string | null) => ChatStatus;
 }
 
 // Umbral del filtro "Con señal de lead" (confirmado con el operador): warm + hot.
@@ -271,7 +271,7 @@ export function ChatList({
                 {/* Barra de acento del chat activo */}
                 {active && <span className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r-full bg-primary" />}
                 {(() => {
-                  const st = statusFor?.(chat.jid);
+                  const st = statusFor?.(chat.jid, chat.phone);
                   const tempColor = st && st.kind !== "dismissed" ? TEMP_HEX[st.temperature || ""] : undefined;
                   // Insignia contextual del avatar: de un vistazo se sabe QUÉ es
                   // este chat: ingeniero, cliente, lead caliente, contacto CRM o
@@ -327,7 +327,7 @@ export function ChatList({
                   <div className="flex items-center gap-1.5">
                     <span className={cn("text-[13px] truncate", !chat.lastIsFromMe ? "font-semibold" : "font-medium")}>{name}</span>
                     {(() => {
-                      const st = statusFor?.(chat.jid);
+                      const st = statusFor?.(chat.jid, chat.phone);
                       const sc = st?.kind === "lead" ? st.score : undefined;
                       if (typeof sc !== "number" || sc <= 0) return null;
                       const c = TEMP_HEX[st?.temperature || "cold"] || TEMP_HEX.cold;

@@ -34,9 +34,12 @@ export function jidToPhone(jid: string): string {
   return local.replace(/[^0-9]/g, "");
 }
 
-export function chatDisplayName(chat: { name: string | null; jid: string; isGroup: boolean }): string {
+export function chatDisplayName(chat: { name: string | null; jid: string; isGroup: boolean; phone?: string | null }): string {
   if (chat.name) return chat.name;
   if (chat.isGroup) return "Grupo sin nombre";
+  // Teléfono canónico primero: en chats @lid el jid es un número interno de
+  // WhatsApp que no le dice nada al operador.
+  if (chat.phone) return `+${chat.phone}`;
   const phone = jidToPhone(chat.jid);
   return phone ? `+${phone}` : chat.jid;
 }

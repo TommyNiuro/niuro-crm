@@ -72,11 +72,6 @@ export function WhatsAppInbox() {
       .catch(() => {});
   }, []);
 
-  const pendingLeadFor = useCallback(
-    (jid: string) => links.pending.find((p) => p.chatJid === jid) || null,
-    [links]
-  );
-
   const contactFor = useCallback(
     (jid: string): LinkContact | null => {
       const num = jid.split("@")[0].replace(/\D/g, "");
@@ -97,10 +92,6 @@ export function WhatsAppInbox() {
     [links, chats]
   );
 
-  const isPending = useCallback(
-    (jid: string) => links.pendingChatJids.includes(jid),
-    [links]
-  );
 
   const loadStatus = useCallback(() => {
     fetch("/api/whatsapp/status")
@@ -349,13 +340,26 @@ export function WhatsAppInbox() {
                 toast.error(err instanceof Error ? err.message : "No se pudo archivar");
               }
             }}
-            statusFor={(jid) => {
-              const c = contactFor(jid);
+            statusFor={(jid, phone) => {
+              // Identidad canónica: las marcas del operador (contacto, lead,
+              // descartado) pueden estar guardadas con el jid viejo (teléfono)
+              // mientras el chat se presenta con el nuevo (@lid). Sin esto,
+              // horas de triage se veían como "desmarcadas".
+              const digits = (s: string) => s.split("@")[0].replace(/\D/g, "");
+              const key = phone || digits(jid);
+              const same = (other: string) => other === jid || (!!key && digits(other) === key);
+              const c =
+                links.contacts.find(
+                  (x) =>
+                    x.whatsappJid === jid ||
+                    (key && x.whatsappJid && digits(x.whatsappJid) === key) ||
+                    (key && x.phone && x.phone.replace(/\D/g, "") === key)
+                ) || null;
               if (c) return { kind: "contact" as const, temperature: c.temperature, contactType: c.contactType ?? null };
-              const p = pendingLeadFor(jid);
+              const p = links.pending.find((x) => same(x.chatJid)) || null;
               if (p) return { kind: "lead" as const, score: p.score, temperature: p.temperature };
-              if (isPending(jid)) return { kind: "lead" as const };
-              if (links.dismissedChatJids.includes(jid)) return { kind: "dismissed" as const };
+              if (links.pendingChatJids.some(same)) return { kind: "lead" as const };
+              if (links.dismissedChatJids.some(same)) return { kind: "dismissed" as const };
               return null;
             }}
           />
