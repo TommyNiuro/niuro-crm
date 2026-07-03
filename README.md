@@ -72,7 +72,7 @@ Detalle de cada una en [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md). Lista compl
 
 ## Plataforma
 
-Verificado en CI sobre hardware real (2026-07-02, workflow `compat.yml`): **macOS Apple Silicon**, **macOS Intel**, **Windows** y **Linux** corren la app completa (install con binarios precompilados del módulo cifrado, typecheck, 177 tests, build y arranque del server con su gate de cuenta).
+Verificado en CI sobre hardware real (workflow `compat.yml`): **macOS Apple Silicon**, **macOS Intel**, **Windows** y **Linux** corren la app completa (install con binarios precompilados del módulo cifrado, typecheck, tests, build y arranque del server con su gate de cuenta).
 
 - **macOS** (Intel o Apple Silicon): experiencia completa, incluida la app de escritorio (Tauri) y la llave de cifrado en el Keychain.
 - **Linux**: core completo (el CI de cada push corre acá). Cifrado opt-in via `CRM_DB_KEY`.
