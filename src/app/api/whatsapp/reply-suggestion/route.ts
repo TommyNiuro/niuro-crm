@@ -126,7 +126,9 @@ async function generateAISuggestion(opts: {
 }): Promise<string | null> {
   if (!dbExists()) return null;
   const operator = getOperator();
-  const msgs = getMessages({ chatJid: opts.chatJid, limit: 15 });
+  // 40 (antes 15): con 15 mensajes la IA no tenía el tono ni la historia de la
+  // relación, y las sugerencias salían genéricas de vendedor.
+  const msgs = getMessages({ chatJid: opts.chatJid, limit: 40 });
   if (!msgs.length) return null;
 
   const transcript = msgs
@@ -167,7 +169,14 @@ REGLA DE TIEMPO (obligatoria, según "Último mensaje"):
 - Ayer o más: abre saludando breve ("Hola ${opts.contactName?.split(" ")[0] || "!"}, ¿cómo va?") y reconecta con el ÚLTIMO TEMA antes de avanzar. NUNCA sigas como si la charla fuera de hoy.
 - Semanas o más: es una re-apertura, no un seguimiento. Saluda, referencia lo que quedó pendiente CON LAS PALABRAS DEL CONTACTO, y aporta algo nuevo (novedad, perfil disponible, caso, idea) que justifique escribir. Jamás un "¿pudiste verlo?" pelado.
 
-REGLAS DE VENTA (estilo ${operator.company}):
+REGLAS DE HUMANIDAD (las más importantes: un mensaje que suena a vendedor genérico es un mensaje FALLIDO):
+- ESPEJÁ el registro del contacto: si escribe informal con modismos, vos también; si usa emojis, usá 1 (el mismo estilo); si es seco y formal, andá al grano sin confianzudeces. Copiale el "vos/tú/usted" que él use.
+- Reconocé lo EMOCIONAL antes de lo comercial: si contó algo personal (viaje, hijo, logro, problema, chiste), tu primera frase reacciona a ESO como lo haría un conocido real. Recién después viene el negocio, si corresponde.
+- Usá las palabras DE ÉL: nombres propios, apodos, términos que usó. Nada de plantilla.
+- Longitud espejo: si él escribe 1 línea, no le mandes un párrafo.
+- SI LA CONVERSACIÓN ES PERSONAL (familia, amigos, hobby, cero señal de negocio): la sugerencia es un mensaje cálido de persona a persona. PROHIBIDO meter venta, agenda o perfiles. Respondé como ${operator.name} humano, no como ${operator.company}.
+
+REGLAS DE VENTA (solo si la conversación ES de negocio, estilo ${operator.company}):
 - Cero desesperación: tono de quien tiene agenda llena. No ruegues, no presiones, no te disculpes por escribir.
 - Personaliza con lo que el contacto DIJO (su rol, su dolor, sus palabras). Nada genérico.
 - Si ${operator.name} habló último y no respondieron: NO repitas lo mismo; cambia de ángulo o aporta valor nuevo.
@@ -186,7 +195,10 @@ Devuelve SOLO el texto del mensaje, sin comillas ni explicacion.`;
   try {
     const result = await runClaude(prompt, {
       model: FAST_MODEL,
-      timeoutMs: 45_000,
+      // 90s (antes 45): haiku por subprocess tarda 50-60s seguido; cortar antes
+      // hacía caer al fallback de plantillas genéricas, que es justo lo que no
+      // queremos mostrar cuando hay contexto real para personalizar.
+      timeoutMs: 90_000,
     });
     const text = result.trim();
     return text.length > 10 ? text : null;

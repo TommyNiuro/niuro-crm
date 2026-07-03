@@ -214,7 +214,7 @@ function IntelSkeleton() {
         {/* Señales 2-col */}
         <div className="grid grid-cols-2 gap-3">
           {[0, 1].map((i) => (
-            <div key={i} className="rounded-xl bg-card border border-border p-3.5 space-y-2">
+            <div key={i} className="rounded-xl bg-card border border-border shadow-sm p-3.5 space-y-2">
               <div className="h-3 w-16 rounded bg-muted animate-pulse" />
               <div className="space-y-1.5">
                 <div className="h-3 rounded bg-muted animate-pulse" />
@@ -228,7 +228,7 @@ function IntelSkeleton() {
         <div className="space-y-2">
           <div className="h-3 w-20 rounded bg-muted animate-pulse" />
           {[0, 1].map((i) => (
-            <div key={i} className="rounded-lg bg-card border border-border px-3.5 py-2.5">
+            <div key={i} className="rounded-xl bg-card border border-border shadow-sm px-3.5 py-2.5">
               <div className={`h-3 ${i === 0 ? "w-3/4" : "w-2/3"} rounded bg-muted animate-pulse`} />
             </div>
           ))}
@@ -237,7 +237,7 @@ function IntelSkeleton() {
         {/* Datos del deal */}
         <div className="space-y-2">
           <div className="h-3 w-24 rounded bg-muted animate-pulse" />
-          <div className="rounded-xl bg-card border border-border divide-y divide-border overflow-hidden">
+          <div className="rounded-xl bg-card border border-border shadow-sm divide-y divide-border overflow-hidden">
             {[0, 1, 2].map((i) => (
               <div key={i} className="px-4 py-3 flex items-center gap-3">
                 <div className="h-7 w-7 rounded-lg bg-muted animate-pulse shrink-0" />
@@ -332,7 +332,7 @@ function IntelPanel({ extracted }: { extracted: Extracted }) {
         {hasSignals && (
           <div className="grid grid-cols-2 gap-3">
             {(extracted.salesSignals?.positive?.length ?? 0) > 0 && (
-              <div className="rounded-xl bg-card border border-border p-3.5">
+              <div className="rounded-xl bg-card border border-border shadow-sm p-3.5">
                 <div className="flex items-center gap-1.5 mb-2.5">
                   <div className="h-5 w-5 rounded-md bg-emerald-100 dark:bg-emerald-950/60 flex items-center justify-center">
                     <TrendingUp className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
@@ -352,7 +352,7 @@ function IntelPanel({ extracted }: { extracted: Extracted }) {
               </div>
             )}
             {(extracted.salesSignals?.negative?.length ?? 0) > 0 && (
-              <div className="rounded-xl bg-card border border-border p-3.5">
+              <div className="rounded-xl bg-card border border-border shadow-sm p-3.5">
                 <div className="flex items-center gap-1.5 mb-2.5">
                   <div className="h-5 w-5 rounded-md bg-red-100 dark:bg-red-950/60 flex items-center justify-center">
                     <TrendingDown className="h-3 w-3 text-red-600 dark:text-red-400" />
@@ -380,7 +380,7 @@ function IntelPanel({ extracted }: { extracted: Extracted }) {
             <SectionTitle icon={<Crosshair className="h-3.5 w-3.5" />}>Dolores del prospecto</SectionTitle>
             <div className="space-y-2">
               {extracted.painPoints!.map((p, i) => (
-                <div key={i} className="rounded-lg bg-card border border-border px-3.5 py-2.5 flex items-start gap-2.5">
+                <div key={i} className="rounded-xl bg-card border border-border shadow-sm px-3.5 py-2.5 flex items-start gap-2.5">
                   <div className="h-1.5 w-1.5 rounded-full bg-orange-500 mt-2 shrink-0" />
                   <p className="text-[13px] text-foreground leading-relaxed">{p}</p>
                 </div>
@@ -393,7 +393,7 @@ function IntelPanel({ extracted }: { extracted: Extracted }) {
         {hasFacts && (
           <div>
             <SectionTitle>Datos del deal</SectionTitle>
-            <div className="rounded-xl bg-card border border-border divide-y divide-border overflow-hidden">
+            <div className="rounded-xl bg-card border border-border shadow-sm divide-y divide-border overflow-hidden">
               {extracted.budgetSignal && (
                 <div className="px-4 py-3 flex items-start gap-3">
                   <div className="h-7 w-7 rounded-lg bg-emerald-100 dark:bg-emerald-950/60 flex items-center justify-center shrink-0">
@@ -459,7 +459,7 @@ function IntelPanel({ extracted }: { extracted: Extracted }) {
             </SectionTitle>
             <div className="space-y-2.5">
               {extracted.objectionHandling!.map((o, i) => (
-                <div key={i} className="rounded-xl bg-card border border-border overflow-hidden">
+                <div key={i} className="rounded-xl bg-card border border-border shadow-sm overflow-hidden">
                   <div className="px-4 pt-3 pb-2">
                     <div className="flex items-start gap-2">
                       <div className="text-[20px] text-border leading-none font-serif shrink-0">&ldquo;</div>
@@ -496,7 +496,7 @@ function IntelPanel({ extracted }: { extracted: Extracted }) {
             <SectionTitle icon={<HelpCircle className="h-3.5 w-3.5" />}>Preguntas pendientes</SectionTitle>
             <div className="space-y-2">
               {extracted.openQuestions!.map((q, i) => (
-                <div key={i} className="rounded-lg bg-card border border-border px-3.5 py-2.5">
+                <div key={i} className="rounded-xl bg-card border border-border shadow-sm px-3.5 py-2.5">
                   <p className="text-[13px] text-foreground leading-relaxed">{q}</p>
                 </div>
               ))}

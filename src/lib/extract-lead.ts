@@ -107,7 +107,7 @@ Devolvé UN ÚNICO JSON (sin markdown):
   "name": "nombre del prospecto. Buscá en: presentaciones ('Hola soy X', 'me llamo X'), firmas al final del mensaje, menciones de '@X' o '-X' al cierre. Si solo hay número de teléfono o no se identifica, null. NUNCA inventes",
   "email": "email del prospecto si lo compartió (formato xxx@yyy.zz). Buscá literal en los mensajes. null si no aparece. NO inventes el local-part de un email aunque conozcas el dominio",
   "company": "nombre de la empresa/proyecto/startup del prospecto. Esto incluye: (a) empresa donde trabaja ('trabajo en X', 'soy de X', mail @x.com), (b) si es founder/emprendedor, el nombre de su STARTUP es la empresa ('mi proyecto se llama Mushnik' → 'Mushnik', 'estoy levantando una idea llamada X' → 'X', 'estamos construyendo Acme' → 'Acme'), (c) cualquier proyecto/marca/idea con nombre propio que mencione como suya. Solo null si REALMENTE no aparece ningún nombre propio asociable a él",
-  "role": "rol que busca contratar. Incluí roles técnicos ('Backend Dev', 'Data Eng'), roles de liderazgo ('CTO', 'Head of Eng') y roles de co-fundador ('CTO Co-fundador', 'Cofounder Técnico'). null si no se discute todavía",
+  "role": "rol que busca contratar. Incluí roles técnicos ('Backend Dev', 'Data Eng'), roles de liderazgo ('CTO', 'Head of Eng') y roles de co-fundador ('CTO Co-fundador', 'Cofounder Técnico'). Si no es explícito pero hay señales indirectas (necesita 'armar la app' → Fullstack Dev, 'automatizar con IA' → AI Eng), poné tu mejor hipótesis. null solo si NADA sugiere un rol",
   "seniority": "junior|mid|senior|lead|principal. Inferí cuando no es explícito: CTO/Co-founder/Head → principal, Tech Lead/Staff → lead, '5+ años' o 'senior' → senior. null solo si no hay señales",
   "stack": ["TODAS las tecnologías mencionadas: lenguajes (Python, JS, Go), frameworks (React, Django, Next.js), cloud (AWS, GCP), DBs (Postgres, Mongo), herramientas (Docker, K8s), dominios (AI/ML, Data, Blockchain). Inferí: 'modelo de IA' → 'AI/ML', 'webapp' → 'React' si no especifica"],
   "stage": "Prospecto|Discovery|Propuesta|Perfil|Entrevistas|Cierre|Expansion",
@@ -116,7 +116,7 @@ Devolvé UN ÚNICO JSON (sin markdown):
   "notes": "resumen ejecutivo en 2-3 frases concretas: quién es (rol/empresa/contexto), qué necesita (rol+seniority+urgencia), dónde está parado el deal (qué falta para cerrar)",
   "nextStep": "acción concreta y específica que ${operator.name} debe hacer ahora. Ej: 'Pedir descripción de cargo detallada' o 'Enviar one-pager de ${operator.company}' o 'Confirmar presupuesto antes de proponer perfiles'. null solo si literalmente no hay nada por hacer",
   "followUpDate": "YYYY-MM-DD. Inferí: si mencionó 'la próxima semana' calculá desde hoy ${today}. Si no hay señal clara, sugerí 2-3 días desde hoy para mantener momentum (calculá la fecha real)",
-  "jobDescription": "descripción detallada del cargo en 3-5 frases. Incluí: responsabilidades concretas, requisitos técnicos (stack, años de experiencia, seniority), contexto del equipo (tamaño, etapa, fully-remote/híbrido), tipo de relación (full-time, equity, contractor). Sintetizá TODO lo que el prospecto haya dicho del rol incluso si está disperso en varios mensajes. null solo si literalmente no compartió nada del puesto"
+  "jobDescription": "descripción detallada del cargo en 3-5 frases. Incluí: responsabilidades concretas, requisitos técnicos (stack, años de experiencia, seniority), contexto del equipo (tamaño, etapa, fully-remote/híbrido), tipo de relación (full-time, equity, contractor). Sintetizá TODO lo que el prospecto haya dicho del rol incluso si está disperso en varios mensajes. Si el rol no se discutió explícitamente pero la NECESIDAD de negocio es clara, armá un borrador de descripción desde esa necesidad y terminalo con '(borrador, confirmar con el prospecto)'. null solo si la conversación no tiene ninguna señal de contratación"
 }
 
 REGLAS GENERALES DE EXTRACCIÓN:
@@ -137,7 +137,7 @@ Solo el JSON, sin texto adicional ni markdown.`;
       // caía en "fallback" sin datos. 90s captura casi toda la distribución.
       timeoutMs: 90_000,
       ttlMs: 6 * 60 * 60 * 1000,
-      cacheKey: `extract-basic:v5:${transcriptHash(transcript)}`,
+      cacheKey: `extract-basic:v6:${transcriptHash(transcript)}`,
     });
     const p = parseJson(raw);
     if (!p) return null;
@@ -182,7 +182,7 @@ Devolvé UN ÚNICO JSON con inteligencia de ventas (sin markdown):
   "budgetSignal": "qué dijo sobre presupuesto o null",
   "decisionMaker": true|false|null,
   "keyObjections": ["objeción explícita 1"],
-  "openQuestions": ["pregunta clave sin responder que ${operator.name} debería hacer"],
+  "openQuestions": ["pregunta clave sin responder que ${operator.name} debería hacer. SIEMPRE al menos 1: si el deal está completo, la pregunta que asegura el cierre o el siguiente rol"],
   "responseStrategy": "cómo responder próximo mensaje: tono, qué preguntar, cómo manejar objeciones (2-3 frases)",
   "salesSignals": { "positive": ["señal de compra"], "negative": ["riesgo o señal negativa"] },
   "objectionHandling": [
@@ -192,7 +192,7 @@ Devolvé UN ÚNICO JSON con inteligencia de ventas (sin markdown):
     }
   ],
   "competitor": { "name": "Ontop|recruiter|in-house|null", "positioning": ["diferenciador Niuro vs competidor"] } | null,
-  "stageMismatch": { "declaredStage": "${declaredStage}", "realStage": "etapa real según señales", "reason": "qué señales muestran la etapa real" } | null
+  "stageMismatch": { "declaredStage": "${declaredStage}", "realStage": "la etapa real, OBLIGATORIAMENTE una de: Prospecto|Discovery|Propuesta|Perfil|Entrevistas|Cierre|Expansion (nada inventado tipo 'Early Engagement')", "reason": "qué señales muestran la etapa real" } | null
 }
 
 Si no hay objeciones, objectionHandling=[]. Si no hay competidor, competitor=null. Si la etapa calza, stageMismatch=null.
@@ -203,7 +203,7 @@ BREVEDAD OBLIGATORIA (la velocidad importa): máx 2 items por lista, cada string
       model: FAST_MODEL,
       timeoutMs: 90_000,
       ttlMs: 6 * 60 * 60 * 1000,
-      cacheKey: `extract-intel:v5:${transcriptHash(transcript)}:${declaredStage}`,
+      cacheKey: `extract-intel:v6:${transcriptHash(transcript)}:${declaredStage}`,
     });
     const p = parseJson(raw);
     if (!p) return null;

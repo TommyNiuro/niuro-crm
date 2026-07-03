@@ -16,6 +16,7 @@ export async function GET() {
       temperature: contacts.temperature,
       whatsappJid: contacts.whatsappJid,
       phone: contacts.phone,
+      contactType: contacts.contactType,
     })
     .from(contacts)
     .all();
@@ -30,9 +31,18 @@ export async function GET() {
     .where(eq(leadCandidates.status, "pending"))
     .all();
 
+  // Chats descartados ("no es de ventas"): el inbox los marca con una X
+  // para que se distingan de un vistazo los personales/no-negocio.
+  const dismissed = db
+    .select({ chatJid: leadCandidates.chatJid })
+    .from(leadCandidates)
+    .where(eq(leadCandidates.status, "dismissed"))
+    .all();
+
   return NextResponse.json({
     contacts: cs,
     pendingChatJids: pendingCands.map((c) => c.chatJid),
     pending: pendingCands, // {chatJid, score, temperature}
+    dismissedChatJids: dismissed.map((c) => c.chatJid),
   });
 }

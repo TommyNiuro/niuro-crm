@@ -17,10 +17,13 @@ export async function POST(request: NextRequest) {
   if (!chatJid) return NextResponse.json({ error: "chatJid es requerido" }, { status: 400 });
 
   const now = new Date();
+  // Buscar CUALQUIER candidate del chat, no solo pending: chat_jid tiene índice
+  // único, así que si ya existía uno (aprobado o descartado antes) el INSERT de
+  // abajo tiraba SqliteError -> 500. Se actualiza el que haya.
   const existing = db
     .select()
     .from(leadCandidates)
-    .where(and(eq(leadCandidates.chatJid, chatJid), eq(leadCandidates.status, "pending")))
+    .where(eq(leadCandidates.chatJid, chatJid))
     .get();
 
   if (existing) {

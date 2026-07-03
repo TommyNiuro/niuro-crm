@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Search, Users, User, RefreshCw, UsersRound, X, ArrowDownWideNarrow, Clock } from "lucide-react";
+import { Search, Users, User, RefreshCw, UsersRound, X, ArrowDownWideNarrow, Clock, Flame, HardHat, Handshake } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Avatar } from "@/components/ds";
 import { cn } from "@/lib/utils";
@@ -26,8 +26,9 @@ import {
 } from "./types";
 
 type ChatStatus =
-  | { kind: "contact"; temperature: string; score?: number }
+  | { kind: "contact"; temperature: string; score?: number; contactType?: string | null }
   | { kind: "lead"; score?: number; temperature?: string }
+  | { kind: "dismissed"; temperature?: string; score?: number }
   | null;
 
 interface ChatListProps {
@@ -271,7 +272,23 @@ export function ChatList({
                 {active && <span className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r-full bg-primary" />}
                 {(() => {
                   const st = statusFor?.(chat.jid);
-                  const tempColor = st ? TEMP_HEX[st.temperature || ""] : undefined;
+                  const tempColor = st && st.kind !== "dismissed" ? TEMP_HEX[st.temperature || ""] : undefined;
+                  // Insignia contextual del avatar: de un vistazo se sabe QUÉ es
+                  // este chat: ingeniero, cliente, lead caliente, contacto CRM o
+                  // descartado (no-negocio). Prioridad: tipo > temperatura > CRM.
+                  const badge = (() => {
+                    if (st?.kind === "dismissed")
+                      return { icon: X, bg: "bg-muted-foreground/70", title: "No es de ventas (archivado)" };
+                    if (st?.kind === "contact" && st.contactType === "engineer")
+                      return { icon: HardHat, bg: "bg-amber-500", title: "Ingeniero del pool" };
+                    if (st?.kind === "contact" && st.contactType === "client")
+                      return { icon: Handshake, bg: "bg-emerald-600", title: "Cliente" };
+                    if (st && st.temperature === "hot")
+                      return { icon: Flame, bg: "bg-red-500", title: st.kind === "contact" ? "Contacto caliente" : `Lead caliente · score ${st.score ?? "?"}` };
+                    if (st?.kind === "contact")
+                      return { icon: User, bg: "bg-primary", title: "Contacto del CRM" };
+                    return null;
+                  })();
                   return (
                     <div
                       className="relative shrink-0 rounded-full"
@@ -279,19 +296,28 @@ export function ChatList({
                       title={
                         st?.kind === "contact" ? "Ya es contacto en el CRM"
                         : st?.kind === "lead" ? `Lead detectado · score ${st.score ?? "?"}`
+                        : st?.kind === "dismissed" ? "Archivado: no es de ventas"
                         : undefined
                       }
                     >
-                      {chat.isGroup ? (
-                        <div className="h-10 w-10 rounded-full flex items-center justify-center bg-emerald-600/15 text-emerald-500">
-                          <Users className="h-4.5 w-4.5" />
-                        </div>
-                      ) : (
-                        <Avatar name={name} size={40} />
-                      )}
-                      {st?.kind === "contact" && (
-                        <span className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full bg-primary border-2 border-card flex items-center justify-center" title="Contacto del CRM">
-                          <User className="h-2 w-2 text-primary-foreground" />
+                      <div className={st?.kind === "dismissed" ? "opacity-50 grayscale" : undefined}>
+                        {chat.isGroup ? (
+                          <div className="h-10 w-10 rounded-full flex items-center justify-center bg-emerald-600/15 text-emerald-500">
+                            <Users className="h-4.5 w-4.5" />
+                          </div>
+                        ) : (
+                          <Avatar name={name} size={40} />
+                        )}
+                      </div>
+                      {badge && (
+                        <span
+                          className={cn(
+                            "absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full border-2 border-card flex items-center justify-center shadow-sm",
+                            badge.bg
+                          )}
+                          title={badge.title}
+                        >
+                          <badge.icon className="h-2.5 w-2.5 text-white" />
                         </span>
                       )}
                     </div>

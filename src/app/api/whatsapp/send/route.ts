@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sendMessage } from "@/lib/whatsapp";
+import { sendMessage, invalidateChatCache } from "@/lib/whatsapp";
 import { db } from "@/db";
 import { activities, contacts } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -34,6 +34,9 @@ export async function POST(request: NextRequest) {
   const result = await sendMessage(recipient, message);
 
   if (result.success) {
+    // El chat cambió: sin esto, la lista/preview seguía sirviendo el cache viejo
+    // y el mensaje enviado tardaba en reflejarse en el CRM.
+    invalidateChatCache();
     const now = new Date();
     const contact = db.select({ id: contacts.id }).from(contacts).where(eq(contacts.whatsappJid, recipient)).get();
     if (contact) {

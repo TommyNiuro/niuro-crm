@@ -344,7 +344,7 @@ function InsightPanel({
 
       <div
         className={cn(
-          "rounded-lg p-3 text-[12px] leading-snug",
+          "rounded-xl shadow-sm p-3 text-[12px] leading-snug",
           recBlock.tone === "save"
             ? "bg-[var(--accent-dim)] text-[var(--primary)] border border-[var(--primary)]/30"
             : recBlock.tone === "discard"
@@ -503,7 +503,7 @@ export function ContactPanel({
       ) : (
         <div className="p-5 space-y-5">
           {/* Valor + probabilidad */}
-          <div className="rounded-lg bg-surface-2 p-4">
+          <div className="rounded-xl bg-surface-2 p-4 shadow-sm">
             <div className="flex items-center justify-between">
               <div className="min-w-0 flex-1">
                 <div className="text-[10px] text-muted-foreground mb-0.5">Valor</div>
@@ -586,7 +586,7 @@ export function ContactPanel({
 
           {/* Próxima acción */}
           {contact.nextAction && (
-            <div className="rounded-lg p-3 text-xs" style={{ background: "var(--accent-dim)", color: "var(--primary)" }}>
+            <div className="rounded-xl shadow-sm p-3 text-xs" style={{ background: "var(--accent-dim)", color: "var(--primary)" }}>
               <div className="text-[10px] opacity-70 mb-0.5">Próxima acción</div>
               {contact.nextAction}
             </div>

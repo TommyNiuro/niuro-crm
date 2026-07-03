@@ -39,16 +39,19 @@ export function WhatsAppInbox() {
     temperature: string;
     whatsappJid: string | null;
     phone: string | null;
+    contactType?: string | null;
   };
   type PendingLead = { chatJid: string; score: number; temperature: string };
   const [links, setLinks] = useState<{
     contacts: LinkContact[];
     pendingChatJids: string[];
     pending: PendingLead[];
+    dismissedChatJids: string[];
   }>({
     contacts: [],
     pendingChatJids: [],
     pending: [],
+    dismissedChatJids: [],
   });
 
   const searchRef = useRef(search);
@@ -63,6 +66,7 @@ export function WhatsAppInbox() {
           contacts: d.contacts || [],
           pendingChatJids: d.pendingChatJids || [],
           pending: d.pending || [],
+          dismissedChatJids: d.dismissedChatJids || [],
         })
       )
       .catch(() => {});
@@ -118,6 +122,8 @@ export function WhatsAppInbox() {
   // fetch anterior — antes una respuesta tardía del chat viejo pisaba los
   // mensajes del chat recién abierto.
   const msgAbort = useRef<AbortController | null>(null);
+  // Mensajes propios enviados desde el CRM que el store del bridge aún no tiene.
+  const echoRef = useRef<{ jid: string; msg: WaMessage; at: number }[]>([]);
   // Ventana de mensajes del chat abierto: el deep-link con ?msg= la amplía a 500
   // y el polling de 6s debe respetarla (si no, pisa la carga amplia con 80).
   const msgLimitRef = useRef<number | undefined>(undefined);
@@ -130,7 +136,22 @@ export function WhatsAppInbox() {
     msgAbort.current = ctrl;
     fetch(`/api/whatsapp/messages?chat_jid=${encodeURIComponent(jid)}${effLimit ? `&limit=${effLimit}` : ""}`, { signal: ctrl.signal })
       .then((r) => (r.ok ? r.json() : []))
-      .then((d) => { if (!ctrl.signal.aborted) setMessages(Array.isArray(d) ? d : []); })
+      .then((d) => {
+        if (ctrl.signal.aborted) return;
+        const fetched: WaMessage[] = Array.isArray(d) ? d : [];
+        // Ecos locales de mensajes recién enviados: el store del bridge tarda en
+        // persistir el enviado, y el refetch/polling PISABA el eco optimista (el
+        // mensaje "desaparecía" del CRM aunque sí salió por WhatsApp). El eco
+        // sobrevive hasta que el store devuelva el mensaje real o pasen 10 min.
+        const nowMs = Date.now();
+        echoRef.current = echoRef.current.filter(
+          (e) =>
+            nowMs - e.at < 10 * 60_000 &&
+            !(e.jid === jid && fetched.some((f) => f.isFromMe && f.content === e.msg.content))
+        );
+        const extras = echoRef.current.filter((e) => e.jid === jid).map((e) => e.msg);
+        setMessages([...fetched, ...extras]);
+      })
       .catch((e: unknown) => {
         if ((e as Error)?.name !== "AbortError") {
           setMessages([]);
@@ -220,19 +241,19 @@ export function WhatsAppInbox() {
         return false;
       }
       toast.success("Mensaje enviado");
-      // optimistic: append, then refresh shortly after
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `local-${Date.now()}`,
-          sender: null,
-          content: textValue,
-          mediaType: null,
-          filename: null,
-          timestamp: new Date().toISOString(),
-          isFromMe: true,
-        },
-      ]);
+      // Eco optimista persistente: se registra en echoRef para que el
+      // refetch/polling no lo pise mientras el bridge persiste el mensaje.
+      const echoMsg: WaMessage = {
+        id: `local-${Date.now()}`,
+        sender: null,
+        content: textValue,
+        mediaType: null,
+        filename: null,
+        timestamp: new Date().toISOString(),
+        isFromMe: true,
+      };
+      echoRef.current.push({ jid: selected.jid, msg: echoMsg, at: Date.now() });
+      setMessages((prev) => [...prev, echoMsg]);
       setTimeout(() => loadMessages(selected.jid, false), 1500);
       return true;
     } catch {
@@ -314,10 +335,11 @@ export function WhatsAppInbox() {
             }}
             statusFor={(jid) => {
               const c = contactFor(jid);
-              if (c) return { kind: "contact" as const, temperature: c.temperature };
+              if (c) return { kind: "contact" as const, temperature: c.temperature, contactType: c.contactType ?? null };
               const p = pendingLeadFor(jid);
               if (p) return { kind: "lead" as const, score: p.score, temperature: p.temperature };
               if (isPending(jid)) return { kind: "lead" as const };
+              if (links.dismissedChatJids.includes(jid)) return { kind: "dismissed" as const };
               return null;
             }}
           />
