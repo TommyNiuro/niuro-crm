@@ -36,6 +36,7 @@ export default function EngineersPage() {
       subtitle="Ingenieros que vas contactando para el pool"
       typeFilter="engineer"
       showMoney={false}
+      variant="engineer"
     />
   );
 }

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { contacts, deals, activities, tasks, stepTransitions, leadCandidates, proposals } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
-import { stageCfgFor } from "@/lib/stages";
+import { stageCfgFor, getStages } from "@/lib/stages";
 import { contactUpdateSchema, validate } from "@/lib/validation";
 import { mergeCustomFields, applyCustomFieldsFromBody } from "@/lib/custom-fields";
 import { logActivity, diffChanges } from "@/lib/timeline";
@@ -128,6 +128,26 @@ export async function PUT(
   const stageChanged = body.stage !== undefined && body.stage !== existing.stage;
   if (body.stage !== undefined) updateData.stage = body.stage;
 
+  // Cambiar de TIPO es cambiar de mundo (venta -> post-venta -> recruiting):
+  // el contacto arranca en la primera etapa del pipeline nuevo y se limpian
+  // los campos del mundo anterior. Si el request trae etapa explícita, manda.
+  // (Fase 2 auditoría 2026-07-02: el backfill dejaba ingenieros con etapa,
+  // score y "próximo paso" heredados de ventas.)
+  const PIPELINE_OF_TYPE: Record<string, string> = { lead: "prospectos", client: "clientes", engineer: "ingenieros" };
+  const typeChanged = body.contactType !== undefined && body.contactType !== existing.contactType;
+  if (typeChanged && body.stage === undefined) {
+    const firstStage = getStages(PIPELINE_OF_TYPE[body.contactType as string] ?? "prospectos")[0]?.name;
+    if (firstStage) {
+      updateData.stage = firstStage;
+      updateData.nextAction = null;
+      updateData.nextStepDue = null;
+      if (body.contactType === "engineer") {
+        updateData.valueCents = 0;
+        updateData.probability = 0;
+      }
+    }
+  }
+
   // Transacción (auditoría 2026-06-09): transición + tarea + actividad + update
   // del contacto son una unidad — antes eran 4 escrituras sueltas.
   const result = db.transaction(() => {
@@ -168,6 +188,23 @@ export async function PUT(
         contactId: id,
         type: "note",
         description: `Movido de ${existing.stage} a ${stage}${cfg ? `. Tarea creada: ${cfg.task}` : ""}`,
+        createdAt: now,
+      })
+      .run();
+  }
+
+  // Cambio de tipo: registrar la transición (así "días en etapa" cuenta desde
+  // la conversión, no desde la creación) y dejar nota en la timeline.
+  if (typeChanged && !stageChanged && typeof updateData.stage === "string") {
+    const TYPE_LABEL: Record<string, string> = { lead: "lead", client: "cliente", engineer: "ingeniero" };
+    db.insert(stepTransitions)
+      .values({ contactId: id, fromStep: existing.stage, toStep: updateData.stage, durationDays: null, occurredAt: now })
+      .run();
+    db.insert(activities)
+      .values({
+        contactId: id,
+        type: "note",
+        description: `Convertido a ${TYPE_LABEL[body.contactType as string] ?? body.contactType} (arranca en ${updateData.stage})`,
         createdAt: now,
       })
       .run();

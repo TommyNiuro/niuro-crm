@@ -36,6 +36,9 @@ interface PipelineBoardProps {
   subtitle: string;
   typeFilter: string; // 'lead' | 'client' | 'engineer'
   showMoney?: boolean;
+  /** 'engineer' quita la semántica de ventas de la tarjeta (temperatura,
+   *  warning de próximo paso). Default: 'sales'. */
+  variant?: "sales" | "engineer";
 }
 
 interface Contact {
@@ -104,6 +107,7 @@ function ContactCard({
   lost = false,
   dragging = false,
   showMoney = true,
+  variant = "sales",
   onDragStart,
   onDragEnd,
   onClick,
@@ -113,13 +117,17 @@ function ContactCard({
   lost?: boolean;
   dragging?: boolean;
   showMoney?: boolean;
+  variant?: "sales" | "engineer";
   onDragStart?: () => void;
   onDragEnd?: () => void;
   onClick: () => void;
 }) {
+  const engineer = variant === "engineer";
   // eslint-disable-next-line react-hooks/purity
   const overdue = !!c.nextStepDue && new Date(c.nextStepDue).getTime() < Date.now();
-  const atRisk = !lost && (overdue || !c.nextAction);
+  // Para un ingeniero, no tener próximo paso es el estado normal (las tareas
+  // llegan al moverlo de etapa); solo el vencimiento es riesgo.
+  const atRisk = !lost && (overdue || (!engineer && !c.nextAction));
   const temp = TEMP_CFG[c.temperature] ?? TEMP_CFG.cold;
   const lastInteract = relativeTime(c.lastInteractionAt);
   const stageDays = lost ? null : daysInStage(c);
@@ -170,13 +178,15 @@ function ContactCard({
       </div>
 
       <div className="flex items-center gap-1.5 mt-2">
-        <span className={cn("flex items-center gap-1 text-[11px] font-medium", temp.colorClass)}>
-          <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", temp.dot)} />
-          {temp.label}
-        </span>
+        {!engineer && (
+          <span className={cn("flex items-center gap-1 text-[11px] font-medium", temp.colorClass)}>
+            <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", temp.dot)} />
+            {temp.label}
+          </span>
+        )}
         {lastInteract && (
           <>
-            <span className="text-border">·</span>
+            {!engineer && <span className="text-border">·</span>}
             <span className="text-[11px] text-muted-foreground">{lastInteract}</span>
           </>
         )}
@@ -215,7 +225,7 @@ function ContactCard({
                 </span>
               )}
             </div>
-          ) : (
+          ) : engineer ? null : (
             <div className="flex items-center gap-1 text-[10.5px] text-warning">
               <AlertTriangle className="h-3 w-3 shrink-0" />
               <span>Sin próximo paso</span>
@@ -241,7 +251,7 @@ function ContactCard({
   );
 }
 
-export function PipelineBoard({ stages, stageCfg, emptyHints, title, subtitle, typeFilter, showMoney = true }: PipelineBoardProps) {
+export function PipelineBoard({ stages, stageCfg, emptyHints, title, subtitle, typeFilter, showMoney = true, variant = "sales" }: PipelineBoardProps) {
   const router = useRouter();
   // Config visual efectiva: override del playbook si existe, si no deriva del
   // color que la etapa tiene en la DB (editable en Ajustes).
@@ -492,6 +502,7 @@ export function PipelineBoard({ stages, stageCfg, emptyHints, title, subtitle, t
                         cfg={cfgMap}
                         lost={isLost}
                         showMoney={showMoney}
+                        variant={variant}
                         dragging={dragId === c.id}
                         onDragStart={() => setDragId(c.id)}
                         onDragEnd={() => setDragId(null)}

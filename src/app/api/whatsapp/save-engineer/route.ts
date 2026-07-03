@@ -58,7 +58,18 @@ export async function POST(request: NextRequest) {
       if (existing) {
         const updated = tx
           .update(contacts)
-          .set({ contactType: "engineer", stage: "Contactado", archived: false, updatedAt: now })
+          .set({
+            contactType: "engineer",
+            stage: "Contactado",
+            archived: false,
+            // Limpia el mundo de ventas: un ingeniero no arrastra monto,
+            // probabilidad ni "próximo paso" de cuando era lead (Fase 2).
+            valueCents: 0,
+            probability: 0,
+            nextAction: null,
+            nextStepDue: null,
+            updatedAt: now,
+          })
           .where(eq(contacts.id, existing.id))
           .returning()
           .get();
