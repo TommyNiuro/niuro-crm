@@ -6,6 +6,8 @@ export interface WaChat {
   lastMessage: string | null;
   lastMediaType: string | null;
   lastIsFromMe: boolean;
+  /** Teléfono canónico (jid @lid resuelto vía lid map del bridge). */
+  phone?: string | null;
 }
 
 export interface WaMessage {

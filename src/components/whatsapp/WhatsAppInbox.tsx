@@ -80,13 +80,21 @@ export function WhatsAppInbox() {
   const contactFor = useCallback(
     (jid: string): LinkContact | null => {
       const num = jid.split("@")[0].replace(/\D/g, "");
+      // Los chats @lid no llevan el teléfono en el jid: usar el teléfono
+      // canónico que resuelve el server (chat.phone) para matchear contactos
+      // guardados con el jid viejo.
+      const canonPhone = chats.find((c) => c.jid === jid)?.phone ?? null;
       return (
         links.contacts.find(
-          (c) => c.whatsappJid === jid || (c.phone && c.phone.replace(/\D/g, "") === num)
+          (c) =>
+            c.whatsappJid === jid ||
+            (c.phone && c.phone.replace(/\D/g, "") === num) ||
+            (canonPhone && c.phone && c.phone.replace(/\D/g, "") === canonPhone) ||
+            (canonPhone && c.whatsappJid && c.whatsappJid.startsWith(canonPhone + "@"))
         ) || null
       );
     },
-    [links]
+    [links, chats]
   );
 
   const isPending = useCallback(
@@ -101,8 +109,8 @@ export function WhatsAppInbox() {
       .catch(() => setStatus(null));
   }, []);
 
-  const loadChats = useCallback((query: string) => {
-    setLoadingChats(true);
+  const loadChats = useCallback((query: string, silent = false) => {
+    if (!silent) setLoadingChats(true);
     // 500 (antes 2000): payload 4x menor por búsqueda; la búsqueda server-side
     // cubre el resto del historial (auditoría 2026-06-09)
     const params = new URLSearchParams({ limit: "500" });
@@ -216,6 +224,14 @@ export function WhatsAppInbox() {
     const t = setInterval(() => loadMessages(selected.jid, false), 6000);
     return () => clearInterval(t);
   }, [selected, loadMessages]);
+
+  // La LISTA también se refresca sola (20s, silencioso): sin esto, los
+  // previews y el orden quedaban congelados hasta un refresh manual aunque
+  // el bridge estuviera recibiendo mensajes en vivo.
+  useEffect(() => {
+    const t = setInterval(() => loadChats(searchRef.current, true), 20_000);
+    return () => clearInterval(t);
+  }, [loadChats]);
 
   const handleSelect = (chat: WaChat) => {
     setSelected(chat);

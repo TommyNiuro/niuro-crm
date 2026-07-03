@@ -15,6 +15,7 @@ import fs from "fs";
 import { readSettings } from "./settings";
 import { dbPath } from "./paths";
 import { openDb } from "./db-open";
+import { canonicalJid, equivalentJids } from "./lid";
 
 const DEFAULT_DB_PATH = "./data/whatsapp/messages.db";
 // Mismo default que bridge-manager.ts: sin esto, el health check pre-pairing
@@ -123,6 +124,8 @@ export interface WaChat {
   lastMessage: string | null;
   lastMediaType: string | null;
   lastIsFromMe: boolean;
+  /** Teléfono canónico (jid @lid resuelto vía lid map). null si no se pudo resolver. */
+  phone: string | null;
 }
 
 export interface WaMessage {
@@ -164,22 +167,24 @@ export function listChats(opts: { query?: string; limit?: number; includeArchive
     if (cached && Date.now() - cached.ts < CACHE_TTL_MS) return cached.data;
   }
 
-  // Leer desde crm.db si ya se hizo sync (mismo proceso, mucho más rápido)
+  const since = getSince();
+
+  // UNIÓN de las dos fuentes. Antes era una U otra (el archivo de crm.db si
+  // hubo sync; si no, el store del bridge), y como el archivo solo se actualiza
+  // al correr sync-wa, el inbox quedaba CONGELADO en el último sync aunque el
+  // bridge recibiera mensajes en vivo. Además WhatsApp migró a LIDs: el store
+  // identifica los chats por @lid y el archivo por teléfono, así que la misma
+  // persona existía dos veces sin verse. Se fusiona por jid canónico
+  // (lid -> teléfono vía whatsmeow_lid_map, ver lid.ts).
+  const fromArchive: WaChat[] = [];
+  const fromStore: WaChat[] = [];
+
   if (isSynced()) {
     const db = openCrm();
     try {
       const whereFilter = query
         ? "AND (LOWER(c.name) LIKE LOWER(:q) OR c.jid LIKE :q)"
         : "";
-      // Excluir chats archivados (lead_candidates con status='dismissed') del inbox.
-      // El operador puede revertir desde /whatsapp/leads o un endpoint.
-      const archivedFilter = includeArchived
-        ? ""
-        : `AND NOT EXISTS (
-             SELECT 1 FROM lead_candidates lc
-             WHERE lc.chat_jid = c.jid AND lc.status = 'dismissed'
-           )`;
-      const since = getSince();
       const sql = `
         WITH top AS (
           SELECT jid, name, is_group, last_message_time
@@ -188,7 +193,6 @@ export function listChats(opts: { query?: string; limit?: number; includeArchive
             AND c.last_message_time >= :since
             AND c.message_count > 0
             ${whereFilter}
-            ${archivedFilter}
           ORDER BY c.last_message_time DESC
           LIMIT :limit
         ),
@@ -203,75 +207,149 @@ export function listChats(opts: { query?: string; limit?: number; includeArchive
           l.content AS lastMessage, l.media_type AS lastMediaType, l.is_from_me AS lastIsFromMe
         FROM top t
         LEFT JOIN latest l ON l.chat_jid = t.jid AND l.rn = 1
-        ORDER BY t.last_message_time DESC
       `;
       const params: Record<string, unknown> = { limit, since };
       if (query) params.q = `%${query}%`;
       const rows = db.prepare(sql).all(params) as (ChatRow & { isGroup: number })[];
-      const result = rows.map((r) => ({
-        jid: r.jid,
-        name: r.name && r.name.trim() ? r.name : null,
-        isGroup: !!r.isGroup,
-        lastMessageTime: toISO(r.lastMessageTime),
-        lastMessage: r.lastMessage ?? null,
-        lastMediaType: r.lastMediaType ?? null,
-        lastIsFromMe: !!r.lastIsFromMe,
-      }));
-      if (!query) _chatCache.set(cacheKey, { ts: Date.now(), data: result });
-      return result;
+      for (const r of rows) {
+        fromArchive.push({
+          jid: r.jid,
+          name: r.name && r.name.trim() ? r.name : null,
+          isGroup: !!r.isGroup,
+          lastMessageTime: toISO(r.lastMessageTime),
+          lastMessage: r.lastMessage ?? null,
+          lastMediaType: r.lastMediaType ?? null,
+          lastIsFromMe: !!r.lastIsFromMe,
+          phone: null,
+        });
+      }
     } finally {
       db.close();
     }
   }
 
-  // Fallback al bridge DB si no hay sync
-  ensureIndexes();
-  const since = getSince();
-  const db = open();
-  try {
-    const whereFilter = query
-      ? "AND (LOWER(c.name) LIKE LOWER(:q) OR c.jid LIKE :q)"
-      : "";
-    const sql = `
-      WITH top AS (
-        SELECT jid, name, last_message_time
-        FROM chats c
-        WHERE c.jid NOT LIKE '%@broadcast'
-          AND c.last_message_time >= :since
-          ${whereFilter}
-        ORDER BY c.last_message_time DESC
-        LIMIT :limit
-      ),
-      latest AS (
-        SELECT m.chat_jid, m.content, m.media_type, m.is_from_me,
-               ROW_NUMBER() OVER (PARTITION BY m.chat_jid ORDER BY m.timestamp DESC) AS rn
-        FROM messages m
-        INNER JOIN top t ON m.chat_jid = t.jid
-        WHERE m.timestamp >= :since
-      )
-      SELECT t.jid, t.name, t.last_message_time AS lastMessageTime,
-             l.content AS lastMessage, l.media_type AS lastMediaType, l.is_from_me AS lastIsFromMe
-      FROM top t
-      LEFT JOIN latest l ON l.chat_jid = t.jid AND l.rn = 1
-      ORDER BY t.last_message_time DESC
-    `;
-    const params: Record<string, unknown> = { limit, since };
-    if (query) params.q = `%${query}%`;
-    const rows = db.prepare(sql).all(params) as ChatRow[];
-    const result = rows.map((r) => ({
-      jid: r.jid,
-      name: r.name && r.name.trim() ? r.name : null,
-      isGroup: r.jid.endsWith("@g.us") || r.jid.includes("-"),
-      lastMessageTime: toISO(r.lastMessageTime),
-      lastMessage: r.lastMessage ?? null,
-      lastMediaType: r.lastMediaType ?? null,
-      lastIsFromMe: !!r.lastIsFromMe,
-    }));
-    if (!query) _chatCache.set(cacheKey, { ts: Date.now(), data: result });
-    return result;
-  } finally {
-    db.close();
+  if (dbExists()) {
+    ensureIndexes();
+    const db = open();
+    try {
+      const whereFilter = query
+        ? "AND (LOWER(c.name) LIKE LOWER(:q) OR c.jid LIKE :q)"
+        : "";
+      const sql = `
+        WITH top AS (
+          SELECT jid, name, last_message_time
+          FROM chats c
+          WHERE c.jid NOT LIKE '%@broadcast'
+            AND c.last_message_time >= :since
+            ${whereFilter}
+          ORDER BY c.last_message_time DESC
+          LIMIT :limit
+        ),
+        latest AS (
+          SELECT m.chat_jid, m.content, m.media_type, m.is_from_me,
+                 ROW_NUMBER() OVER (PARTITION BY m.chat_jid ORDER BY m.timestamp DESC) AS rn
+          FROM messages m
+          INNER JOIN top t ON m.chat_jid = t.jid
+          WHERE m.timestamp >= :since
+        )
+        SELECT t.jid, t.name, t.last_message_time AS lastMessageTime,
+               l.content AS lastMessage, l.media_type AS lastMediaType, l.is_from_me AS lastIsFromMe
+        FROM top t
+        LEFT JOIN latest l ON l.chat_jid = t.jid AND l.rn = 1
+      `;
+      const params: Record<string, unknown> = { limit, since };
+      if (query) params.q = `%${query}%`;
+      const rows = db.prepare(sql).all(params) as ChatRow[];
+      for (const r of rows) {
+        fromStore.push({
+          jid: r.jid,
+          name: r.name && r.name.trim() ? r.name : null,
+          isGroup: r.jid.endsWith("@g.us") || r.jid.includes("-"),
+          lastMessageTime: toISO(r.lastMessageTime),
+          lastMessage: r.lastMessage ?? null,
+          lastMediaType: r.lastMediaType ?? null,
+          lastIsFromMe: !!r.lastIsFromMe,
+          phone: null,
+        });
+      }
+    } finally {
+      db.close();
+    }
   }
+
+  // Chats archivados ("no es de ventas"): set canónico, para que el descarte
+  // hecho sobre el jid viejo (teléfono) también oculte el chat nuevo (@lid).
+  // EXCEPCIÓN: si el chat pertenece a un contacto del CRM (ingeniero, cliente
+  // o lead), NO se oculta. Marcar "Es un ingeniero" descarta el candidate de
+  // venta, pero la conversación con esa persona tiene que seguir visible.
+  const dismissed = new Set<string>();
+  if (!includeArchived) {
+    try {
+      const db = openCrm();
+      try {
+        const contactJids = new Set<string>();
+        try {
+          const cs = db
+            .prepare("SELECT whatsapp_jid FROM contacts WHERE whatsapp_jid IS NOT NULL AND deleted_at IS NULL")
+            .all() as { whatsapp_jid: string }[];
+          for (const c of cs) contactJids.add(canonicalJid(c.whatsapp_jid));
+        } catch {
+          // esquema viejo sin deleted_at: sin excepción de contactos
+        }
+        const rows = db
+          .prepare("SELECT chat_jid FROM lead_candidates WHERE status = 'dismissed'")
+          .all() as { chat_jid: string }[];
+        for (const r of rows) {
+          const canon = canonicalJid(r.chat_jid);
+          if (!contactJids.has(canon)) dismissed.add(canon);
+        }
+      } finally {
+        db.close();
+      }
+    } catch {
+      // sin crm.db: no hay archivados
+    }
+  }
+
+  // Merge: el archivo entra primero; el store pisa el preview donde es más
+  // nuevo y su jid gana SIEMPRE (es el accionable para leer lo vivo y enviar).
+  const merged = new Map<string, WaChat>();
+  for (const r of fromArchive) {
+    const canon = canonicalJid(r.jid);
+    if (dismissed.has(canon)) continue;
+    merged.set(canon, r);
+  }
+  for (const r of fromStore) {
+    const canon = canonicalJid(r.jid);
+    if (dismissed.has(canon)) continue;
+    const prev = merged.get(canon);
+    if (!prev) {
+      merged.set(canon, r);
+      continue;
+    }
+    const newer = (r.lastMessageTime ?? "") >= (prev.lastMessageTime ?? "");
+    merged.set(canon, {
+      jid: r.jid,
+      name: prev.name && /[a-zA-Z]/.test(prev.name) ? prev.name : r.name || prev.name,
+      isGroup: prev.isGroup || r.isGroup,
+      lastMessageTime: newer ? r.lastMessageTime : prev.lastMessageTime,
+      lastMessage: newer ? r.lastMessage : prev.lastMessage,
+      lastMediaType: newer ? r.lastMediaType : prev.lastMediaType,
+      lastIsFromMe: newer ? r.lastIsFromMe : prev.lastIsFromMe,
+      phone: null,
+    });
+  }
+
+  const result: WaChat[] = Array.from(merged.entries())
+    .map(([canon, r]) => ({
+      ...r,
+      phone: canon.endsWith("@s.whatsapp.net") ? canon.split("@")[0] : null,
+    }))
+    .sort((a, b) => (b.lastMessageTime ?? "").localeCompare(a.lastMessageTime ?? ""))
+    .slice(0, limit);
+
+  if (!query) _chatCache.set(cacheKey, { ts: Date.now(), data: result });
+  return result;
 }
 
 interface MessageRow {
@@ -288,51 +366,68 @@ export function getMessages(opts: { chatJid: string; limit?: number }): WaMessag
   const limit = Math.min(opts.limit ?? 80, 500);
   const since = getSince();
 
+  // Historial UNIFICADO: la misma conversación vive con jid @lid en el store
+  // del bridge y con jid-teléfono en el archivo de crm.db (migración a LIDs de
+  // WhatsApp). Se leen AMBAS fuentes con TODOS los jids equivalentes del chat y
+  // se deduplica por id de mensaje: al abrir cualquier chat se ve el historial
+  // completo más lo vivo, sin importar bajo qué identidad quedó guardado.
+  const jids = equivalentJids(opts.chatJid);
+  const collected = new Map<string, WaMessage>();
+
   if (isSynced()) {
     const db = openCrm();
     try {
-      const rows = db
-        .prepare(
-          `SELECT id, sender, content, media_type, NULL as filename, timestamp, is_from_me
-           FROM wa_messages WHERE chat_jid = ? AND timestamp >= ?
-           ORDER BY timestamp DESC LIMIT ?`
-        )
-        .all(opts.chatJid, since, limit) as MessageRow[];
-      return rows.reverse().map((r) => ({
-        id: r.id,
-        sender: r.sender ?? null,
-        content: r.content ?? null,
-        mediaType: r.media_type ?? null,
-        filename: null,
-        timestamp: toISO(r.timestamp),
-        isFromMe: !!r.is_from_me,
-      }));
+      const stmt = db.prepare(
+        `SELECT id, sender, content, media_type, NULL as filename, timestamp, is_from_me
+         FROM wa_messages WHERE chat_jid = ? AND timestamp >= ?
+         ORDER BY timestamp DESC LIMIT ?`
+      );
+      for (const jid of jids) {
+        for (const r of stmt.all(jid, since, limit) as MessageRow[]) {
+          collected.set(r.id, {
+            id: r.id,
+            sender: r.sender ?? null,
+            content: r.content ?? null,
+            mediaType: r.media_type ?? null,
+            filename: null,
+            timestamp: toISO(r.timestamp),
+            isFromMe: !!r.is_from_me,
+          });
+        }
+      }
     } finally {
       db.close();
     }
   }
 
-  // Fallback bridge DB
-  const db = open();
-  try {
-    const rows = db
-      .prepare(
+  if (dbExists()) {
+    const db = open();
+    try {
+      const stmt = db.prepare(
         `SELECT id, sender, content, media_type, filename, timestamp, is_from_me
          FROM messages WHERE chat_jid = ? AND timestamp >= ? ORDER BY timestamp DESC LIMIT ?`
-      )
-      .all(opts.chatJid, since, limit) as MessageRow[];
-    return rows.reverse().map((r) => ({
-      id: r.id,
-      sender: r.sender ?? null,
-      content: r.content ?? null,
-      mediaType: r.media_type ?? null,
-      filename: r.filename ?? null,
-      timestamp: toISO(r.timestamp),
-      isFromMe: !!r.is_from_me,
-    }));
-  } finally {
-    db.close();
+      );
+      for (const jid of jids) {
+        for (const r of stmt.all(jid, since, limit) as MessageRow[]) {
+          collected.set(r.id, {
+            id: r.id,
+            sender: r.sender ?? null,
+            content: r.content ?? null,
+            mediaType: r.media_type ?? null,
+            filename: r.filename ?? null,
+            timestamp: toISO(r.timestamp),
+            isFromMe: !!r.is_from_me,
+          });
+        }
+      }
+    } finally {
+      db.close();
+    }
   }
+
+  return Array.from(collected.values())
+    .sort((a, b) => (a.timestamp ?? "").localeCompare(b.timestamp ?? ""))
+    .slice(-limit);
 }
 
 export interface SendResult {
