@@ -5,6 +5,7 @@ import { eq, desc, isNull, isNotNull } from "drizzle-orm";
 import { dealCreateSchema, validate } from "@/lib/validation";
 import { mergeCustomFields } from "@/lib/custom-fields";
 import { dispatchRecordEvent } from "@/lib/workflows/dispatch";
+import { mirrorDealsToContact } from "@/lib/deal-sync";
 
 export async function GET(request: NextRequest) {
   // Papelera (b7): por defecto solo vivos; ?deleted=1 lista solo los borrados.
@@ -91,6 +92,8 @@ export async function POST(request: NextRequest) {
       .returning()
       .get();
 
+    // El deal es la fuente de verdad del dinero: re-espejar el contacto (Fase 1).
+    mirrorDealsToContact(result.contactId);
     dispatchRecordEvent("deals", "created", result as { id: string } & Record<string, unknown>);
     return NextResponse.json(result, { status: 201 });
   } catch (error) {

@@ -6,6 +6,7 @@ import { dealUpdateSchema, validate } from "@/lib/validation";
 import { mergeCustomFields, applyCustomFieldsFromBody } from "@/lib/custom-fields";
 import { logActivity, diffChanges } from "@/lib/timeline";
 import { dispatchRecordEvent } from "@/lib/workflows/dispatch";
+import { mirrorDealsToContact } from "@/lib/deal-sync";
 
 /** Saca el nombre legible del cliente desde la columna 'client' (JSON o string). */
 function parseClientName(raw: unknown): string {
@@ -101,6 +102,11 @@ export async function PUT(
 
   if (raw && typeof raw === "object") applyCustomFieldsFromBody("deals", id, raw as Record<string, unknown>);
 
+  // Re-espejar el dinero en el contacto dueño; si el deal cambió de contacto,
+  // también en el anterior (Fase 1: el deal es la fuente de verdad).
+  mirrorDealsToContact(result.contactId);
+  if (existing.contactId !== result.contactId) mirrorDealsToContact(existing.contactId);
+
   if (body.deletedAt === null && existing.deletedAt) {
     logActivity("deals", id, "restored");
   } else {
@@ -131,6 +137,7 @@ export async function DELETE(
 
   if (hard) db.delete(deals).where(eq(deals.id, id)).run();
   else db.update(deals).set({ deletedAt: new Date() }).where(eq(deals.id, id)).run();
+  mirrorDealsToContact(existing.contactId); // el espejo del contacto baja a lo que quede vivo
   logActivity("deals", id, hard ? "deleted" : "deleted");
   dispatchRecordEvent("deals", "deleted", existing as { id: string } & Record<string, unknown>);
   return NextResponse.json({ success: true });

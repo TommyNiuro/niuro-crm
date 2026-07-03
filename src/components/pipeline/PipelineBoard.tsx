@@ -7,24 +7,34 @@ import { Avatar } from "@/components/ds";
 import { STAGE_PERDIDOS } from "@/lib/crm-ui";
 import { formatCurrency } from "@/lib/constants";
 import { cn } from "@/lib/utils";
-import { MessageCircle, Clock, AlertTriangle, TrendingUp, XCircle, ChevronsLeft, ChevronsRight, Info } from "lucide-react";
+import { MessageCircle, Clock, AlertTriangle, XCircle, ChevronsLeft, ChevronsRight, Info } from "lucide-react";
 
-// Kanban de pipeline reutilizable: lo usan Ventas (contact_type='lead') e
-// Ingenieros (contact_type='engineer'). Parametrizado por etapas, config,
-// título y el tipo de contacto que filtra.
+// Kanban de pipeline reutilizable: lo usan Ventas (contact_type='lead'),
+// Clientes ('client') e Ingenieros ('engineer'). Las etapas llegan de la DB
+// (nombre + color); stageCfg es un override opcional para las del playbook.
 type StageCfg = { text: string; bg: string; dueInDays: number };
+type StageDef = { name: string; color: string };
 
 /** Columna virtual para contactos cuya etapa no existe en el pipeline. */
 const ORPHAN_COL = "Sin etapa";
 const ORPHAN_CFG: StageCfg = { text: "#d97706", bg: "rgba(217,119,6,0.10)", dueInDays: 2 };
 
+/** #rrggbb -> rgba con alpha; inválido cae en gris neutro. */
+function hexA(hex: string, a: number): string {
+  const m = /^#([0-9a-fA-F]{6})$/.exec(hex || "");
+  if (!m) return "rgba(148,163,184,0.12)";
+  const n = parseInt(m[1], 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+}
+
 interface PipelineBoardProps {
-  stages: readonly string[];
-  stageCfg: Record<string, StageCfg>;
+  stages: StageDef[];
+  /** overrides del playbook por nombre de etapa; las demás derivan del color de la DB */
+  stageCfg?: Record<string, StageCfg>;
   emptyHints: Record<string, string>;
   title: string;
   subtitle: string;
-  typeFilter: string; // 'lead' | 'engineer'
+  typeFilter: string; // 'lead' | 'client' | 'engineer'
   showMoney?: boolean;
 }
 
@@ -80,20 +90,6 @@ function relativeTime(ts: number | string | null): string {
   if (d < 7) return `hace ${d}d`;
   if (d < 30) return `hace ${Math.floor(d / 7)}sem`;
   return `hace ${Math.floor(d / 30)}m`;
-}
-
-function scoreColor(s: number): string {
-  if (s >= 75) return "text-emerald-500";
-  if (s >= 50) return "text-amber-500";
-  if (s >= 25) return "text-orange-500";
-  return "text-destructive";
-}
-
-function scoreBg(s: number): string {
-  if (s >= 75) return "bg-emerald-500";
-  if (s >= 50) return "bg-amber-500";
-  if (s >= 25) return "bg-orange-500";
-  return "bg-destructive";
 }
 
 const TEMP_CFG: Record<string, { label: string; colorClass: string; dot: string }> = {
@@ -155,17 +151,22 @@ function ContactCard({
             <span className="text-[12.5px] font-semibold truncate leading-tight text-foreground">
               {c.name}
             </span>
-            {c.source === "whatsapp" && c.whatsappJid && (
-              <MessageCircle className="h-3 w-3 shrink-0 text-emerald-500" />
-            )}
           </div>
           {c.company && (
             <div className="text-[10.5px] text-muted-foreground truncate leading-tight">{c.company}</div>
           )}
         </div>
-        <div className={cn("text-[11px] font-bold tabular-nums shrink-0", scoreColor(c.score))}>
-          {c.score}
-        </div>
+        {c.whatsappJid && (
+          <a
+            href={`/whatsapp?chat=${encodeURIComponent(c.whatsappJid)}`}
+            onClick={(e) => e.stopPropagation()}
+            title="Abrir chat de WhatsApp"
+            aria-label={`Abrir chat de WhatsApp con ${c.name}`}
+            className="shrink-0 p-1 -m-0.5 rounded-md text-emerald-500 hover:bg-emerald-500/10"
+          >
+            <MessageCircle className="h-3.5 w-3.5" />
+          </a>
+        )}
       </div>
 
       <div className="flex items-center gap-1.5 mt-2">
@@ -223,36 +224,34 @@ function ContactCard({
         </div>
       )}
 
-      <div className="flex items-center gap-2 mt-2.5">
-        {showMoney && (
+      {showMoney && (
+        <div className="flex items-center gap-1.5 mt-2.5">
           <span className={cn(
             "text-[12px] font-bold tabular-nums",
             c.valueCents ? "text-emerald-500" : "text-muted-foreground"
           )}>
             {c.valueCents ? formatCurrency(c.valueCents) : "Sin monto"}
           </span>
-        )}
-        <div className="flex-1 flex items-center gap-1.5 justify-end">
-          <div className="h-1 w-10 rounded-full bg-muted overflow-hidden">
-            <div
-              className={cn("h-full rounded-full transition-all", scoreBg(c.score))}
-              style={{ width: `${c.score}%` }}
-            />
-          </div>
-          {!lost && (
-            <div className="flex items-center gap-0.5">
-              <TrendingUp className="h-2.5 w-2.5 text-muted-foreground" />
-              <span className="text-[11px] text-muted-foreground tabular-nums">{c.probability}%</span>
-            </div>
+          {!lost && c.valueCents > 0 && (
+            <span className="text-[11px] text-muted-foreground tabular-nums">· {c.probability}% prob.</span>
           )}
         </div>
-      </div>
+      )}
     </div>
   );
 }
 
 export function PipelineBoard({ stages, stageCfg, emptyHints, title, subtitle, typeFilter, showMoney = true }: PipelineBoardProps) {
   const router = useRouter();
+  // Config visual efectiva: override del playbook si existe, si no deriva del
+  // color que la etapa tiene en la DB (editable en Ajustes).
+  const stageNames = stages.map((s) => s.name);
+  const cfgMap: Record<string, StageCfg> = Object.fromEntries(
+    stages.map((s) => [
+      s.name,
+      stageCfg?.[s.name] ?? { text: s.color, bg: hexA(s.color, 0.10), dueInDays: 2 },
+    ])
+  );
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
   const [dragId, setDragId] = useState<string | null>(null);
@@ -306,7 +305,7 @@ export function PipelineBoard({ stages, stageCfg, emptyHints, title, subtitle, t
   const lostContacts   = contacts.filter((c) => c.archived);
   const staleCount     = activeContacts.filter((c) => {
     const d = daysInStage(c);
-    return d != null && d > stageStaleThreshold(c.stage, stageCfg);
+    return d != null && d > stageStaleThreshold(c.stage, cfgMap);
   }).length;
   const totalPipeline  = activeContacts.reduce((a, c) => a + (c.valueCents || 0), 0);
   const totalWeighted  = activeContacts.reduce((a, c) => a + (c.valueCents || 0) * (c.probability || 0) / 100, 0);
@@ -315,11 +314,11 @@ export function PipelineBoard({ stages, stageCfg, emptyHints, title, subtitle, t
   // Huérfanos: contactos vivos cuya etapa ya no existe en este pipeline
   // (etapa renombrada/borrada en Ajustes, o migración). Antes desaparecían del
   // kanban sin aviso; ahora tienen su propia columna y se arrastran a una real.
-  const knownStages = new Set(stages);
+  const knownStages = new Set(stageNames);
   const orphans = activeContacts.filter((c) => !knownStages.has(c.stage));
 
   const allCols: Array<{ key: string; isLost: boolean; isOrphan?: boolean }> = [
-    ...stages.map((s) => ({ key: s, isLost: false })),
+    ...stageNames.map((s) => ({ key: s, isLost: false })),
     ...(orphans.length ? [{ key: ORPHAN_COL, isLost: false, isOrphan: true }] : []),
     { key: STAGE_PERDIDOS, isLost: true },
   ];
@@ -371,7 +370,7 @@ export function PipelineBoard({ stages, stageCfg, emptyHints, title, subtitle, t
       ) : (
         <div className="flex-1 min-h-0 flex gap-3 p-5 overflow-x-auto">
           {allCols.map(({ key: stage, isLost, isOrphan }) => {
-            const cfg = isOrphan ? ORPHAN_CFG : stageCfg[stage];
+            const cfg = isOrphan ? ORPHAN_CFG : cfgMap[stage];
             const items = isLost
               ? lostContacts
               : isOrphan
@@ -490,7 +489,7 @@ export function PipelineBoard({ stages, stageCfg, emptyHints, title, subtitle, t
                       <ContactCard
                         key={c.id}
                         c={c}
-                        cfg={stageCfg}
+                        cfg={cfgMap}
                         lost={isLost}
                         showMoney={showMoney}
                         dragging={dragId === c.id}

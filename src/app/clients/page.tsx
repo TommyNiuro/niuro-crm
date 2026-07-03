@@ -27,26 +27,9 @@ export default function ClientsPage() {
 
   if (!stages) return null;
 
-  const names = stages.map((s) => s.name);
-  const cfg = Object.fromEntries(
-    stages.map((s, i) => [
-      s.name,
-      {
-        text: s.color,
-        bg: "rgba(148,163,184,0.12)",
-        order: i,
-        task: `Avanzar en ${s.name}`,
-        sla: "",
-        dueInDays: 2,
-        probability: 10,
-      },
-    ])
-  );
-
   return (
     <PipelineBoard
-      stages={names}
-      stageCfg={cfg}
+      stages={stages}
       emptyHints={EMPTY_HINT}
       title="Clientes"
       subtitle="El ciclo post-venta: onboarding, expansión y retención"

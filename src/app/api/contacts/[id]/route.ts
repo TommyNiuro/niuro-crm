@@ -7,6 +7,7 @@ import { contactUpdateSchema, validate } from "@/lib/validation";
 import { mergeCustomFields, applyCustomFieldsFromBody } from "@/lib/custom-fields";
 import { logActivity, diffChanges } from "@/lib/timeline";
 import { dispatchRecordEvent } from "@/lib/workflows/dispatch";
+import { syncMoneyFromContact, alignDealStage } from "@/lib/deal-sync";
 
 /** Saca el nombre legible del cliente desde la columna 'client' (JSON o string). */
 function parseClientName(raw: unknown): string {
@@ -179,6 +180,17 @@ export async function PUT(
     .returning()
     .get();
   });
+
+  // Deal como fuente de verdad del dinero (Fase 1): editar monto/probabilidad
+  // baja al deal (write-through), y mover de etapa arrastra el deal a la etapa
+  // homónima. El cambio de etapa también sincroniza porque la etapa redefine
+  // la probabilidad (cfg.probability, estilo HubSpot).
+  if (result) {
+    if (body.valueCents !== undefined || body.probability !== undefined || stageChanged) {
+      syncMoneyFromContact(result);
+    }
+    if (stageChanged && !result.archived) alignDealStage(id, result.stage);
+  }
 
   // Campos custom: las keys del body crudo que sean fields custom de 'contacts'
   // se guardan en custom_field_values (no son columnas reales). El resto ya lo

@@ -21,25 +21,15 @@ export default function EngineersPage() {
 
   if (!stages) return null;
 
-  const names = stages.map((s) => s.name);
+  // Overrides del playbook para las etapas conocidas; las custom derivan su
+  // estilo del color de la DB dentro del board.
   const cfg = Object.fromEntries(
-    stages.map((s, i) => [
-      s.name,
-      ENGINEER_STAGE_CFG[s.name] ?? {
-        text: s.color,
-        bg: "rgba(148,163,184,0.12)",
-        order: i,
-        task: `Avanzar en ${s.name}`,
-        sla: "",
-        dueInDays: 2,
-        probability: 10,
-      },
-    ])
+    stages.filter((s) => ENGINEER_STAGE_CFG[s.name]).map((s) => [s.name, ENGINEER_STAGE_CFG[s.name]])
   );
 
   return (
     <PipelineBoard
-      stages={names}
+      stages={stages}
       stageCfg={cfg}
       emptyHints={ENGINEER_EMPTY_HINT}
       title="Pipeline de Ingenieros"
