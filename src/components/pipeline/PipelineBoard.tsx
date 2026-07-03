@@ -13,7 +13,7 @@ import { MessageCircle, Clock, AlertTriangle, XCircle, ChevronsLeft, ChevronsRig
 // Clientes ('client') e Ingenieros ('engineer'). Las etapas llegan de la DB
 // (nombre + color); stageCfg es un override opcional para las del playbook.
 type StageCfg = { text: string; bg: string; dueInDays: number };
-type StageDef = { name: string; color: string };
+type StageDef = { name: string; color: string; isWon?: boolean };
 
 /** Columna virtual para contactos cuya etapa no existe en el pipeline. */
 const ORPHAN_COL = "Sin etapa";
@@ -36,9 +36,10 @@ interface PipelineBoardProps {
   subtitle: string;
   typeFilter: string; // 'lead' | 'client' | 'engineer'
   showMoney?: boolean;
-  /** 'engineer' quita la semántica de ventas de la tarjeta (temperatura,
-   *  warning de próximo paso). Default: 'sales'. */
-  variant?: "sales" | "engineer";
+  /** 'engineer' y 'client' quitan la semántica de venta de la tarjeta
+   *  (temperatura, warning de próximo paso, probabilidad). 'client' además
+   *  cambia el header a métricas post-venta. Default: 'sales'. */
+  variant?: "sales" | "client" | "engineer";
 }
 
 interface Contact {
@@ -117,17 +118,18 @@ function ContactCard({
   lost?: boolean;
   dragging?: boolean;
   showMoney?: boolean;
-  variant?: "sales" | "engineer";
+  variant?: "sales" | "client" | "engineer";
   onDragStart?: () => void;
   onDragEnd?: () => void;
   onClick: () => void;
 }) {
-  const engineer = variant === "engineer";
+  // Fuera de ventas (ingeniero/cliente) la tarjeta pierde la semántica de
+  // venta: ni temperatura ni warning por falta de próximo paso (las tareas
+  // llegan al mover de etapa); solo el vencimiento real es riesgo.
+  const sales = variant === "sales";
   // eslint-disable-next-line react-hooks/purity
   const overdue = !!c.nextStepDue && new Date(c.nextStepDue).getTime() < Date.now();
-  // Para un ingeniero, no tener próximo paso es el estado normal (las tareas
-  // llegan al moverlo de etapa); solo el vencimiento es riesgo.
-  const atRisk = !lost && (overdue || (!engineer && !c.nextAction));
+  const atRisk = !lost && (overdue || (sales && !c.nextAction));
   const temp = TEMP_CFG[c.temperature] ?? TEMP_CFG.cold;
   const lastInteract = relativeTime(c.lastInteractionAt);
   const stageDays = lost ? null : daysInStage(c);
@@ -178,7 +180,7 @@ function ContactCard({
       </div>
 
       <div className="flex items-center gap-1.5 mt-2">
-        {!engineer && (
+        {sales && (
           <span className={cn("flex items-center gap-1 text-[11px] font-medium", temp.colorClass)}>
             <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", temp.dot)} />
             {temp.label}
@@ -186,7 +188,7 @@ function ContactCard({
         )}
         {lastInteract && (
           <>
-            {!engineer && <span className="text-border">·</span>}
+            {sales && <span className="text-border">·</span>}
             <span className="text-[11px] text-muted-foreground">{lastInteract}</span>
           </>
         )}
@@ -225,7 +227,7 @@ function ContactCard({
                 </span>
               )}
             </div>
-          ) : engineer ? null : (
+          ) : !sales ? null : (
             <div className="flex items-center gap-1 text-[10.5px] text-warning">
               <AlertTriangle className="h-3 w-3 shrink-0" />
               <span>Sin próximo paso</span>
@@ -242,7 +244,7 @@ function ContactCard({
           )}>
             {c.valueCents ? formatCurrency(c.valueCents) : "Sin monto"}
           </span>
-          {!lost && c.valueCents > 0 && (
+          {!lost && sales && c.valueCents > 0 && (
             <span className="text-[11px] text-muted-foreground tabular-nums">· {c.probability}% prob.</span>
           )}
         </div>
@@ -256,6 +258,7 @@ export function PipelineBoard({ stages, stageCfg, emptyHints, title, subtitle, t
   // Config visual efectiva: override del playbook si existe, si no deriva del
   // color que la etapa tiene en la DB (editable en Ajustes).
   const stageNames = stages.map((s) => s.name);
+  const wonStages = new Set(stages.filter((s) => s.isWon).map((s) => s.name));
   const cfgMap: Record<string, StageCfg> = Object.fromEntries(
     stages.map((s) => [
       s.name,
@@ -304,6 +307,33 @@ export function PipelineBoard({ stages, stageCfg, emptyHints, title, subtitle, t
         body: JSON.stringify(payload),
       });
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      // Negocio ganado: ofrecer pasarlo al post-venta. El PUT con contactType
+      // resetea etapa a la primera del pipeline nuevo (Onboarding) y registra
+      // la transición (ver /api/contacts/[id]).
+      if (typeFilter === "lead" && wonStages.has(stage)) {
+        const c = contacts.find((x) => x.id === id);
+        toast.success(`Negocio ganado${c ? `: ${c.name}` : ""} 🎉`, {
+          description: "¿Pasarlo a Clientes para el post-venta (Onboarding)?",
+          duration: 12000,
+          action: {
+            label: "Convertir en cliente",
+            onClick: async () => {
+              try {
+                const rc = await fetch(`/api/contacts/${id}`, {
+                  method: "PUT",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ contactType: "client" }),
+                });
+                if (!rc.ok) throw new Error(`HTTP ${rc.status}`);
+                setContacts((prev) => prev.filter((x) => x.id !== id));
+                toast.success("Ahora vive en Clientes, arrancando en Onboarding");
+              } catch {
+                toast.error("No se pudo convertir el contacto");
+              }
+            },
+          },
+        });
+      }
     } catch (err) {
       console.error("[pipeline] move falló:", err);
       setContacts(snapshot);
@@ -320,6 +350,10 @@ export function PipelineBoard({ stages, stageCfg, emptyHints, title, subtitle, t
   const totalPipeline  = activeContacts.reduce((a, c) => a + (c.valueCents || 0), 0);
   const totalWeighted  = activeContacts.reduce((a, c) => a + (c.valueCents || 0) * (c.probability || 0) / 100, 0);
   const totalWithValue = activeContacts.filter((c) => c.valueCents > 0).length;
+  // Post-venta: clientes en la etapa de riesgo (si fue renombrada sin "riesgo"
+  // en el nombre, el bloque del header simplemente no se muestra).
+  const riskStage = variant === "client" ? stageNames.find((n) => /riesgo/i.test(n)) : undefined;
+  const riskCount = riskStage ? activeContacts.filter((c) => c.stage === riskStage).length : 0;
 
   // Huérfanos: contactos vivos cuya etapa ya no existe en este pipeline
   // (etapa renombrada/borrada en Ajustes, o migración). Antes desaparecían del
@@ -341,7 +375,26 @@ export function PipelineBoard({ stages, stageCfg, emptyHints, title, subtitle, t
           <p className="text-[11px] text-muted-foreground mt-0.5">{subtitle}</p>
         </div>
         <div className="flex items-center gap-4 text-right">
-          {showMoney ? (
+          {variant === "client" ? (
+            // Post-venta: acá la plata YA entra; "ponderado por probabilidad"
+            // no significa nada. Revenue actual + volumen + riesgo de churn.
+            <>
+              <div>
+                <div className="text-[11px] text-muted-foreground">Revenue</div>
+                <div className="text-[14px] font-bold text-emerald-500 tabular-nums">{formatCurrency(totalPipeline)}</div>
+              </div>
+              <div>
+                <div className="text-[11px] text-muted-foreground">Clientes</div>
+                <div className="text-[14px] font-bold tabular-nums text-foreground">{activeContacts.length}</div>
+              </div>
+              {riskCount > 0 && (
+                <div>
+                  <div className="text-[11px] text-muted-foreground">En riesgo</div>
+                  <div className="text-[14px] font-bold tabular-nums text-destructive">{riskCount}</div>
+                </div>
+              )}
+            </>
+          ) : showMoney ? (
             <>
               <div>
                 <div className="text-[11px] text-muted-foreground">Pipeline total</div>
@@ -521,7 +574,7 @@ export function PipelineBoard({ stages, stageCfg, emptyHints, title, subtitle, t
                         </span>
                         <span className="text-[9.5px] uppercase tracking-wide text-muted-foreground font-medium">Total</span>
                       </div>
-                      {!isLost && (
+                      {!isLost && variant === "sales" && (
                         <div className="flex items-center justify-between">
                           <span className="text-[11px] tabular-nums text-muted-foreground">
                             {weighted ? formatCurrency(weighted) : "$0"}

@@ -56,7 +56,7 @@ interface ContactDetailClientProps {
     archived: boolean; disqualifyReason: string | null; scoreBreakdown: string | null;
     nextAction: string | null; nextStepDue: Date | number | null; createdAt: number | Date;
     jobDescription: string | null; valueCents: number; probability: number;
-    salesIntel: string | null;
+    salesIntel: string | null; contactType?: string | null;
   };
   openTask: OpenTask | null;
   deals: Array<{ id: string; title: string; value: number; probability: number; stageName: string | null; stageColor: string | null; createdAt: number | Date; }>;
@@ -233,6 +233,20 @@ export function ContactDetailClient({ contact, openTask, deals, activities, what
     } catch { toast.error("Error al eliminar el contacto"); }
   };
 
+  const handleConvertToClient = async () => {
+    if (!confirm("¿Convertir este lead en cliente? Arranca en Onboarding del pipeline post-venta.")) return;
+    try {
+      const res = await fetch(`/api/contacts/${contact.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contactType: "client" }),
+      });
+      if (!res.ok) throw new Error();
+      toast.success("Convertido en cliente: ahora vive en la sección Clientes");
+      router.refresh();
+    } catch { toast.error("No se pudo convertir el contacto"); }
+  };
+
   const handleCompleteTask = async () => {
     if (!openTask) return;
     setCompletingTask(true);
@@ -320,6 +334,18 @@ export function ContactDetailClient({ contact, openTask, deals, activities, what
           )}
         </div>
         <div className="flex gap-2">
+          {(contact.contactType ?? "lead") === "lead" && !contact.archived && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleConvertToClient}
+              className="cursor-pointer gap-1.5 border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
+              title="Pasarlo al pipeline post-venta (Clientes), arrancando en Onboarding"
+            >
+              <CheckCircle2 className="h-4 w-4" />
+              Convertir en cliente
+            </Button>
+          )}
           {waLinked && (
             <Button
               variant="outline"

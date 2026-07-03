@@ -9,7 +9,7 @@ import { PipelineBoard } from "@/components/pipeline/PipelineBoard";
 type Stage = { id: string; name: string; color: string; order: number };
 
 const EMPTY_HINT: Record<string, string> = {
-  Onboarding: "Cuando ganes un negocio, convertí el contacto en cliente y arranca acá.",
+  Onboarding: "Al mover un lead a Cierre te ofrece convertirlo en cliente y arranca acá. También desde su ficha: 'Convertir en cliente'.",
   Activo: "Clientes con ingenieros colocados y facturando.",
   Expansion: "Clientes con señales de necesitar más gente.",
   "En riesgo": "Clientes con señales de churn: atenderlos antes de que se enfríen.",
@@ -35,6 +35,7 @@ export default function ClientsPage() {
       subtitle="El ciclo post-venta: onboarding, expansión y retención"
       typeFilter="client"
       showMoney
+      variant="client"
     />
   );
 }
