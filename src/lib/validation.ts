@@ -32,6 +32,9 @@ export const contactUpdateSchema = contactCreateSchema
     archived: z.boolean().optional(),
     disqualifyReason: optionalText,
     stage: z.string().max(100).optional(),
+    // Conversión entre pipelines: lead (prospectos) -> client (clientes) al ganar,
+    // o engineer (pool de talento). Cada tipo vive en su kanban.
+    contactType: z.enum(["lead", "client", "engineer"]).optional(),
     tags: z.union([z.array(z.string().max(100)), z.string().max(2000)]).nullish(),
     deletedAt: z.null().optional(), // papelera: solo se admite restaurar (null) por PUT
   });

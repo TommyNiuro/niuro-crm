@@ -7,14 +7,19 @@
  */
 import { db } from "@/db";
 import { pipelineStages } from "@/db/schema";
-import { asc } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { STAGES, STAGE_CFG } from "./crm-ui";
 
 export type StageRow = typeof pipelineStages.$inferSelect;
 
 /** Etapas ordenadas desde la DB; si la instalación no tiene seed, las default. */
-export function getStages(): StageRow[] {
-  const rows = db.select().from(pipelineStages).orderBy(asc(pipelineStages.order)).all();
+export function getStages(pipeline: string = "prospectos"): StageRow[] {
+  const rows = db
+    .select()
+    .from(pipelineStages)
+    .where(eq(pipelineStages.pipeline, pipeline))
+    .orderBy(asc(pipelineStages.order))
+    .all();
   if (rows.length) return rows;
   return STAGES.map((name, i) => ({
     id: name,
@@ -23,11 +28,12 @@ export function getStages(): StageRow[] {
     color: STAGE_CFG[name]?.text ?? "#64748b",
     isWon: name === "Cierre",
     isLost: false,
+    pipeline,
   }));
 }
 
-export function getStageNames(): string[] {
-  return getStages().map((s) => s.name);
+export function getStageNames(pipeline: string = "prospectos"): string[] {
+  return getStages(pipeline).map((s) => s.name);
 }
 
 /** Config operativa de una etapa: la conocida por nombre, o defaults sanos. */

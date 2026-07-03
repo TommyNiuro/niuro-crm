@@ -16,21 +16,21 @@ type Stage = { id: string; name: string; color: string; order: number; isWon: bo
 
 const PALETTE = ["#64748b", "#3B5FE5", "#D4940A", "#0EA5E9", "#8B5CF6", "#16A34A", "#DC2626", "#EAB308"];
 
-export function StageEditor() {
+export function StageEditor({ pipeline = "prospectos" }: { pipeline?: string }) {
   const [stages, setStages] = useState<Stage[] | null>(null);
   const [names, setNames] = useState<Record<string, string>>({});
   const [newName, setNewName] = useState("");
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(() => {
-    fetch("/api/pipeline/stages")
+    fetch(`/api/pipeline/stages?pipeline=${encodeURIComponent(pipeline)}`)
       .then((r) => (r.ok ? r.json() : []))
       .then((d: Stage[]) => {
         setStages(d);
         setNames(Object.fromEntries(d.map((s) => [s.id, s.name])));
       })
       .catch(() => setStages([]));
-  }, []);
+  }, [pipeline]);
   useEffect(load, [load]);
 
   const call = async (init: RequestInit & { url?: string }, okMsg?: string) => {
@@ -79,7 +79,7 @@ export function StageEditor() {
     if (!name) return;
     setNewName("");
     call(
-      { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) },
+      { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, pipeline }) },
       `Etapa "${name}" creada`
     );
   };

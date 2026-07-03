@@ -231,7 +231,9 @@ export function applyStatusChange(proposal: Proposal, status: string): StatusCha
       return { proposal: updated, pipeline: { moved: false, reason: "contacto ligado no existe" } };
     }
 
-    const allStages = tx.select().from(pipelineStages).all();
+    // Solo etapas de ventas: con multi-pipeline, acá no entran las de
+    // ingenieros/clientes (p.ej. su isWon no debe capturar el "signed").
+    const allStages = tx.select().from(pipelineStages).where(eq(pipelineStages.pipeline, "prospectos")).all();
     const stagesByName = new Map(allStages.map((s) => [s.name, s] as const));
 
     // ── status = lost: no hay etapa isLost. Archivamos el contacto. ──────────

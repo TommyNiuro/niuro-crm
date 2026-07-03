@@ -9,6 +9,7 @@ export async function GET() {
     const stages = db
       .select()
       .from(pipelineStages)
+      .where(eq(pipelineStages.pipeline, "prospectos"))
       .orderBy(asc(pipelineStages.order))
       .all();
 
@@ -130,6 +131,7 @@ export async function PUT(request: NextRequest) {
     const updated = db
       .select()
       .from(pipelineStages)
+      .where(eq(pipelineStages.pipeline, "prospectos"))
       .orderBy(asc(pipelineStages.order))
       .all();
 

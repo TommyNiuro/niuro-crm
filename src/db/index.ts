@@ -77,7 +77,8 @@ function initTables(db: Database.Database): void {
       "order" INTEGER NOT NULL,
       color TEXT NOT NULL DEFAULT '#64748b',
       is_won INTEGER NOT NULL DEFAULT 0,
-      is_lost INTEGER NOT NULL DEFAULT 0
+      is_lost INTEGER NOT NULL DEFAULT 0,
+      pipeline TEXT NOT NULL DEFAULT 'prospectos'
     )`,
     `CREATE TABLE IF NOT EXISTS deals (
       id TEXT PRIMARY KEY,
@@ -553,6 +554,23 @@ function initTables(db: Database.Database): void {
       checked_at INTEGER NOT NULL
     )`,
     `CREATE INDEX IF NOT EXISTS idx_bridge_status_log_checked ON bridge_status_log(checked_at DESC)`,
+    // Multi-pipeline (Ajustes v2): prospectos (ventas), clientes e ingenieros.
+    // Las etapas de ingenieros salen de las constantes viejas (mismos nombres:
+    // los contactos engineer ya usan esos stage); clientes nace con defaults
+    // editables desde Ajustes.
+    `ALTER TABLE pipeline_stages ADD COLUMN pipeline TEXT NOT NULL DEFAULT 'prospectos'`,
+    `DROP INDEX IF EXISTS idx_stages_name;
+     CREATE UNIQUE INDEX IF NOT EXISTS idx_stages_pipeline_name ON pipeline_stages(pipeline, name);
+     INSERT OR IGNORE INTO pipeline_stages (id, name, "order", color, is_won, is_lost, pipeline) VALUES
+       ('ing-contactado', 'Contactado', 0, '#64748b', 0, 0, 'ingenieros'),
+       ('ing-entrevista', 'Entrevista', 1, '#3B5FE5', 0, 0, 'ingenieros'),
+       ('ing-evaluacion', 'Evaluacion', 2, '#D4940A', 0, 0, 'ingenieros'),
+       ('ing-disponible', 'Disponible', 3, '#0EA5E9', 0, 0, 'ingenieros'),
+       ('ing-colocado', 'Colocado', 4, '#16A34A', 0, 0, 'ingenieros'),
+       ('cli-onboarding', 'Onboarding', 0, '#3B5FE5', 0, 0, 'clientes'),
+       ('cli-activo', 'Activo', 1, '#16A34A', 0, 0, 'clientes'),
+       ('cli-expansion', 'Expansion', 2, '#8B5CF6', 0, 0, 'clientes'),
+       ('cli-en-riesgo', 'En riesgo', 3, '#DC2626', 0, 0, 'clientes')`,
   ];
   // Control de versiones (auditoria SaaS 2026-07-01, fase 1). Antes se re-corrian
   // TODOS los ALTER en cada arranque (idempotentes, pero re-ejecutados) y un error

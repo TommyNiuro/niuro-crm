@@ -116,6 +116,7 @@ export async function PUT(
   if (body.valueCents !== undefined) updateData.valueCents = Math.max(0, body.valueCents);
   if (body.nextAction !== undefined) updateData.nextAction = body.nextAction;
   if (body.agentId !== undefined) updateData.agentId = body.agentId;
+  if (body.contactType !== undefined) updateData.contactType = body.contactType;
   if (body.archived !== undefined) updateData.archived = !!body.archived;
   if (body.disqualifyReason !== undefined) updateData.disqualifyReason = body.disqualifyReason;
   if (body.deletedAt === null) updateData.deletedAt = null; // restaurar desde papelera (b7)

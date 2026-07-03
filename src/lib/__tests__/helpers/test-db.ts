@@ -53,7 +53,8 @@ const CREATE_TABLES = [
     "order" INTEGER NOT NULL,
     color TEXT NOT NULL DEFAULT '#64748b',
     is_won INTEGER NOT NULL DEFAULT 0,
-    is_lost INTEGER NOT NULL DEFAULT 0
+    is_lost INTEGER NOT NULL DEFAULT 0,
+    pipeline TEXT NOT NULL DEFAULT 'prospectos'
   )`,
   `CREATE TABLE deals (
     id TEXT PRIMARY KEY,

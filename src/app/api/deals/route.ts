@@ -59,6 +59,7 @@ export async function POST(request: NextRequest) {
     const firstStage = db
       .select()
       .from(pipelineStages)
+      .where(eq(pipelineStages.pipeline, "prospectos"))
       .orderBy(pipelineStages.order)
       .limit(1)
       .get();

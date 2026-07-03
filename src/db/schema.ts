@@ -174,6 +174,8 @@ export const pipelineStages = sqliteTable("pipeline_stages", {
   color: text("color").notNull().default("#64748b"),
   isWon: integer("is_won", { mode: "boolean" }).notNull().default(false),
   isLost: integer("is_lost", { mode: "boolean" }).notNull().default(false),
+  // A qué pipeline pertenece: prospectos (ventas) | clientes | ingenieros.
+  pipeline: text("pipeline").notNull().default("prospectos"),
 });
 
 export const deals = sqliteTable("deals", {

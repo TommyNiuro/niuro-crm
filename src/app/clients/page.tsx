@@ -2,18 +2,24 @@
 
 import { useEffect, useState } from "react";
 import { PipelineBoard } from "@/components/pipeline/PipelineBoard";
-import { ENGINEER_STAGE_CFG, ENGINEER_EMPTY_HINT } from "@/lib/crm-ui";
 
-// Pipeline de ingenieros (contact_type='engineer'). Las etapas salen de la DB
-// (pipeline='ingenieros', editables en Ajustes); ENGINEER_STAGE_CFG aporta la
-// config de las conocidas y las custom usan defaults.
+// Pipeline de clientes (contact_type='client'): el ciclo post-venta. Etapas en
+// la DB (pipeline='clientes', editables en Ajustes). Un contacto se convierte
+// en cliente editándolo (tipo de contacto) o vía API.
 type Stage = { id: string; name: string; color: string; order: number };
 
-export default function EngineersPage() {
+const EMPTY_HINT: Record<string, string> = {
+  Onboarding: "Cuando ganes un negocio, convertí el contacto en cliente y arranca acá.",
+  Activo: "Clientes con ingenieros colocados y facturando.",
+  Expansion: "Clientes con señales de necesitar más gente.",
+  "En riesgo": "Clientes con señales de churn: atenderlos antes de que se enfríen.",
+};
+
+export default function ClientsPage() {
   const [stages, setStages] = useState<Stage[] | null>(null);
 
   useEffect(() => {
-    fetch("/api/pipeline/stages?pipeline=ingenieros")
+    fetch("/api/pipeline/stages?pipeline=clientes")
       .then((r) => (r.ok ? r.json() : []))
       .then((d: Stage[]) => setStages(Array.isArray(d) ? d : []))
       .catch(() => setStages([]));
@@ -25,7 +31,7 @@ export default function EngineersPage() {
   const cfg = Object.fromEntries(
     stages.map((s, i) => [
       s.name,
-      ENGINEER_STAGE_CFG[s.name] ?? {
+      {
         text: s.color,
         bg: "rgba(148,163,184,0.12)",
         order: i,
@@ -41,11 +47,11 @@ export default function EngineersPage() {
     <PipelineBoard
       stages={names}
       stageCfg={cfg}
-      emptyHints={ENGINEER_EMPTY_HINT}
-      title="Pipeline de Ingenieros"
-      subtitle="Ingenieros que vas contactando para el pool"
-      typeFilter="engineer"
-      showMoney={false}
+      emptyHints={EMPTY_HINT}
+      title="Clientes"
+      subtitle="El ciclo post-venta: onboarding, expansión y retención"
+      typeFilter="client"
+      showMoney
     />
   );
 }
