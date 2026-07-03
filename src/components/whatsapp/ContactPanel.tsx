@@ -48,6 +48,7 @@ interface ScoreResponse {
   mode: "rules" | "ai";
   source?: "cache" | "fresh";
   candidateStatus?: "pending" | "dismissed";
+  kind?: "sales" | "engineer";
 }
 
 const TEMP_LABEL: Record<string, string> = { hot: "Caliente", warm: "Tibio", cold: "Frío" };
@@ -299,6 +300,7 @@ function InsightPanel({
   }
 
   const dismissed = data.candidateStatus === "dismissed";
+  const isEngineer = data.kind === "engineer";
   const rec = data.recommendation;
   const recBlock =
     rec === "save"
@@ -311,80 +313,104 @@ function InsightPanel({
 
   return (
     <div className="p-5 space-y-5">
-      {/* Hero: gauge radial + temperatura */}
-      <div className="flex flex-col items-center text-center">
-        <ScoreGauge score={data.score} temperature={data.temperature} />
-        <div className="flex items-center gap-1.5 -mt-1">
-          <span className={cn("h-2 w-2 rounded-full", TEMP_DOT[data.temperature])} />
-          <span className={cn("text-[10px] uppercase tracking-wide font-semibold rounded px-1.5 py-0.5", TEMP_BG[data.temperature])}>
-            {TEMP_LABEL[data.temperature]}
+      {isEngineer ? (
+        /* Reclutamiento detectado: acá el score de venta NO aplica; la persona
+           es un candidato. Nada de gauge ni desglose de compra. */
+        <div className="flex flex-col items-center text-center">
+          <div className="h-[104px] w-[104px] rounded-full bg-amber-500/12 border-2 border-amber-500/40 flex items-center justify-center shadow-sm">
+            <HardHat className="h-11 w-11 text-amber-500" />
+          </div>
+          <span className="mt-3 text-[10px] uppercase tracking-wide font-semibold rounded px-2 py-0.5 bg-amber-500/15 text-amber-500">
+            Candidato · Ingeniero
           </span>
-          {dismissed && (
-            <span className="text-[10px] uppercase tracking-wide font-semibold rounded px-1.5 py-0.5 bg-surface-3 text-meta">
-              Descartado
-            </span>
-          )}
-          <span className="text-[10px] text-meta">· {data.mode === "ai" ? "criterio IA" : "reglas"}</span>
+          <p className="text-[11.5px] text-muted-foreground mt-2.5 leading-snug border-l-2 border-amber-500 pl-2.5 text-left">
+            {data.reason}
+          </p>
         </div>
-        <p className="text-[11.5px] text-muted-foreground mt-2.5 leading-snug border-l-2 pl-2.5 text-left" style={{ borderColor: TEMP_COLOR[data.temperature] }}>
-          {data.reason}
-        </p>
-      </div>
+      ) : (
+        <>
+          {/* Hero: gauge radial + temperatura */}
+          <div className="flex flex-col items-center text-center">
+            <ScoreGauge score={data.score} temperature={data.temperature} />
+            <div className="flex items-center gap-1.5 -mt-1">
+              <span className={cn("h-2 w-2 rounded-full", TEMP_DOT[data.temperature])} />
+              <span className={cn("text-[10px] uppercase tracking-wide font-semibold rounded px-1.5 py-0.5", TEMP_BG[data.temperature])}>
+                {TEMP_LABEL[data.temperature]}
+              </span>
+              {dismissed && (
+                <span className="text-[10px] uppercase tracking-wide font-semibold rounded px-1.5 py-0.5 bg-surface-3 text-meta">
+                  Descartado
+                </span>
+              )}
+              <span className="text-[10px] text-meta">· {data.mode === "ai" ? "criterio IA" : "reglas"}</span>
+            </div>
+            <p className="text-[11.5px] text-muted-foreground mt-2.5 leading-snug border-l-2 pl-2.5 text-left" style={{ borderColor: TEMP_COLOR[data.temperature] }}>
+              {data.reason}
+            </p>
+          </div>
 
-      <SignalChips signals={data.signals} />
+          <SignalChips signals={data.signals} />
 
-      <div className="space-y-2.5">
-        <div className="text-[10px] uppercase tracking-wide text-meta font-semibold">
-          Desglose
-        </div>
-        {(Object.keys(data.breakdown) as (keyof ScoreBreakdown)[]).map((k) => (
-          <BreakdownBar key={k} label={DIM_LABEL[k]} points={data.breakdown[k]} max={DIM_MAX[k]} />
-        ))}
-      </div>
+          <div className="space-y-2.5">
+            <div className="text-[10px] uppercase tracking-wide text-meta font-semibold">
+              Desglose
+            </div>
+            {(Object.keys(data.breakdown) as (keyof ScoreBreakdown)[]).map((k) => (
+              <BreakdownBar key={k} label={DIM_LABEL[k]} points={data.breakdown[k]} max={DIM_MAX[k]} />
+            ))}
+          </div>
 
-      <div
-        className={cn(
-          "rounded-xl shadow-sm p-3 text-[12px] leading-snug",
-          recBlock.tone === "save"
-            ? "bg-[var(--accent-dim)] text-[var(--primary)] border border-[var(--primary)]/30"
-            : recBlock.tone === "discard"
-            ? "bg-surface-2 text-muted-foreground"
-            : "bg-surface-2 text-foreground border border-warning/25"
-        )}
-      >
-        <div className="text-[10px] uppercase tracking-wide opacity-70 mb-0.5">Recomendación</div>
-        {recBlock.text}
-      </div>
+          <div
+            className={cn(
+              "rounded-xl shadow-sm p-3 text-[12px] leading-snug",
+              recBlock.tone === "save"
+                ? "bg-[var(--accent-dim)] text-[var(--primary)] border border-[var(--primary)]/30"
+                : recBlock.tone === "discard"
+                ? "bg-surface-2 text-muted-foreground"
+                : "bg-surface-2 text-foreground border border-warning/25"
+            )}
+          >
+            <div className="text-[10px] uppercase tracking-wide opacity-70 mb-0.5">Recomendación</div>
+            {recBlock.text}
+          </div>
+        </>
+      )}
 
       {!chat.isGroup && !dismissed && (
         <div className="flex flex-col gap-2">
+          {/* En reclutamiento, la acción primaria es guardarlo como ingeniero. */}
+          <button
+            onClick={handleEngineer}
+            disabled={markingEng}
+            title="No es venta: es un ingeniero para el pool. Va al pipeline de Ingenieros."
+            className={cn(
+              buttonVariants({ variant: isEngineer ? "default" : "secondary", size: "sm" }),
+              "w-full cursor-pointer",
+              isEngineer ? "order-first" : "order-2 text-cyan-400"
+            )}
+          >
+            {markingEng ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <HardHat className="h-4 w-4 mr-1.5" />}
+            Es un ingeniero 👷
+          </button>
           <button
             onClick={onSaveLead}
             className={cn(
               buttonVariants({
-                variant: rec === "save" ? "default" : "secondary",
+                variant: !isEngineer && rec === "save" ? "default" : "secondary",
                 size: "sm",
               }),
-              "w-full cursor-pointer"
+              "w-full cursor-pointer",
+              isEngineer ? "order-2" : "order-first"
             )}
           >
             <UserPlus className="h-4 w-4 mr-1.5" />
             Guardar como lead
           </button>
           <button
-            onClick={handleEngineer}
-            disabled={markingEng}
-            title="No es venta: es un ingeniero para el pool. Va al pipeline de Ingenieros."
-            className={cn(buttonVariants({ variant: "secondary", size: "sm" }), "w-full cursor-pointer text-cyan-400")}
-          >
-            {markingEng ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <HardHat className="h-4 w-4 mr-1.5" />}
-            Es un ingeniero 👷
-          </button>
-          <button
             onClick={handleLost}
             disabled={losing}
             title="Era un prospecto real pero no quiso o no necesita. Queda contabilizado en Perdidos del pipeline."
-            className={cn(buttonVariants({ variant: "secondary", size: "sm" }), "w-full cursor-pointer text-amber-300")}
+            className={cn(buttonVariants({ variant: "secondary", size: "sm" }), "w-full cursor-pointer text-amber-300 order-3")}
           >
             {losing ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <UserX className="h-4 w-4 mr-1.5" />}
             Lead perdido (no quiso)
@@ -392,7 +418,7 @@ function InsightPanel({
           <button
             onClick={handleDismiss}
             disabled={dismissing}
-            className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "w-full cursor-pointer text-meta")}
+            className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "w-full cursor-pointer text-meta order-4")}
           >
             {dismissing ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <X className="h-4 w-4 mr-1.5" />}
             No es de ventas (archivar)

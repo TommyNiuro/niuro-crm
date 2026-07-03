@@ -51,6 +51,31 @@ export interface ScoreLeadResult {
   recommendation: "save" | "discard" | "review";
   disqualifier: string | null;
   mode: "rules" | "ai";
+  /** "engineer" = conversación de RECLUTAMIENTO (la persona es candidato, no comprador). */
+  kind?: "sales" | "engineer";
+}
+
+// ---- Detección de reclutamiento ----
+// El score de venta mide si el CONTACTO nos quiere comprar. Cuando el operador
+// le está ofreciendo TRABAJO a la persona (postulación, su CV, entrevista para
+// un cargo), la conversación es de reclutamiento y el score de venta NO aplica:
+// antes estas conversaciones puntuaban alto (pitch de Niuro + respuesta rápida
+// del candidato = "intención de compra" falsa). Las keywords son de segunda
+// persona / lado candidato a propósito: "tu cv" (reclutando) matchea, "el cv de
+// Juan" (vendiéndole un perfil a un cliente) NO.
+const RECRUITING_KW = [
+  // El operador reclutando al contacto:
+  "postulaste", "tu postulación", "tu postulacion", "tu cv", "viendo tu perfil",
+  "posibilidad de trabajo", "oferta laboral", "quedaste seleccionado",
+  "proceso de selección", "proceso de seleccion", "niuro.io/source",
+  // El contacto como candidato:
+  "busco trabajo", "estoy buscando trabajo", "mi cv", "adjunto mi cv",
+  "me interesa el cargo", "mi postulación", "mi postulacion",
+];
+
+/** Señales de reclutamiento presentes en el texto (ya en minúscula). */
+export function recruitingHits(combinedLower: string): string[] {
+  return Array.from(new Set(RECRUITING_KW.filter((k) => combinedLower.includes(k))));
 }
 
 // ---- Configuracion de la rubrica (externalizable via crmSettings) ----
@@ -287,6 +312,28 @@ export function scoreLead(
   // Overrides por densidad (idéntico al scanner). Si el chat trae token de
   // empresa (el operador ya lo calificó) o se mandó el pitch de Niuro.io, nada de
   // descartar por menciones sueltas: la conversación se trató como comercial.
+  // Reclutamiento ANTES del override del pitch: al reclutar, el operador
+  // también menciona Niuro y manda links, así que pitchSent no puede tapar esto.
+  const recHits = recruitingHits(combined);
+  if (recHits.length >= 2) {
+    return {
+      score: 0,
+      base: 0,
+      temperature: "cold",
+      breakdown: { intencion: 0, autoridad: 0, necesidad: 0, urgencia: 0, presupuesto: 0 },
+      signals: {
+        companyToken, companyTokenText, ownerSelling: false, ownerSellHits: 0,
+        docsSent: ownerDocs, reciprocity: false, contactIntent: 0,
+        daysSinceLast: lastTs ? dsl : null, recencyFactor: factor,
+      },
+      reason: `Reclutamiento (${recHits.slice(0, 3).join(", ")}): la persona es un candidato, no un comprador. Guardala como ingeniero.`,
+      recommendation: "discard",
+      disqualifier: "reclutamiento",
+      mode: "rules",
+      kind: "engineer",
+    };
+  }
+
   const disqualifier = companyToken || pitchSent
     ? null
     : checkDisqualifier(messages.map((m) => ({ content: m.content, isFromMe: m.isFromMe })));

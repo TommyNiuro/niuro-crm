@@ -5,6 +5,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { dbExists, getMessages } from "@/lib/whatsapp";
 import {
   scoreLead,
+  recruitingHits,
   type ScoreLeadResult,
   type ScoreBreakdown,
   DIM_MAX,
@@ -98,6 +99,28 @@ export async function GET(request: NextRequest) {
   const name = searchParams.get("name");
   if (!chatJid) {
     return NextResponse.json({ error: "chat_jid es requerido" }, { status: 400 });
+  }
+
+  // 0) Reclutamiento ANTES del cache: los candidates viejos guardan scores de
+  // venta calculados cuando el scorer no distinguía reclutamiento, y servirlos
+  // seguiría mostrando "48 de venta" a un candidato. El chequeo es keywords
+  // sobre los mensajes (barato) y gana siempre.
+  if (dbExists()) {
+    try {
+      const recMsgs = getMessages({ chatJid, limit: 60 });
+      const combined = recMsgs.map((m) => (m.content || "").toLowerCase()).join(" \n ");
+      const recHits = recruitingHits(combined);
+      if (recHits.length >= 2) {
+        const result = scoreLead(
+          recMsgs.map((m) => ({ content: m.content, isFromMe: m.isFromMe, timestamp: m.timestamp, mediaType: m.mediaType })),
+          name,
+          { rubric: getRubricConfig() }
+        );
+        return NextResponse.json({ ...result, source: "fresh" });
+      }
+    } catch {
+      // si el store no responde, sigue el flujo normal (cache / on-demand)
+    }
   }
 
   // 1) Cache: ¿hay un lead_candidate (pending o dismissed) con breakdown?
