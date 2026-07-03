@@ -3,6 +3,7 @@ import crypto from "crypto";
 import { getStatus } from "@/lib/whatsapp";
 import { dbPath } from "@/lib/paths";
 import { openDb } from "@/lib/db-open";
+import { readSettings } from "@/lib/settings";
 
 // Tick del bridge de WhatsApp para /status (mismo patron que /api/workflows/tick
 // y /api/sync/tick: pensado para que lo dispare un poller/cron). Loguea una
@@ -35,7 +36,8 @@ export async function POST() {
       //    Si el contacto revive, el scoring lo vuelve a generar.
       // (columnas Drizzle mode:"timestamp" = unix SEGUNDOS, no ms)
       const nowSec = Math.floor(now / 1000);
-      const cutoffSec = nowSec - 30 * 86400;
+      const decayDays = Math.max(1, Number(readSettings(["radar_decay_days"]).radar_decay_days) || 30);
+      const cutoffSec = nowSec - decayDays * 86400;
       const decayed = db
         .prepare(
           `UPDATE lead_candidates SET status = 'dismissed', updated_at = ?

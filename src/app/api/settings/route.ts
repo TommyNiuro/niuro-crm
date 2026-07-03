@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readSettings, writeSettings } from "@/lib/settings";
 
-const ALLOWLIST = ["auto_promote_hot", "rubric_config"];
+const ALLOWLIST = ["auto_promote_hot", "rubric_config", "goal_mrr", "radar_decay_days"];
 
 export async function GET(req: NextRequest) {
   const key = req.nextUrl.searchParams.get("key");

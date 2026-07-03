@@ -5,7 +5,7 @@ import { and, eq } from "drizzle-orm";
 import { getMessages, dbExists } from "@/lib/whatsapp";
 import { scoreLead } from "@/lib/score-lead";
 import { getRubricConfig } from "@/lib/score-lead-server";
-import { STAGE_CFG } from "@/lib/crm-ui";
+import { getStageNames, stageCfgFor } from "@/lib/stages";
 
 function mediaLabel(mediaType: string | null): string {
   const labels: Record<string, string> = {
@@ -80,9 +80,12 @@ export async function POST(request: NextRequest) {
   );
 
   const now = new Date();
-  const validStage = stage && STAGE_CFG[stage] ? stage : null;
-  // probability por etapa: fuente única en STAGE_CFG (antes había un mapa inline aquí)
-  const stageProbability = STAGE_CFG[validStage || "Prospecto"]?.probability ?? 5;
+  // Etapas desde la DB (editables en Ajustes): validar contra lo que existe y
+  // caer a la primera etapa real, no a un nombre hardcodeado que pudo cambiar.
+  const dbStages = getStageNames();
+  const defaultStage = dbStages[0] ?? "Prospecto";
+  const validStage = stage && dbStages.includes(stage) ? stage : null;
+  const stageProbability = stageCfgFor(validStage || defaultStage, 0).probability;
   let contact;
   try {
     // Combinar metadata extraida en las notas para no perder info que no encaja en columnas
@@ -112,7 +115,7 @@ export async function POST(request: NextRequest) {
           source: "whatsapp",
           temperature: sl.temperature,
           score: sl.score,
-          stage: validStage || "Prospecto",
+          stage: validStage || defaultStage,
           probability: stageProbability,
           valueCents: typeof valueCents === "number" && valueCents > 0 ? valueCents : 0,
           whatsappJid: chatJid || null,
@@ -133,8 +136,8 @@ export async function POST(request: NextRequest) {
         .get();
 
       // Si el stage es distinto de Prospecto, crear tarea del playbook + step_transition
-      if (validStage && validStage !== "Prospecto") {
-        const cfg = STAGE_CFG[validStage];
+      if (validStage && validStage !== defaultStage) {
+        const cfg = stageCfgFor(validStage, 0);
         if (cfg) {
           const due = new Date(now.getTime() + cfg.dueInDays * 86400000);
           tx.insert(tasks)
@@ -162,7 +165,7 @@ export async function POST(request: NextRequest) {
           .values({
             contactId: created.id,
             title: nextAction.trim(),
-            stepName: validStage || "Prospecto",
+            stepName: validStage || defaultStage,
             dueAt: due,
             status: "open",
             createdAt: now,

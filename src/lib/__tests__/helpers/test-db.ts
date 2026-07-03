@@ -86,6 +86,16 @@ const CREATE_TABLES = [
     completed_at INTEGER,
     created_at INTEGER NOT NULL
   )`,
+  `CREATE TABLE tasks (
+    id TEXT PRIMARY KEY,
+    contact_id TEXT NOT NULL,
+    title TEXT NOT NULL,
+    step_name TEXT,
+    due_at INTEGER,
+    status TEXT NOT NULL DEFAULT 'open',
+    completed_at INTEGER,
+    created_at INTEGER NOT NULL
+  )`,
   `CREATE TABLE proposals (
     id TEXT PRIMARY KEY,
     contact_id TEXT,

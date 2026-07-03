@@ -1,6 +1,5 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -25,26 +24,10 @@ import { AutoPromoteToggle } from "@/components/shared/AutoPromoteToggle";
 import { RubricEditor } from "@/components/shared/RubricEditor";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
 import { AccountSection } from "@/components/shared/AccountSection";
-import type { CrmConfig } from "@/types";
+import { BusinessForm } from "@/components/settings/BusinessForm";
+import { StageEditor } from "@/components/settings/StageEditor";
 
 export default function SettingsPage() {
-  const [config, setConfig] = useState<CrmConfig | null>(null);
-  const [stages, setStages] = useState<
-    Array<{ id: string; name: string; color: string; order: number }>
-  >([]);
-
-  useEffect(() => {
-    fetch("/crm-config.json")
-      .then((r) => r.json())
-      .then(setConfig)
-      .catch(() => {});
-
-    fetch("/api/pipeline")
-      .then((r) => (r.ok ? r.json() : []))
-      .then((d) => setStages(Array.isArray(d) ? d : []))
-      .catch(() => {}); // sin crash si la API falla (auditoría 2026-06-09)
-  }, []);
-
   const commands = [
     {
       name: "/setup",
@@ -126,39 +109,8 @@ export default function SettingsPage() {
               Negocio
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
-            {config ? (
-              <>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Tipo</span>
-                  <span className="capitalize">{config.business.type}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Industria</span>
-                  <span className="capitalize">{config.business.industry}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Equipo</span>
-                  <span>{config.business.teamSize}</span>
-                </div>
-                <Separator />
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Idioma</span>
-                  <span>
-                    {config.preferences.language === "es" ? "Espanol" : "Ingles"}
-                  </span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Tema</span>
-                  <span className="capitalize">{config.preferences.theme}</span>
-                </div>
-              </>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Ejecuta <code>/setup</code> en Claude Code para configurar tu
-                negocio.
-              </p>
-            )}
+          <CardContent>
+            <BusinessForm />
           </CardContent>
         </Card>
 
@@ -171,28 +123,7 @@ export default function SettingsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div role="list" aria-label="Etapas del pipeline" className="space-y-2">
-              {stages.map((stage) => (
-                <div
-                  key={stage.id}
-                  role="listitem"
-                  className="flex items-center gap-3 p-2 rounded-lg bg-muted/50"
-                >
-                  <div
-                    className="w-3 h-3 rounded-full shrink-0"
-                    style={{ backgroundColor: stage.color }}
-                  />
-                  <span className="text-sm flex-1">{stage.name}</span>
-                  <Badge variant="outline" className="text-xs">
-                    #{stage.order}
-                  </Badge>
-                </div>
-              ))}
-            </div>
-            <p className="text-xs text-muted-foreground mt-3">
-              Usa <code>/customize</code> en Claude Code para modificar las
-              etapas.
-            </p>
+            <StageEditor />
           </CardContent>
         </Card>
 

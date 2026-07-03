@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { contacts, deals, activities, tasks, stepTransitions, leadCandidates, proposals } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
-import { STAGE_CFG } from "@/lib/crm-ui";
+import { stageCfgFor } from "@/lib/stages";
 import { contactUpdateSchema, validate } from "@/lib/validation";
 import { mergeCustomFields, applyCustomFieldsFromBody } from "@/lib/custom-fields";
 import { logActivity, diffChanges } from "@/lib/timeline";
@@ -134,7 +134,7 @@ export async function PUT(
   // + fijar el proximo paso con fecha (ejecucion obligatoria).
   if (stageChanged) {
     const stage = body.stage as string; // stageChanged garantiza definido
-    const cfg = STAGE_CFG[stage];
+    const cfg = stageCfgFor(stage, 0);
     // Registrar transición de etapa
     const lastTransition = db.select({ occurredAt: stepTransitions.occurredAt })
       .from(stepTransitions)

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { imageLeads, contacts, tasks, activities, stepTransitions } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { STAGE_CFG } from "@/lib/crm-ui";
+import { getStageNames, stageCfgFor } from "@/lib/stages";
 
 // POST /api/image-leads/[id]/approve
 // Crea un contacto en etapa Prospecto con los datos extraidos (acepta overrides
@@ -71,7 +71,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     .filter(Boolean)
     .join(" ") || null;
 
-  const prospectProb = STAGE_CFG.Prospecto?.probability ?? 5;
+  // Primera etapa real de la DB (editables en Ajustes), no "Prospecto" literal.
+  const defaultStage = getStageNames()[0] ?? "Prospecto";
+  const prospectProb = stageCfgFor(defaultStage, 0).probability;
 
   const contact = db.transaction((tx) => {
     const created = tx
@@ -85,7 +87,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         source: "captura",
         temperature,
         score,
-        stage: "Prospecto",
+        stage: defaultStage,
         probability: prospectProb,
         valueCents: 0,
         country: null,
@@ -112,7 +114,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       .values({
         contactId: created.id,
         title: taskTitle,
-        stepName: "Prospecto",
+        stepName: defaultStage,
         dueAt: due,
         status: "open",
         createdAt: now,
@@ -124,7 +126,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       .run();
 
     tx.insert(stepTransitions)
-      .values({ contactId: created.id, fromStep: null, toStep: "Prospecto", occurredAt: now })
+      .values({ contactId: created.id, fromStep: null, toStep: defaultStage, occurredAt: now })
       .run();
 
     tx.insert(activities)

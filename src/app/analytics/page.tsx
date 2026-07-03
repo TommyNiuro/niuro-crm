@@ -1,12 +1,11 @@
-import { STAGES, STAGE_CFG } from "@/lib/crm-ui";
+import { getStageNames, stageCfgFor } from "@/lib/stages";
+import { readSettings } from "@/lib/settings";
 import { formatCurrency } from "@/lib/constants";
 import { getAnalyticsData } from "@/lib/analytics-cache";
 import { TrendingDown, Filter, Clock } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
-const GOAL_MRR = 20000;
-const STAGE_ORDER: Record<string, number> = Object.fromEntries(STAGES.map((s, i) => [s, i]));
 
 // Categoría de pérdida: el texto libre de disqualify_reason empieza con la
 // razón corta ("No quiso / no necesita. Señal previa: ...").
@@ -19,6 +18,10 @@ function lossCategory(reason: string | null): string {
 export default function AnalyticsPage() {
   // Datasets crudos cacheados 60s (ver analytics-cache.ts); el cómputo va acá.
   const { allContacts, transitions, allCandidates, allTasks, allOpps, medianResponseMinutes } = getAnalyticsData();
+  // Etapas y meta desde la DB (editables en Ajustes), no constantes.
+  const STAGES = getStageNames();
+  const GOAL_MRR = Number(readSettings(["goal_mrr"]).goal_mrr) || 20000;
+  const STAGE_ORDER: Record<string, number> = Object.fromEntries(STAGES.map((s, i) => [s, i]));
   const activeContacts = allContacts.filter((c) => !c.archived);
   const lostContacts = allContacts.filter((c) => c.archived);
 
@@ -173,7 +176,7 @@ export default function AnalyticsPage() {
           <h2 className="text-sm font-semibold mb-4">Distribucion por Etapa</h2>
           <div className="space-y-3">
             {byStage.map(s => {
-              const cfg = STAGE_CFG[s.stage];
+              const cfg = stageCfgFor(s.stage, 0);
               return (
                 <div key={s.stage}>
                   <div className="flex items-center justify-between mb-1">
@@ -198,7 +201,7 @@ export default function AnalyticsPage() {
           <p className="text-[11px] text-muted-foreground mb-4">Contactos que llegaron a cada etapa (incluye perdidos) · % de conversion desde la etapa anterior · dias promedio en la etapa</p>
           <div className="space-y-2.5">
             {funnel.map((f) => {
-              const cfg = STAGE_CFG[f.stage];
+              const cfg = stageCfgFor(f.stage, 0);
               const avg = avgByStage.find((a) => a.stage === f.stage);
               return (
                 <div key={f.stage} className="flex items-center gap-3">
@@ -289,7 +292,7 @@ export default function AnalyticsPage() {
               ) : (
                 <div className="space-y-2">
                   {lossStages.map(({ stage, count }) => {
-                    const cfg = STAGE_CFG[stage];
+                    const cfg = stageCfgFor(stage, 0);
                     return (
                       <div key={stage}>
                         <div className="flex items-center justify-between mb-0.5">

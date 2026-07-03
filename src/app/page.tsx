@@ -12,11 +12,10 @@ import {
 import { Avatar } from "@/components/ds";
 import MyDay from "@/components/dashboard/MyDay";
 import { formatCurrency } from "@/lib/constants";
-import { STAGES, STAGE_CFG } from "@/lib/crm-ui";
+import { getStages, stageCfgFor } from "@/lib/stages";
+import { readSettings } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
-
-const GOAL_CENTS = 20_000 * 100;
 
 const DIM_MAX = { intencion: 35, autoridad: 20, necesidad: 20, urgencia: 15, presupuesto: 10 };
 const DIM_LABEL: Record<string, string> = {
@@ -55,6 +54,10 @@ export default function HomePage() {
   const now = new Date();
   const weekAgo = new Date(now.getTime() - 7 * 86_400_000);
 
+  // Etapas y meta desde la DB (editables en Ajustes), no constantes.
+  const STAGES = getStages().map((s) => s.name);
+  const GOAL_CENTS = (Number(readSettings(["goal_mrr"]).goal_mrr) || 20_000) * 100;
+
   // ── Datos (cacheados 15s: son agregados de KPIs, no tiene sentido recalcular
   // un full scan en cada request de force-dynamic) ──
   const dash = getDashboardData();
@@ -86,7 +89,7 @@ export default function HomePage() {
     .all();
 
   // ── KPIs ──
-  const STAGE_PROB: Record<string, number> = Object.fromEntries(STAGES.map((s) => [s, STAGE_CFG[s].probability]));
+  const STAGE_PROB: Record<string, number> = Object.fromEntries(STAGES.map((s, i) => [s, stageCfgFor(s, i).probability]));
   const closedCents = active.filter((c) => c.stage === "Cierre" || c.stage === "Expansion").reduce((s, c) => s + (c.valueCents || 0), 0);
   const projectedCents = active.filter((c) => c.stage !== "Cierre" && c.stage !== "Expansion")
     .reduce((s, c) => s + ((c.valueCents || 0) * (STAGE_PROB[c.stage] || 0)) / 100, 0);
@@ -195,7 +198,7 @@ export default function HomePage() {
               </div>
               <div className="space-y-2">
                 {byStage.map((s) => {
-                  const cfg = STAGE_CFG[s.stage];
+                  const cfg = stageCfgFor(s.stage, 0);
                   return (
                     <Link key={s.stage} href="/pipeline" aria-label={`${s.stage}: ${s.count} contacto${s.count !== 1 ? "s" : ""}${s.value > 0 ? ", " + formatCurrency(s.value) : ""}`} className="flex items-center gap-3 group">
                       <span className="w-[84px] text-[11px] text-right shrink-0" style={{ color: cfg.text }}>{s.stage}</span>
