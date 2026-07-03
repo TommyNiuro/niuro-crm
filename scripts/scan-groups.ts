@@ -19,13 +19,14 @@
  * Forzar re-escaneo: npx tsx scripts/scan-groups.ts --since-days 14
  */
 import { openDb } from "../src/lib/db-open";
-import path from "path";
 import { execFileSync } from "child_process";
 import { runClaude, DEFAULT_MODEL } from "../src/lib/claude-subprocess";
 import { resolveSenderPhone } from "../src/lib/lid";
 import { operator } from "../src/lib/operator";
+import { dbPath } from "../src/lib/paths";
 
-const CRM_DB = path.resolve(process.cwd(), "data/crm.db");
+// Misma resolución que la app: CRM_DB_PATH > CRM_DATA_DIR/crm.db > cwd/data.
+const CRM_DB = dbPath();
 const MAX_AI_MSGS = 30; // tope de mensajes a calificar por corrida
 const WATERMARK_KEY = "group_radar_last_rowid";
 

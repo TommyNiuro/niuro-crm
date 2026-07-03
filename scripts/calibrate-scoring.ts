@@ -11,9 +11,10 @@
  *   npx tsx scripts/calibrate-scoring.ts
  */
 import { openDb } from "../src/lib/db-open";
-import path from "path";
+import { dbPath } from "../src/lib/paths";
 
-const CRM_DB = path.resolve(process.cwd(), "data/crm.db");
+// Misma resolución que la app: CRM_DB_PATH > CRM_DATA_DIR/crm.db > cwd/data.
+const CRM_DB = dbPath();
 
 function lossCategory(reason: string | null): string {
   if (!reason || !reason.trim()) return "Sin razón registrada";
