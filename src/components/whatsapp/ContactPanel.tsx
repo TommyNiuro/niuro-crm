@@ -88,24 +88,25 @@ function ScoreGauge({ score, temperature }: { score: number; temperature: string
   );
 }
 
-function BreakdownBar({ label, points, max }: { label: string; points: number; max: number }) {
+function BreakdownBar({ label, points, max, color }: { label: string; points: number; max: number; color: string }) {
   const pct = max > 0 ? Math.max(0, Math.min(100, (points / max) * 100)) : 0;
-  // Paleta: el desglose es "progreso" → esmeralda única. El semáforo de
-  // temperatura vive SOLO en el gauge/pills; dos escalas de color juntas
-  // hacían ilegible el panel.
+  // Paleta unificada: antes el desglose era esmeralda fijo mientras el gauge y
+  // el badge de arriba usan el color de temperatura (rojo/ambar/gris) — dos
+  // escalas de color chocando en el mismo panel se veía roto. Ahora todo el
+  // panel usa UN solo acento: el de la temperatura del lead.
   return (
     <div>
       <div className="flex items-baseline justify-between text-[11px] mb-1">
         <span className="text-muted-foreground">{label}</span>
-        <span className={pct > 0 ? "tabular-nums font-semibold text-emerald-500" : "tabular-nums text-meta"}>
+        <span className="tabular-nums font-semibold" style={{ color: pct > 0 ? color : "var(--meta)" }}>
           {points}
           <span className="text-meta font-normal">/{max}</span>
         </span>
       </div>
       <div className="h-1.5 rounded-full bg-surface-3 overflow-hidden">
         <div
-          className="h-full rounded-full bg-emerald-500"
-          style={{ width: `${pct}%`, opacity: 0.45 + (pct / 100) * 0.55, transition: "width 500ms cubic-bezier(.4,0,.2,1)" }}
+          className="h-full rounded-full"
+          style={{ width: `${pct}%`, background: color, opacity: 0.45 + (pct / 100) * 0.55, transition: "width 500ms cubic-bezier(.4,0,.2,1)" }}
         />
       </div>
     </div>
@@ -356,7 +357,7 @@ function InsightPanel({
               Desglose
             </div>
             {(Object.keys(data.breakdown) as (keyof ScoreBreakdown)[]).map((k) => (
-              <BreakdownBar key={k} label={DIM_LABEL[k]} points={data.breakdown[k]} max={DIM_MAX[k]} />
+              <BreakdownBar key={k} label={DIM_LABEL[k]} points={data.breakdown[k]} max={DIM_MAX[k]} color={TEMP_COLOR[data.temperature]} />
             ))}
           </div>
 
