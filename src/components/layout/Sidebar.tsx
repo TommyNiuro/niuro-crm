@@ -53,7 +53,7 @@ export const NAV_ITEMS = [
   { href: "/engineers", label: "Ingenieros", icon: HardHat },
   { href: "/proposals", label: "Propuestas", icon: FileText },
   { href: "/contacts", label: "Directorio", icon: Users },
-  { href: "/calendar", label: "Agenda", icon: Calendar },
+  { href: "/tasks", label: "Tareas", icon: Calendar },
   { href: "/automations", label: "Automatizaciones", icon: Zap },
   { href: "/analytics", label: "Analitica", icon: BarChart3 },
   { href: "/integrations", label: "Integraciones", icon: Plug },
@@ -166,7 +166,7 @@ export function Sidebar() {
   const badgeFor = (href: string) => {
     if (href === "/whatsapp") return counts.leads;
     if (href === "/opportunities") return counts.opportunities;
-    if (href === "/calendar") return counts.tareasVencidas;
+    if (href === "/tasks") return counts.tareasVencidas;
     return 0;
   };
 

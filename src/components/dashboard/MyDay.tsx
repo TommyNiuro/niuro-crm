@@ -144,7 +144,7 @@ export default function MyDay() {
             {data.items.length} acción{data.items.length === 1 ? "" : "es"} pendiente{data.items.length === 1 ? "" : "s"}
           </span>
         </div>
-        <Link href="/calendar" className="text-xs text-muted-foreground hover:text-foreground">Ver agenda</Link>
+        <Link href="/tasks" className="text-xs text-muted-foreground hover:text-foreground">Ver tareas</Link>
       </div>
 
       {data.items.length === 0 ? (

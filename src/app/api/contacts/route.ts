@@ -6,7 +6,7 @@ import { contactCreateSchema, validate } from "@/lib/validation";
 import { dispatchRecordEvent } from "@/lib/workflows/dispatch";
 import { mergeCustomFields } from "@/lib/custom-fields";
 import { canonicalJid, phonebookNames } from "@/lib/lid";
-import { listChats } from "@/lib/whatsapp";
+import { lastChatTimes } from "@/lib/chat-times";
 
 // Nombres que en realidad son un número/JID crudo (contactos importados de
 // WhatsApp sin nombre real). Solo dígitos, con separadores opcionales.
@@ -75,18 +75,8 @@ export async function GET(request: NextRequest) {
   // Solo presentación: no se escribe en la DB.
   const pb = phonebookNames();
 
-  // Última interacción REAL del chat (unión archivo+store, identidad canónica,
-  // cacheada 30s en listChats). El campo del CRM solo se toca en acciones del
-  // CRM y se queda viejo; el chat es la verdad. Solo presentación.
-  const chatTimes = new Map<string, string>();
-  try {
-    for (const ch of listChats({ limit: 2000, includeArchived: true })) {
-      if (ch.isGroup || !ch.lastMessageTime) continue;
-      const k = canonicalJid(ch.jid);
-      const prev = chatTimes.get(k);
-      if (!prev || ch.lastMessageTime > prev) chatTimes.set(k, ch.lastMessageTime);
-    }
-  } catch { /* sin store del bridge (dev/CI): queda el campo del CRM */ }
+  // Última interacción REAL del chat (helper compartido con /api/tasks).
+  const chatTimes = lastChatTimes();
 
   const withStage = results.map((c) => {
     const ts = enteredAt.get(`${c.id}:${c.stage}`) ?? new Date(c.createdAt).getTime();

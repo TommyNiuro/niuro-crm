@@ -176,7 +176,7 @@ export default function HomePage() {
           <Kpi icon={Scale} label="Pipeline ponderado" value={formatCurrency(Math.round(weightedCents))} sub={`${active.filter((c) => c.valueCents > 0).length} con monto`} />
           <Kpi icon={Trophy} label="Win rate" value={winRate != null ? `${winRate}%` : "—"} sub={`${won} ganados · ${lost.length} perdidos`} tone={winRate != null && winRate >= 30 ? "ok" : undefined} href="/analytics" />
           <Kpi icon={Flame} label="Con señal de lead" value={hotPending.length + warmPending.length} sub={`${hotPending.length} calientes · ${warmPending.length} tibios · ${newLeads7d} nuevos 7d`} tone={hotPending.length > 0 ? "warn" : undefined} href="/whatsapp/leads" />
-          <Kpi icon={CalendarClock} label="Tareas hoy" value={dueToday.length} sub={`${openTasks.length} abiertas · ${atRisk.length} sin paso`} tone={dueToday.length > 0 ? "warn" : "ok"} href="/calendar" />
+          <Kpi icon={CalendarClock} label="Tareas hoy" value={dueToday.length} sub={`${openTasks.length} abiertas · ${atRisk.length} sin paso`} tone={dueToday.length > 0 ? "warn" : "ok"} href="/tasks" />
         </div>
 
         {/* ── Grid principal ── */}
@@ -360,7 +360,7 @@ export default function HomePage() {
               {[
                 { label: "WhatsApp", href: "/whatsapp", icon: MessageCircle },
                 { label: "Pipeline", href: "/pipeline", icon: BarChart3 },
-                { label: "Agenda", href: "/calendar", icon: Clock },
+                { label: "Tareas", href: "/tasks", icon: Clock },
                 { label: "Analítica", href: "/analytics", icon: TrendingUp },
               ].map((a) => (
                 <Link key={a.href} href={a.href} className="flex items-center gap-2 p-2.5 rounded-lg border border-border bg-card hover:bg-hover transition-colors">
