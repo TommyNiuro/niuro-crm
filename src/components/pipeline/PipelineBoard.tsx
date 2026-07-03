@@ -14,6 +14,10 @@ import { MessageCircle, Clock, AlertTriangle, TrendingUp, XCircle, ChevronsLeft,
 // título y el tipo de contacto que filtra.
 type StageCfg = { text: string; bg: string; dueInDays: number };
 
+/** Columna virtual para contactos cuya etapa no existe en el pipeline. */
+const ORPHAN_COL = "Sin etapa";
+const ORPHAN_CFG: StageCfg = { text: "#d97706", bg: "rgba(217,119,6,0.10)", dueInDays: 2 };
+
 interface PipelineBoardProps {
   stages: readonly string[];
   stageCfg: Record<string, StageCfg>;
@@ -264,11 +268,11 @@ export function PipelineBoard({ stages, stageCfg, emptyHints, title, subtitle, t
     });
 
   useEffect(() => {
-    fetch("/api/contacts?includeArchived=1&limit=1000")
+    // El filtro por tipo corre en la API (antes traía 1000 contactos de todos
+    // los tipos y filtraba en el navegador).
+    fetch(`/api/contacts?includeArchived=1&limit=1000&type=${encodeURIComponent(typeFilter)}`)
       .then((r) => (r.ok ? r.json() : []))
-      // Filtra por tipo: ventas ve leads, ingenieros ve engineers. Los viejos
-      // sin contact_type cuentan como 'lead' (default de la migración).
-      .then((d) => setContacts(Array.isArray(d) ? d.filter((c: Contact) => (c.contactType || "lead") === typeFilter) : []))
+      .then((d) => setContacts(Array.isArray(d) ? d : []))
       .finally(() => setLoading(false));
   }, [typeFilter]);
 
@@ -308,8 +312,15 @@ export function PipelineBoard({ stages, stageCfg, emptyHints, title, subtitle, t
   const totalWeighted  = activeContacts.reduce((a, c) => a + (c.valueCents || 0) * (c.probability || 0) / 100, 0);
   const totalWithValue = activeContacts.filter((c) => c.valueCents > 0).length;
 
-  const allCols: Array<{ key: string; isLost: boolean }> = [
+  // Huérfanos: contactos vivos cuya etapa ya no existe en este pipeline
+  // (etapa renombrada/borrada en Ajustes, o migración). Antes desaparecían del
+  // kanban sin aviso; ahora tienen su propia columna y se arrastran a una real.
+  const knownStages = new Set(stages);
+  const orphans = activeContacts.filter((c) => !knownStages.has(c.stage));
+
+  const allCols: Array<{ key: string; isLost: boolean; isOrphan?: boolean }> = [
     ...stages.map((s) => ({ key: s, isLost: false })),
+    ...(orphans.length ? [{ key: ORPHAN_COL, isLost: false, isOrphan: true }] : []),
     { key: STAGE_PERDIDOS, isLost: true },
   ];
 
@@ -359,11 +370,13 @@ export function PipelineBoard({ stages, stageCfg, emptyHints, title, subtitle, t
         </div>
       ) : (
         <div className="flex-1 min-h-0 flex gap-3 p-5 overflow-x-auto">
-          {allCols.map(({ key: stage, isLost }) => {
-            const cfg = stageCfg[stage];
+          {allCols.map(({ key: stage, isLost, isOrphan }) => {
+            const cfg = isOrphan ? ORPHAN_CFG : stageCfg[stage];
             const items = isLost
               ? lostContacts
-              : activeContacts.filter((c) => c.stage === stage);
+              : isOrphan
+                ? orphans
+                : activeContacts.filter((c) => c.stage === stage);
             const total = items.reduce((a, c) => a + (c.valueCents || 0), 0);
             const weighted = isLost
               ? 0
@@ -382,7 +395,8 @@ export function PipelineBoard({ stages, stageCfg, emptyHints, title, subtitle, t
                   onDragOver={(e) => { e.preventDefault(); setOverStage(stage); }}
                   onDrop={(e) => {
                     e.preventDefault();
-                    if (dragId) move(dragId, stage);
+                    // A "Sin etapa" no se puede soltar: es virtual, no una etapa real.
+                    if (dragId && !isOrphan) move(dragId, stage);
                     setDragId(null);
                     setOverStage(null);
                   }}
@@ -419,7 +433,8 @@ export function PipelineBoard({ stages, stageCfg, emptyHints, title, subtitle, t
                 }}
                 onDrop={(e) => {
                   e.preventDefault();
-                  if (dragId) move(dragId, stage);
+                  // A "Sin etapa" no se puede soltar: es virtual, no una etapa real.
+                  if (dragId && !isOrphan) move(dragId, stage);
                   setDragId(null);
                   setOverStage(null);
                 }}
@@ -461,6 +476,11 @@ export function PipelineBoard({ stages, stageCfg, emptyHints, title, subtitle, t
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-2 space-y-2 min-h-[80px]">
+                  {isOrphan && (
+                    <p className="text-[10.5px] leading-snug text-warning px-1.5 pt-1">
+                      Su etapa fue renombrada o borrada. Arrastrá cada contacto a su etapa actual.
+                    </p>
+                  )}
                   {items.length === 0 ? (
                     <p className="text-center text-[11px] text-muted-foreground py-6 px-3 leading-snug">
                       {emptyHints[stage] ?? "Nada aquí todavía."}

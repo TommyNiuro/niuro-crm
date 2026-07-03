@@ -16,11 +16,13 @@
  * Forzar ventana más amplia: npx tsx scripts/scan-external-jobs.ts --since-days 14
  */
 import { openDb } from "../src/lib/db-open";
-import path from "path";
 import { execFileSync } from "child_process";
 import { operator } from "../src/lib/operator";
+import { dbPath } from "../src/lib/paths";
 
-const CRM_DB = path.resolve(process.cwd(), "data/crm.db");
+// Misma resolución que la app: CRM_DB_PATH > CRM_DATA_DIR/crm.db > cwd/data.
+// Permite correr el scanner contra la DB de la .app instalada.
+const CRM_DB = dbPath();
 const API = "https://www.getonbrd.com/api/v0/categories/programming/jobs";
 const MAX_PAGES = 4; // 25 avisos por página
 const SOURCE = "getonboard";
@@ -45,7 +47,7 @@ type Job = {
     max_salary: number | null;
     published_at: number; // unix segundos
     lang: string;
-    tags?: { data?: { id: string }[] } | string[];
+    tags?: { data?: { id: string; attributes?: { name?: string } }[] } | string[];
     seniority: { data: { id: string | number; attributes?: { name: string } } };
     company: { data: { id: string; attributes?: { name: string; description?: string } } };
   };
@@ -59,7 +61,10 @@ function stripHtml(html: string | null): string {
 function tagNames(tags: Job["attributes"]["tags"]): string[] {
   if (!tags) return [];
   if (Array.isArray(tags)) return tags.map(String);
-  return (tags.data || []).map((t) => String(t.id));
+  // Con expand=["tags"] cada tag trae attributes.name legible. Sin expand la API
+  // devuelve solo IDs numéricos, que era lo que se guardaba como "stack"
+  // (auditoría 2026-07-02).
+  return (tags.data || []).map((t) => t.attributes?.name || String(t.id)).filter(Boolean);
 }
 
 function notify(msg: string) {
@@ -93,7 +98,7 @@ function suggestedReply(company: string, role: string): string {
 }
 
 async function fetchPage(page: number): Promise<Job[]> {
-  const url = `${API}?per_page=25&page=${page}&expand=${encodeURIComponent('["company","seniority"]')}`;
+  const url = `${API}?per_page=25&page=${page}&expand=${encodeURIComponent('["company","seniority","tags"]')}`;
   const res = await fetch(url, { headers: { Accept: "application/json" } });
   if (!res.ok) throw new Error(`GetOnBoard HTTP ${res.status}`);
   const body = (await res.json()) as { data: Job[] };
@@ -105,6 +110,14 @@ async function main() {
   db.pragma("journal_mode = WAL");
   db.pragma("busy_timeout = 60000");
 
+  // Filas viejas con stack de IDs numéricos (bug del expand de tags faltante):
+  // se re-resuelven contra los avisos que siguen listados. Si hay que sanear,
+  // se leen todas las páginas aunque queden detrás del cutoff.
+  const numericStacks = db.prepare(`
+    SELECT id, message_id FROM group_opportunities
+    WHERE source = ? AND stack IS NOT NULL AND stack NOT GLOB '*[a-zA-Z]*'
+  `).all(SOURCE) as { id: string; message_id: string }[];
+
   const cutoff = Date.now() / 1000 - SINCE_DAYS * 86400;
   const jobs: Job[] = [];
   for (let page = 1; page <= MAX_PAGES; page++) {
@@ -113,7 +126,7 @@ async function main() {
     jobs.push(...batch);
     // Los avisos vienen ordenados por publicación: si la página ya quedó
     // completa detrás del cutoff, no hay nada más nuevo que buscar.
-    if (batch.every((j) => j.attributes.published_at < cutoff)) break;
+    if (batch.every((j) => j.attributes.published_at < cutoff) && numericStacks.length === 0) break;
   }
 
   const recent = jobs.filter((j) => j.attributes.published_at >= cutoff);
@@ -159,6 +172,20 @@ async function main() {
       suggestedReply(company, a.title), SOURCE, j.links?.public_url || null,
     );
     inserted += r.changes;
+  }
+
+  if (numericStacks.length) {
+    const bySlug = new Map(jobs.map((j) => [j.id, tagNames(j.attributes.tags).slice(0, 6).join(", ") || null]));
+    const upd = db.prepare("UPDATE group_opportunities SET stack = ?, updated_at = unixepoch('now') WHERE id = ?");
+    let healed = 0;
+    for (const r of numericStacks) {
+      const s = bySlug.get(r.message_id) ?? null;
+      upd.run(s, r.id);
+      if (s) healed++;
+    }
+    // ponytail: los avisos que ya no están listados quedan sin stack; mejor
+    // hueco honesto que IDs sin sentido (el endpoint de tag individual da 404).
+    console.log(`[radar-ext] stacks numéricos saneados: ${healed}/${numericStacks.length} (el resto queda vacío)`);
   }
 
   const pendingNew = (db.prepare("SELECT COUNT(*) AS c FROM group_opportunities WHERE status='new' AND source=?").get(SOURCE) as { c: number }).c;

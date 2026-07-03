@@ -5,12 +5,18 @@ import { eq, like, or, desc, and, inArray, isNull, isNotNull } from "drizzle-orm
 import { contactCreateSchema, validate } from "@/lib/validation";
 import { dispatchRecordEvent } from "@/lib/workflows/dispatch";
 import { mergeCustomFields } from "@/lib/custom-fields";
+import { canonicalJid, phonebookNames } from "@/lib/lid";
+
+// Nombres que en realidad son un número/JID crudo (contactos importados de
+// WhatsApp sin nombre real). Solo dígitos, con separadores opcionales.
+const JID_NAME_RE = /^\+?\d[\d\s.-]{5,}$/;
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const search = searchParams.get("search");
   const temperature = searchParams.get("temperature");
   const source = searchParams.get("source");
+  const type = searchParams.get("type"); // lead | client | engineer
   const includeArchived = searchParams.get("includeArchived") === "1";
   const deleted = searchParams.get("deleted") === "1"; // papelera: solo borrados
   // || fallback: parseInt("abc") = NaN rompía la query con 500 (auditoría 2026-06-09)
@@ -32,6 +38,7 @@ export async function GET(request: NextRequest) {
   }
   if (temperature) conditions.push(eq(contacts.temperature, temperature));
   if (source) conditions.push(eq(contacts.source, source));
+  if (type) conditions.push(eq(contacts.contactType, type));
 
   const results = db
     .select()
@@ -62,9 +69,17 @@ export async function GET(request: NextRequest) {
     const key = `${t.contactId}:${t.toStep}`;
     if (!enteredAt.has(key) || ts > enteredAt.get(key)!) enteredAt.set(key, ts);
   }
+  // Nombre visible: si el contacto quedó con el número/JID como nombre (import
+  // de WhatsApp sin nombre), se resuelve contra la agenda real del teléfono.
+  // Solo presentación: no se escribe en la DB.
+  const pb = phonebookNames();
   const withStage = results.map((c) => {
     const ts = enteredAt.get(`${c.id}:${c.stage}`) ?? new Date(c.createdAt).getTime();
-    return { ...c, stageEnteredAt: isNaN(ts) ? null : new Date(ts).toISOString() };
+    const name =
+      c.whatsappJid && JID_NAME_RE.test(c.name)
+        ? pb.get(canonicalJid(c.whatsappJid)) ?? c.name
+        : c.name;
+    return { ...c, name, stageEnteredAt: isNaN(ts) ? null : new Date(ts).toISOString() };
   });
   return NextResponse.json(mergeCustomFields("contacts", withStage));
 }

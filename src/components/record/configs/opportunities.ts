@@ -50,6 +50,9 @@ export const opportunitiesConfig: RecordConfig = {
       },
     },
   ],
+  // Las descartadas no aparecen por defecto (con score alto flotaban arriba de
+  // las nuevas). El chip del filtro queda visible en la barra y se puede quitar.
+  defaultFilters: [{ id: "status-default", key: "status", op: "isNot", value: "discarded" }],
   boardGroupKey: "status",
   boardGroups: STATUS_OPTIONS,
   cardFields: ["company", "score"],

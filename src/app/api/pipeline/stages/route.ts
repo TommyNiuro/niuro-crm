@@ -37,8 +37,16 @@ function cleanName(v: unknown): string | null {
 }
 
 export async function GET(req: NextRequest) {
+  // Sin pipeline devolvía los 3 mezclados y el kanban de Ventas renderizaba
+  // columnas de Clientes/Ingenieros (auditoría 2026-07-02). Parámetro obligatorio.
   const p = req.nextUrl.searchParams.get("pipeline");
-  return NextResponse.json(list(isPipeline(p) ? p : undefined));
+  if (!isPipeline(p)) {
+    return NextResponse.json(
+      { error: `pipeline requerido: ${PIPELINES.join(" | ")}` },
+      { status: 400 }
+    );
+  }
+  return NextResponse.json(list(p));
 }
 
 export async function POST(req: NextRequest) {

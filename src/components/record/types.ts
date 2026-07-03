@@ -144,6 +144,9 @@ export interface RecordConfig {
   /** acciones de fila: botón en la tabla y en el panel de detalle. href navega
    *  (ej. deep-link a /whatsapp); devuelve null para ocultar la acción en esa fila. */
   rowActions?: RowAction[];
+  /** filtros activos al abrir la vista (el usuario puede quitarlos desde la barra).
+   *  Ej: ocultar descartadas por defecto en el Radar. */
+  defaultFilters?: import("./filters").Filter[];
 }
 
 export interface RowAction {

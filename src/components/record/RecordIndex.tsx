@@ -72,7 +72,7 @@ export function RecordIndex({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [activeId, setActiveId] = useState<string | null>(null);
   const [dynGroups, setDynGroups] = useState<SelectOption[] | null>(null);
-  const [filters, setFilters] = useState<Filter[]>([]);
+  const [filters, setFilters] = useState<Filter[]>(config.defaultFilters ?? []);
   const [colState, setColState] = useState<ColumnState>({ order: [], hidden: new Set(), widths: {} });
   const [showArchived, setShowArchived] = useState(false);
   const [showTrash, setShowTrash] = useState(false); // papelera: lista solo los borrados

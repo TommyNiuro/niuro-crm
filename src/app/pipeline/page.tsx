@@ -23,7 +23,7 @@ export default function PipelinePage() {
   const [stages, setStages] = useState<Stage[] | null>(null);
 
   useEffect(() => {
-    fetch("/api/pipeline/stages")
+    fetch("/api/pipeline/stages?pipeline=prospectos")
       .then((r) => (r.ok ? r.json() : []))
       .then((d: Stage[]) => setStages(Array.isArray(d) && d.length ? d : []))
       .catch(() => setStages([]));
