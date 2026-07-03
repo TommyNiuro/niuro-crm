@@ -571,6 +571,16 @@ function initTables(db: Database.Database): void {
        ('cli-activo', 'Activo', 1, '#16A34A', 0, 0, 'clientes'),
        ('cli-expansion', 'Expansion', 2, '#8B5CF6', 0, 0, 'clientes'),
        ('cli-en-riesgo', 'En riesgo', 3, '#DC2626', 0, 0, 'clientes')`,
+    // Saneo de timestamps en milisegundos (auditoría 2026-07-02, Fase 4):
+    // followup-cadence escribía Date.now() (ms) por SQL crudo en columnas que
+    // drizzle define con mode 'timestamp' (unix SEGUNDOS). Resultado: tareas
+    // que vencían en el año 58395 y next_step_due que jamás aparecía vencido.
+    // Umbral 1e11 segundos = año 5138: cualquier valor mayor solo puede ser ms.
+    `UPDATE tasks SET due_at = due_at/1000 WHERE due_at > 100000000000;
+     UPDATE tasks SET created_at = created_at/1000 WHERE created_at > 100000000000;
+     UPDATE tasks SET completed_at = completed_at/1000 WHERE completed_at > 100000000000;
+     UPDATE contacts SET next_step_due = next_step_due/1000 WHERE next_step_due > 100000000000;
+     UPDATE contacts SET updated_at = updated_at/1000 WHERE updated_at > 100000000000`,
   ];
   // Control de versiones (auditoria SaaS 2026-07-01, fase 1). Antes se re-corrian
   // TODOS los ALTER en cada arranque (idempotentes, pero re-ejecutados) y un error

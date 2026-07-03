@@ -149,14 +149,16 @@ export function Sidebar() {
         setCounts((c) => ({ ...c, opportunities: Array.isArray(ops) ? ops.length : 0 }));
       })
       .catch(() => {});
-    // Tareas vencidas: sin este badge, la Agenda es un cementerio invisible.
+    // Tareas que exigen atención: vencidas + las de hoy. Misma semántica que
+    // las secciones "Vencidas" y "Hoy" de la Agenda (el badge y la página
+    // mostraban números distintos, auditoría 2026-07-02).
     fetch("/api/tasks?scope=today")
       .then((r) => (r.ok ? r.json() : []))
       .then((ts) => {
-        const vencidas = Array.isArray(ts)
-          ? ts.filter((t: { dueAt?: string | null }) => t.dueAt && new Date(t.dueAt).getTime() < Date.now()).length
+        const pendientes = Array.isArray(ts)
+          ? ts.filter((t: { dueAt?: string | null }) => t.dueAt).length
           : 0;
-        setCounts((c) => ({ ...c, tareasVencidas: vencidas }));
+        setCounts((c) => ({ ...c, tareasVencidas: pendientes }));
       })
       .catch(() => {});
   }, []);

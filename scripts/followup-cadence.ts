@@ -17,9 +17,10 @@
  * Uso manual: npx tsx scripts/followup-cadence.ts
  */
 import { openDb } from "../src/lib/db-open";
-import path from "path";
+import { dbPath } from "../src/lib/paths";
 
-const CRM_DB = path.resolve(process.cwd(), "data/crm.db");
+// Misma resolución que la app: CRM_DB_PATH > CRM_DATA_DIR/crm.db > cwd/data.
+const CRM_DB = dbPath();
 const WORKING_STAGES = ["Prospecto", "Discovery", "Propuesta", "Perfil", "Entrevistas"];
 const MAX_TOUCHES = 5;
 
@@ -105,8 +106,11 @@ const run = db.transaction(() => {
       if (touch >= MAX_TOUCHES) lastCall++;
     }
 
-    insertTask.run(c.id, title, dueAt, now);
-    updateContact.run(title, dueAt, now, c.id);
+    // Al borde SQL siempre en SEGUNDOS: drizzle define estas columnas con
+    // mode 'timestamp' (unix segundos). Escribir Date.now() (ms) acá era el
+    // bug de las tareas con vencimiento en el año 58395 (auditoría 2026-07-02).
+    insertTask.run(c.id, title, Math.floor(dueAt / 1000), Math.floor(now / 1000));
+    updateContact.run(title, Math.floor(dueAt / 1000), Math.floor(now / 1000), c.id);
     counters[c.stage] = (counters[c.stage] ?? 0) + 1;
     created++;
   }
