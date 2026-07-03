@@ -50,23 +50,24 @@ export const opportunitiesConfig: RecordConfig = {
       },
     },
   ],
-  // Las descartadas no aparecen por defecto (con score alto flotaban arriba de
-  // las nuevas). El chip del filtro queda visible en la barra y se puede quitar.
-  defaultFilters: [{ id: "status-default", key: "status", op: "isNot", value: "discarded" }],
+  // Los filtros por estado los pone la página (pestañas Nuevas/Contactadas/
+  // Descartadas); acá solo la forma de la tabla. Triage: las columnas visibles
+  // son las que deciden (rol, score, empresa, fuente, stack, antigüedad); el
+  // resto vive en el panel de detalle (Fase 5 auditoría 2026-07-02).
   boardGroupKey: "status",
   boardGroups: STATUS_OPTIONS,
   cardFields: ["company", "score"],
   columns: [
-    { key: "role", label: "Rol / Oportunidad", type: "text", primary: true, width: 260 },
+    { key: "role", label: "Rol / Oportunidad", type: "text", primary: true, width: 280 },
     { key: "score", label: "Score", type: "number", width: 80 },
-    { key: "status", label: "Estado", type: "status", editable: true, options: STATUS_OPTIONS, width: 130 },
-    { key: "urgency", label: "Urgencia", type: "status", options: URGENCY_OPTIONS, width: 110 },
+    { key: "company", label: "Empresa", type: "text", width: 160 },
     { key: "source", label: "Fuente", type: "status", options: SOURCE_OPTIONS, width: 120 },
     { key: "seniority", label: "Seniority", type: "text", width: 110 },
-    { key: "company", label: "Empresa", type: "text", width: 150 },
-    { key: "groupName", label: "Grupo / Fuente", type: "text", width: 150 },
-    { key: "stack", label: "Stack", type: "text", width: 160 },
+    { key: "stack", label: "Stack", type: "text", width: 180 },
     { key: "messageAt", label: "Detectado", type: "date", width: 130 },
+    { key: "status", label: "Estado", type: "status", editable: true, options: STATUS_OPTIONS, detailOnly: true },
+    { key: "urgency", label: "Urgencia", type: "status", options: URGENCY_OPTIONS, detailOnly: true },
+    { key: "groupName", label: "Grupo / Fuente", type: "text", detailOnly: true },
     { key: "summary", label: "Resumen IA", type: "longtext", detailOnly: true },
     { key: "suggestedReply", label: "Respuesta sugerida (IA)", type: "longtext", detailOnly: true },
     { key: "excerpt", label: "Mensaje original", type: "longtext", detailOnly: true },
