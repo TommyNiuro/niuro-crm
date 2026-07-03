@@ -24,32 +24,52 @@ interface AnalyticsData {
   allCandidates: Pick<typeof leadCandidates.$inferSelect, "createdAt">[];
   allTasks: Pick<typeof tasks.$inferSelect, "completedAt" | "status">[];
   allOpps: Pick<typeof groupOpportunities.$inferSelect, "status" | "updatedAt">[];
-  /** Mediana en minutos de la primera respuesta nuestra a un mensaje entrante (30d). null sin datos. */
-  medianResponseMinutes: number | null;
+  /** Actividad de WhatsApp de los últimos 30 días (solo chats 1a1, sin grupos). */
+  waStats: WaStats;
 }
 
-/** Mediana de minutos entrante->respuesta nuestra por chat, últimos 30 días.
- * SQL crudo sobre wa_messages (tabla fuera de Drizzle, la crea el sync). */
-function medianResponseMinutes(): number | null {
+export interface WaStats {
+  /** Mediana en minutos de la primera respuesta nuestra a un mensaje entrante. null sin datos. */
+  medianResponseMinutes: number | null;
+  sent30: number;
+  received30: number;
+  activeChats30: number;
+}
+
+/** Métricas de wa_messages (tabla fuera de Drizzle, la crea el sync), últimos
+ * 30 días y SIN grupos: en un grupo "responder" no significa nada y los
+ * mensajes encadenados hacían mediana 0. */
+function computeWaStats(): WaStats {
+  const empty: WaStats = { medianResponseMinutes: null, sent30: 0, received30: 0, activeChats30: 0 };
   let conn: ReturnType<typeof openDb> | null = null;
   try {
     conn = openDb(dbPath(), { readonly: true });
+    const counts = conn.prepare(
+      `SELECT SUM(is_from_me = 1) AS sent, SUM(is_from_me = 0) AS received,
+              COUNT(DISTINCT chat_jid) AS chats
+       FROM wa_messages
+       WHERE timestamp >= datetime('now', '-30 days') AND chat_jid NOT LIKE '%@g.us'`
+    ).get() as { sent: number | null; received: number | null; chats: number | null };
     const rows = conn.prepare(
       `SELECT mins FROM (
          SELECT m.is_from_me,
                 LEAD(m.is_from_me) OVER w AS nf,
                 CAST((julianday(LEAD(m.timestamp) OVER w) - julianday(m.timestamp)) * 1440 AS INTEGER) AS mins
          FROM wa_messages m
-         WHERE m.timestamp >= datetime('now', '-30 days')
+         WHERE m.timestamp >= datetime('now', '-30 days') AND m.chat_jid NOT LIKE '%@g.us'
          WINDOW w AS (PARTITION BY m.chat_jid ORDER BY m.timestamp)
        )
        WHERE is_from_me = 0 AND nf = 1 AND mins BETWEEN 0 AND 4320
        ORDER BY mins`
     ).pluck().all() as number[];
-    if (!rows.length) return null;
-    return rows[Math.floor(rows.length / 2)];
+    return {
+      medianResponseMinutes: rows.length ? rows[Math.floor(rows.length / 2)] : null,
+      sent30: counts?.sent ?? 0,
+      received30: counts?.received ?? 0,
+      activeChats30: counts?.chats ?? 0,
+    };
   } catch {
-    return null; // instalación sin sync todavía: sin la tabla o vacía
+    return empty; // instalación sin sync todavía: sin la tabla o vacía
   } finally {
     conn?.close();
   }
@@ -72,7 +92,7 @@ export function getAnalyticsData(): AnalyticsData {
       .select({ status: groupOpportunities.status, updatedAt: groupOpportunities.updatedAt })
       .from(groupOpportunities)
       .all(),
-    medianResponseMinutes: medianResponseMinutes(),
+    waStats: computeWaStats(),
   };
   return cache;
 }
