@@ -249,6 +249,7 @@ function initTables(db: Database.Database): void {
       sources TEXT,
       job_count INTEGER NOT NULL DEFAULT 1,
       roles TEXT,
+      jobs TEXT,
       stack TEXT,
       seniority TEXT,
       countries TEXT,
@@ -270,6 +271,7 @@ function initTables(db: Database.Database): void {
       contact_email TEXT,
       contact_phone TEXT,
       contact_linkedin TEXT,
+      alt_contacts TEXT,
       apollo_enriched_at INTEGER,
       msg_connect TEXT,
       msg_pitch TEXT,
@@ -616,6 +618,8 @@ function initTables(db: Database.Database): void {
      UPDATE tasks SET completed_at = completed_at/1000 WHERE completed_at > 100000000000;
      UPDATE contacts SET next_step_due = next_step_due/1000 WHERE next_step_due > 100000000000;
      UPDATE contacts SET updated_at = updated_at/1000 WHERE updated_at > 100000000000`,
+    `ALTER TABLE prospects ADD COLUMN jobs TEXT`,
+    `ALTER TABLE prospects ADD COLUMN alt_contacts TEXT`,
   ];
   // Control de versiones (auditoria SaaS 2026-07-01, fase 1). Antes se re-corrian
   // TODOS los ALTER en cada arranque (idempotentes, pero re-ejecutados) y un error

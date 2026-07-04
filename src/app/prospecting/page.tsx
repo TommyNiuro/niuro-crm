@@ -24,12 +24,16 @@ import {
   Phone,
   RotateCcw,
   Search,
+  LayoutList,
+  Columns3,
+  MapPin,
   Sparkles,
   UserSearch,
   Users,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { openExternal } from "@/lib/open-external";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
@@ -42,6 +46,7 @@ interface Prospect {
   sources: string | null;
   jobCount: number;
   roles: string | null;
+  jobs: string | null; // JSON [{title,url,source}]
   stack: string | null;
   seniority: string | null;
   countries: string | null;
@@ -60,6 +65,7 @@ interface Prospect {
   contactEmail: string | null;
   contactPhone: string | null;
   contactLinkedin: string | null;
+  altContacts: string | null; // JSON [{name,title,email,linkedin}]
   apolloEnrichedAt: number | null;
   msgConnect: string | null;
   msgPitch: string | null;
@@ -75,6 +81,14 @@ const TABS = [
   { key: "all", label: "Todas" },
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
+
+// Columnas del embudo de contacto (descartadas queda fuera: vive en la lista).
+const FUNNEL_COLS = [
+  { key: "new", label: "Para contactar", color: "#3B5FE5" },
+  { key: "enriched", label: "Con decisor", color: "#06b6d4" },
+  { key: "contacted", label: "Contactada", color: "#D4940A" },
+  { key: "conversation", label: "En conversación", color: "#16A34A" },
+] as const;
 
 const URGENCY_STYLE: Record<string, string> = {
   alta: "bg-red-500/10 text-red-600 dark:text-red-400",
@@ -171,6 +185,7 @@ export default function ProspectingPage() {
   const [tab, setTab] = useState<TabKey>("new");
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<"score" | "daysOpen" | "jobCount">("score");
+  const [view, setView] = useState<"lista" | "embudo">("lista");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [busy, setBusy] = useState<Record<string, string>>({}); // id -> acción en curso
   const [apolloSet, setApolloSet] = useState<boolean | null>(null);
@@ -287,7 +302,7 @@ export default function ProspectingPage() {
       <div className="flex items-center gap-3 px-6 pt-5 pb-3 shrink-0">
         <div className="flex-1 min-w-0">
           <h1 className="text-[19px] font-semibold tracking-tight">Prospección</h1>
-          <p className="text-[12.5px] text-muted-foreground">
+          <p className="text-[12.5px] text-muted-foreground truncate">
             Empresas contratando talento tech en LATAM, detectadas a diario en 4 bolsas de trabajo
           </p>
         </div>
@@ -314,6 +329,22 @@ export default function ProspectingPage() {
           <option value="daysOpen">Por días abierta</option>
           <option value="jobCount">Por vacantes</option>
         </select>
+        <div className="flex rounded-lg border border-border bg-card p-0.5">
+          {([["lista", LayoutList], ["embudo", Columns3]] as const).map(([v, Icon]) => (
+            <button
+              key={v}
+              onClick={() => setView(v)}
+              aria-pressed={view === v}
+              title={v === "lista" ? "Vista lista" : "Vista embudo"}
+              className={cn(
+                "h-7 px-2.5 rounded-md flex items-center gap-1.5 text-[12px] capitalize cursor-pointer transition-colors",
+                view === v ? "bg-muted font-medium text-foreground" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <Icon className="h-3.5 w-3.5" /> {v}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* KPIs */}
@@ -337,7 +368,8 @@ export default function ProspectingPage() {
         ))}
       </div>
 
-      {/* Tabs */}
+      {/* Tabs (solo lista; el embudo ya muestra los estados como columnas) */}
+      {view === "lista" && (
       <div className="flex items-center gap-1 px-6 pb-2 shrink-0">
         {TABS.map((t) => {
           const active = tab === t.key;
@@ -360,8 +392,94 @@ export default function ProspectingPage() {
           );
         })}
       </div>
+      )}
+
+      {/* Embudo de contacto: columnas por estado, drag & drop */}
+      {view === "embudo" && (
+        <div className="flex-1 min-h-0 overflow-x-auto px-6 pb-6">
+          <div className="flex gap-3 h-full min-w-max">
+            {FUNNEL_COLS.map((col) => {
+              const items = rows
+                .filter((r) => r.status === col.key)
+                .sort((a, b) => b.score - a.score);
+              return (
+                <div
+                  key={col.key}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    const id = e.dataTransfer.getData("text/prospect-id");
+                    const prospect = rows.find((r) => r.id === id);
+                    if (prospect && prospect.status !== col.key) setStatus(prospect, col.key);
+                  }}
+                  className="w-80 flex flex-col rounded-xl border border-border bg-muted/30 max-h-full"
+                >
+                  <div className="flex items-center gap-2 px-3 py-2.5 shrink-0">
+                    <span className="h-2 w-2 rounded-full" style={{ background: col.color }} />
+                    <span className="text-[12.5px] font-semibold">{col.label}</span>
+                    <span className="text-[11px] font-bold tabular-nums rounded-full px-1.5 bg-card text-muted-foreground">
+                      {items.length}
+                    </span>
+                  </div>
+                  <div className="flex-1 min-h-0 overflow-y-auto px-2 pb-2 space-y-1.5">
+                    {items.length === 0 && (
+                      <div className="text-[11.5px] text-muted-foreground/60 text-center py-6">
+                        Arrastrá una tarjeta acá
+                      </div>
+                    )}
+                    {items.map((p) => {
+                      const countries = j(p.countries);
+                      const sources = j(p.sources);
+                      const roles = j(p.roles);
+                      return (
+                        <div
+                          key={p.id}
+                          draggable
+                          onDragStart={(e) => e.dataTransfer.setData("text/prospect-id", p.id)}
+                          onClick={() => setSelectedId(p.id)}
+                          className="rounded-lg border border-border bg-card p-3 cursor-pointer space-y-1.5 hover:border-ring/40 transition-colors"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className={cn("text-[12px] font-bold tabular-nums", scoreColor(p.score))}>{p.score}</span>
+                            <span className="text-[13px] font-medium truncate flex-1">{p.company}</span>
+                            <span className={cn("text-[10px] rounded-full px-1.5 py-px font-medium shrink-0", URGENCY_STYLE[p.urgency])}>
+                              {p.urgency}
+                            </span>
+                          </div>
+                          <div className="text-[11.5px] text-muted-foreground truncate">
+                            {roles[0] ?? "Ingenieros de software"}{roles.length > 1 ? ` +${roles.length - 1}` : ""}
+                          </div>
+                          <div className="flex items-center gap-2 text-[11px] text-muted-foreground tabular-nums">
+                            <span className="flex items-center gap-0.5"><Briefcase className="h-3 w-3" />{p.jobCount}</span>
+                            <span className={cn("flex items-center gap-0.5", p.daysOpen >= 30 && "text-red-500 font-medium")}>
+                              {p.daysOpen >= 30 && <Flame className="h-3 w-3" />}{p.daysOpen}d sin llenar
+                            </span>
+                            {countries.length > 0 && (
+                              <span className="flex items-center gap-0.5 truncate"><MapPin className="h-3 w-3" />{countries[0]}</span>
+                            )}
+                          </div>
+                          <div className="flex items-center justify-between gap-2 text-[10.5px] text-muted-foreground/80">
+                            <span className="truncate">{sources.join(" · ")}</span>
+                            <span className="shrink-0">hace {Math.max(0, Math.round((Date.now() - p.createdAt) / 86400000))}d</span>
+                          </div>
+                          {p.contactName && (
+                            <div className="pt-1 border-t border-border/60 text-[11.5px] truncate">
+                              <span className="font-medium">{p.contactName}</span>
+                              {p.contactTitle && <span className="text-muted-foreground"> · {p.contactTitle}</span>}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Lista */}
+      {view === "lista" && (
       <div className="flex-1 min-h-0 overflow-y-auto px-6 pb-6">
         {loading ? (
           <div className="flex items-center justify-center h-40 text-muted-foreground text-[13px]">
@@ -490,6 +608,7 @@ export default function ProspectingPage() {
           </div>
         )}
       </div>
+      )}
 
       {/* Popup de detalle */}
       <Dialog open={!!selected} onOpenChange={(o) => !o && setSelectedId(null)}>
@@ -532,6 +651,18 @@ function ProspectDetail({
   onSaveMsg: (field: "msgConnect" | "msgPitch", value: string) => void;
 }) {
   const roles = j(p.roles);
+  const jobs = (() => {
+    try {
+      const arr = p.jobs ? (JSON.parse(p.jobs) as { title: string; url: string; source: string }[]) : [];
+      return Array.isArray(arr) ? arr.filter((x) => x && x.title) : [];
+    } catch { return []; }
+  })();
+  const altContacts = (() => {
+    try {
+      const arr = p.altContacts ? (JSON.parse(p.altContacts) as { name: string; title: string | null; email: string | null; linkedin: string | null }[]) : [];
+      return Array.isArray(arr) ? arr.filter((x) => x && x.name) : [];
+    } catch { return []; }
+  })();
   const stack = j(p.stack);
   const sources = j(p.sources);
   const countries = j(p.countries);
@@ -616,10 +747,21 @@ function ProspectDetail({
                 Qué están buscando
               </h3>
               <ul className="space-y-1.5">
-                {roles.map((r) => (
-                  <li key={r} className="text-[13px] flex items-start gap-2 leading-snug">
+                {(jobs.length > 0 ? jobs : roles.map((r) => ({ title: r, url: "", source: "" }))).map((job, i) => (
+                  <li key={`${job.title}-${i}`} className="text-[13px] flex items-start gap-2 leading-snug">
                     <Briefcase className="h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0" />
-                    {r}
+                    {job.url ? (
+                      <button
+                        onClick={() => openExternal(job.url)}
+                        className="text-left hover:text-primary hover:underline cursor-pointer flex items-start gap-1 group/job"
+                        title={`Ver el aviso original (${job.source})`}
+                      >
+                        {job.title}
+                        <ExternalLink className="h-3 w-3 mt-0.5 opacity-0 group-hover/job:opacity-60 shrink-0" />
+                      </button>
+                    ) : (
+                      job.title
+                    )}
                   </li>
                 ))}
               </ul>
@@ -648,29 +790,46 @@ function ProspectDetail({
                 </Button>
               </div>
               {p.contactName ? (
-                <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-1.5">
-                  <div className="text-[13.5px] font-medium">{p.contactName}</div>
-                  {p.contactTitle && <div className="text-[12px] text-muted-foreground">{p.contactTitle}</div>}
-                  <div className="flex flex-col gap-1 pt-1">
-                    {p.contactEmail && (
-                      <button onClick={() => copy(p.contactEmail!, "Email")} className="flex items-center gap-1.5 text-[12.5px] text-primary hover:underline cursor-pointer w-fit">
-                        <Mail className="h-3.5 w-3.5" /> {p.contactEmail} <Copy className="h-3 w-3 opacity-50" />
-                      </button>
-                    )}
-                    {p.contactPhone && (
-                      <button onClick={() => copy(p.contactPhone!, "Teléfono")} className="flex items-center gap-1.5 text-[12.5px] hover:underline cursor-pointer w-fit">
-                        <Phone className="h-3.5 w-3.5" /> {p.contactPhone} <Copy className="h-3 w-3 opacity-50" />
-                      </button>
-                    )}
-                    {p.contactLinkedin && (
-                      <a href={p.contactLinkedin} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-[12.5px] text-primary hover:underline w-fit">
-                        <ExternalLink className="h-3.5 w-3.5" /> Perfil de LinkedIn
-                      </a>
-                    )}
-                    {!p.contactEmail && !p.contactPhone && (
-                      <span className="text-[12px] text-muted-foreground">Apollo no reveló email ni teléfono (créditos o plan)</span>
-                    )}
-                  </div>
+                <div className="space-y-2">
+                  {[
+                    { name: p.contactName, title: p.contactTitle, email: p.contactEmail, linkedin: p.contactLinkedin, phone: p.contactPhone, primary: true },
+                    ...altContacts.map((c) => ({ ...c, phone: null as string | null, primary: false })),
+                  ].map((c, i) => (
+                    <div key={`${c.name}-${i}`} className={cn("rounded-lg border border-border p-3 space-y-1.5", c.primary ? "bg-muted/30" : "bg-card")}>
+                      <div className="flex items-center gap-2">
+                        <div className="text-[13.5px] font-medium flex-1 truncate">{c.name}</div>
+                        {!c.primary && (
+                          <span className="text-[10px] rounded-full px-1.5 py-px bg-muted text-muted-foreground shrink-0">alternativo</span>
+                        )}
+                      </div>
+                      {c.title && <div className="text-[12px] text-muted-foreground">{c.title}</div>}
+                      <div className="flex flex-col gap-1 pt-1">
+                        {c.email && (
+                          <div className="flex items-center gap-1.5 text-[12.5px]">
+                            <button onClick={() => openExternal(`mailto:${c.email}`)} className="flex items-center gap-1.5 text-primary hover:underline cursor-pointer" title="Escribirle">
+                              <Mail className="h-3.5 w-3.5" /> {c.email}
+                            </button>
+                            <button onClick={() => copy(c.email!, "Email")} className="text-muted-foreground hover:text-foreground cursor-pointer" title="Copiar">
+                              <Copy className="h-3 w-3" />
+                            </button>
+                          </div>
+                        )}
+                        {c.phone && (
+                          <button onClick={() => copy(c.phone!, "Teléfono")} className="flex items-center gap-1.5 text-[12.5px] hover:underline cursor-pointer w-fit">
+                            <Phone className="h-3.5 w-3.5" /> {c.phone} <Copy className="h-3 w-3 opacity-50" />
+                          </button>
+                        )}
+                        {c.linkedin && (
+                          <button onClick={() => openExternal(c.linkedin!)} className="flex items-center gap-1.5 text-[12.5px] text-primary hover:underline cursor-pointer w-fit">
+                            <ExternalLink className="h-3.5 w-3.5" /> Perfil de LinkedIn
+                          </button>
+                        )}
+                        {!c.email && !c.linkedin && (
+                          <span className="text-[12px] text-muted-foreground">Apollo no reveló email ni LinkedIn</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ) : (
                 <p className="text-[12.5px] text-muted-foreground">

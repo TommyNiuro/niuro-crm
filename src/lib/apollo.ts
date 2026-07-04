@@ -65,11 +65,13 @@ type ApolloPerson = {
   phone_numbers?: { sanitized_number?: string | null }[];
 };
 
-/** Busca el decisor tech en la empresa y revela su email (consume créditos). */
-export async function findHiringContact(
+/** Busca decisores tech en la empresa y revela los primeros 2 (consume
+ *  créditos de people/match por cada reveal). Devuelve el principal +
+ *  alternativos, rankeados por cargo. */
+export async function findHiringContacts(
   company: string,
   domain?: string | null
-): Promise<ApolloContact | null> {
+): Promise<ApolloContact[]> {
   const key = apolloKey();
   if (!key) throw new Error("Apollo no configurado: falta apollo_api_key en Ajustes");
 
@@ -82,34 +84,38 @@ export async function findHiringContact(
     per_page: 5,
   });
   const people = search.people || [];
-  if (people.length === 0) return null;
+  if (people.length === 0) return [];
 
   // Preferir el cargo más alto según el orden de TARGET_TITLES.
   const rank = (t: string | null) => {
     const i = TARGET_TITLES.findIndex((x) => t?.toLowerCase().includes(x.toLowerCase()));
     return i === -1 ? TARGET_TITLES.length : i;
   };
-  const best = [...people].sort((a, b) => rank(a.title) - rank(b.title))[0];
+  const ranked = [...people].sort((a, b) => rank(a.title) - rank(b.title)).slice(0, 2);
 
-  // people/match revela el email real (search devuelve emails enmascarados).
-  let matched: ApolloPerson | null = null;
-  try {
-    const res = await post<{ person: ApolloPerson }>("/people/match", key, {
-      id: best.id,
-      reveal_personal_emails: false,
+  // people/match revela el email real (api_search devuelve datos enmascarados).
+  const out: ApolloContact[] = [];
+  for (const person of ranked) {
+    let matched: ApolloPerson | null = null;
+    try {
+      const res = await post<{ person: ApolloPerson }>("/people/match", key, {
+        id: person.id,
+        reveal_personal_emails: false,
+      });
+      matched = res.person || null;
+    } catch {
+      // Sin créditos de reveal o plan sin acceso: usamos lo que dio search.
+    }
+    const p = matched || person;
+    if (!p.name) continue; // sin reveal el nombre viene enmascarado: no sirve
+    out.push({
+      name: p.name,
+      title: p.title,
+      email: p.email && !p.email.includes("not_unlocked") ? p.email : null,
+      phone: p.phone_numbers?.[0]?.sanitized_number || null,
+      linkedin: p.linkedin_url,
+      organizationDomain: p.organization?.primary_domain || null,
     });
-    matched = res.person || null;
-  } catch {
-    // Sin créditos de reveal o plan sin acceso: devolvemos lo que dio search.
   }
-  const p = matched || best;
-
-  return {
-    name: p.name,
-    title: p.title,
-    email: p.email && !p.email.includes("not_unlocked") ? p.email : null,
-    phone: p.phone_numbers?.[0]?.sanitized_number || null,
-    linkedin: p.linkedin_url,
-    organizationDomain: p.organization?.primary_domain || null,
-  };
+  return out;
 }

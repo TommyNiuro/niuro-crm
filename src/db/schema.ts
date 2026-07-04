@@ -416,6 +416,7 @@ export const prospects = sqliteTable("prospects", {
   sources: text("sources"), // JSON array: ["getonboard","remoteok",...]
   jobCount: integer("job_count").notNull().default(1), // vacantes vistas abiertas
   roles: text("roles"), // JSON array de títulos de vacantes
+  jobs: text("jobs"), // JSON array [{title,url,source}] por vacante (links directos)
   stack: text("stack"), // JSON array
   seniority: text("seniority"),
   countries: text("countries"), // JSON array
@@ -437,6 +438,7 @@ export const prospects = sqliteTable("prospects", {
   contactEmail: text("contact_email"),
   contactPhone: text("contact_phone"),
   contactLinkedin: text("contact_linkedin"),
+  altContacts: text("alt_contacts"), // JSON array de decisores alternativos [{name,title,email,linkedin}]
   apolloEnrichedAt: integer("apollo_enriched_at", { mode: "timestamp" }),
   msgConnect: text("msg_connect"), // mensaje 1: conexión (IA)
   msgPitch: text("msg_pitch"), // mensaje 2: oferta staffing (IA)

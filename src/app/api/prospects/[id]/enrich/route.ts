@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { prospects } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { findHiringContact, apolloKey } from "@/lib/apollo";
+import { findHiringContacts, apolloKey } from "@/lib/apollo";
 import { serializeProspect } from "@/lib/prospect-serialize";
 
 // POST /api/prospects/[id]/enrich → busca el decisor tech en Apollo y guarda
@@ -19,7 +19,8 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   }
 
   try {
-    const contact = await findHiringContact(row.company, row.domain);
+    const found = await findHiringContacts(row.company, row.domain);
+    const contact = found[0];
     if (!contact) {
       return NextResponse.json(
         { error: `Apollo no encontró un decisor tech en ${row.company}` },
@@ -34,6 +35,9 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
         contactEmail: contact.email,
         contactPhone: contact.phone,
         contactLinkedin: contact.linkedin,
+        altContacts: JSON.stringify(
+          found.slice(1).map((c) => ({ name: c.name, title: c.title, email: c.email, linkedin: c.linkedin }))
+        ),
         domain: row.domain || contact.organizationDomain,
         apolloEnrichedAt: new Date(),
         status: row.status === "new" ? "enriched" : row.status,

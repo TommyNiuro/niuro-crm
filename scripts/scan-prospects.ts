@@ -293,17 +293,18 @@ async function main() {
   // 4. Upsert por empresa. Los datos de contacto/mensajes/status se preservan.
   const upsert = db.prepare(`
     INSERT INTO prospects (id, company, company_key, domain, sources, job_count,
-      roles, stack, seniority, countries, remote, min_salary, max_salary,
+      roles, jobs, stack, seniority, countries, remote, min_salary, max_salary,
       first_seen_at, last_seen_at, oldest_job_at, days_open, urgency, score,
       is_open, status, url, known_contact_id, created_at, updated_at)
     VALUES (lower(hex(randomblob(8))), @company, @key, NULL, @sources, @jobCount,
-      @roles, @stack, @seniority, @countries, @remote, @minSalary, @maxSalary,
+      @roles, @jobs, @stack, @seniority, @countries, @remote, @minSalary, @maxSalary,
       @now, @now, @oldestJobAt, @daysOpen, @urgency, @score,
       1, 'new', @url, @knownContactId, @now, @now)
     ON CONFLICT(company_key) DO UPDATE SET
       job_count = @jobCount,
       sources = @sources,
       roles = @roles,
+      jobs = @jobs,
       stack = @stack,
       seniority = COALESCE(@seniority, seniority),
       countries = @countries,
@@ -349,6 +350,9 @@ async function main() {
         sources: JSON.stringify([...new Set(jobs.map((j) => j.source))]),
         jobCount: jobs.length,
         roles: JSON.stringify([...new Set(jobs.map((j) => j.title))].slice(0, 10)),
+        jobs: JSON.stringify(
+          jobs.slice(0, 12).map((j) => ({ title: j.title, url: j.url, source: j.source }))
+        ),
         stack: JSON.stringify(stack),
         seniority,
         countries: JSON.stringify(countries),
