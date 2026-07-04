@@ -113,5 +113,5 @@ export const prospectsConfig: RecordConfig = {
       show: (row) => row.status !== "discarded",
     },
   ],
-  defaultFilters: [{ id: "no-discarded", key: "status", op: "neq", value: "discarded" }],
+  defaultFilters: [{ id: "no-discarded", key: "status", op: "isNot", value: "discarded" }],
 };
