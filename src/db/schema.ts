@@ -401,3 +401,49 @@ export const attachments = sqliteTable("attachments", {
     .notNull()
     .$defaultFn(() => new Date()),
 });
+
+// Prospección (radar de empresas contratando talento tech): la unidad es la
+// EMPRESA, no el aviso (a diferencia de group_opportunities). El scanner
+// diario (scripts/scan-prospects.ts) agrupa avisos de varias bolsas por
+// empresa y hace upsert por companyKey (nombre normalizado).
+export const prospects = sqliteTable("prospects", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  company: text("company").notNull(),
+  companyKey: text("company_key").notNull().unique(), // nombre normalizado (dedup)
+  domain: text("domain"),
+  sources: text("sources"), // JSON array: ["getonboard","remoteok",...]
+  jobCount: integer("job_count").notNull().default(1), // vacantes vistas abiertas
+  roles: text("roles"), // JSON array de títulos de vacantes
+  stack: text("stack"), // JSON array
+  seniority: text("seniority"),
+  countries: text("countries"), // JSON array
+  remote: integer("remote").notNull().default(0),
+  minSalary: integer("min_salary"),
+  maxSalary: integer("max_salary"),
+  firstSeenAt: integer("first_seen_at", { mode: "timestamp" }).notNull(),
+  lastSeenAt: integer("last_seen_at", { mode: "timestamp" }).notNull(),
+  oldestJobAt: integer("oldest_job_at", { mode: "timestamp" }), // published_at más viejo
+  daysOpen: integer("days_open").notNull().default(0), // derivado en cada scan
+  urgency: text("urgency").notNull().default("media"), // baja | media | alta
+  score: integer("score").notNull().default(0),
+  isOpen: integer("is_open").notNull().default(1), // sigue publicando (visto en el último scan)
+  status: text("status").notNull().default("new"), // new | enriched | contacted | conversation | discarded
+  url: text("url"), // aviso de muestra
+  knownContactId: text("known_contact_id"), // match con contacts existentes
+  contactName: text("contact_name"), // datos Apollo
+  contactTitle: text("contact_title"),
+  contactEmail: text("contact_email"),
+  contactPhone: text("contact_phone"),
+  contactLinkedin: text("contact_linkedin"),
+  apolloEnrichedAt: integer("apollo_enriched_at", { mode: "timestamp" }),
+  msgConnect: text("msg_connect"), // mensaje 1: conexión (IA)
+  msgPitch: text("msg_pitch"), // mensaje 2: oferta staffing (IA)
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  updatedAt: integer("updated_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});

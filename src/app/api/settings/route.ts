@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readSettings, writeSettings } from "@/lib/settings";
 
-const ALLOWLIST = ["auto_promote_hot", "rubric_config", "goal_mrr", "radar_decay_days"];
+const ALLOWLIST = ["auto_promote_hot", "rubric_config", "goal_mrr", "radar_decay_days", "apollo_api_key"];
+// Secretos: el GET nunca devuelve el valor, solo si está seteado.
+const SECRET_KEYS = new Set(["apollo_api_key"]);
 
 export async function GET(req: NextRequest) {
   const key = req.nextUrl.searchParams.get("key");
@@ -9,6 +11,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Clave no permitida" }, { status: 400 });
   }
   const value = readSettings([key])[key] ?? null;
+  if (SECRET_KEYS.has(key)) {
+    return NextResponse.json({ key, set: value !== null && value !== "" });
+  }
   return NextResponse.json({ key, value });
 }
 
