@@ -16,6 +16,8 @@ import { execFileSync } from "child_process";
 import { openDb } from "../src/lib/db-open";
 import { dbPath } from "../src/lib/paths";
 import { operator } from "../src/lib/operator";
+import { callLinkedinTool, linkedinSessionExists } from "../src/lib/linkedin-mcp";
+import { runClaude, FAST_MODEL } from "../src/lib/claude-subprocess";
 import {
   companyKey,
   computeUrgency,
@@ -170,11 +172,75 @@ async function fetchJobicy(): Promise<RawJob[]> {
   }));
 }
 
+/**
+ * LinkedIn vía MCP (linkedin-mcp-server): scrapea la búsqueda de empleos con
+ * la sesión guardada en ~/.linkedin-mcp (setup una vez con
+ * `uvx mcp-server-linkedin@latest --import-from-browser`). El resultado es
+ * texto crudo de la página, así que lo estructura una llamada barata a haiku
+ * (mismo patrón que task-intel). Se limita a UNA búsqueda por corrida para
+ * mantener bajo el riesgo de la cuenta (el scraping viola TOS de LinkedIn).
+ */
+async function fetchLinkedIn(): Promise<RawJob[]> {
+  if (!linkedinSessionExists()) {
+    console.log("[prospect] linkedin: sin sesión (~/.linkedin-mcp), salteado");
+    return [];
+  }
+  const result = (await callLinkedinTool("search_jobs", {
+    keywords: "software engineer",
+    location: "Latin America",
+    max_pages: 2,
+    date_posted: "past_week",
+    sort_by: "date",
+  })) as { content?: { type: string; text?: string }[]; structuredContent?: { sections?: Record<string, string>; url?: string } };
+
+  // FastMCP devuelve el dict como structuredContent y/o texto en content.
+  const sections = result?.structuredContent?.sections;
+  const raw = sections
+    ? Object.values(sections).join("\n")
+    : (result?.content || []).map((c) => c.text || "").join("\n");
+  const searchUrl = result?.structuredContent?.url || "https://www.linkedin.com/jobs/search/";
+  if (!raw.trim()) return [];
+
+  const prompt = `Texto crudo de una búsqueda de empleos de LinkedIn (software, Latinoamérica, última semana).
+Extraé los avisos como JSON. Respondé SOLO un array JSON válido, sin markdown:
+[{"company": "...", "title": "...", "location": "..."}]
+Ignorá todo lo que no sea un aviso de empleo (menús, filtros, promos).
+
+TEXTO:
+${raw.slice(0, 30000)}`;
+
+  const answer = await runClaude(prompt, { model: FAST_MODEL, timeoutMs: 90_000 });
+  const match = answer.match(/\[[\s\S]*\]/);
+  if (!match) throw new Error("haiku no devolvió JSON para linkedin");
+  const jobs = JSON.parse(match[0]) as { company?: string; title?: string; location?: string }[];
+
+  // publishedAt aproximado: la búsqueda filtra a la última semana, usamos ~3
+  // días. El days_open de empresas solo-LinkedIn queda como cota inferior.
+  const approxPublished = Math.floor(Date.now() / 1000) - 3 * 86400;
+  return jobs
+    .filter((j) => j.company && j.title)
+    .map((j) => ({
+      source: "linkedin",
+      company: j.company!,
+      title: j.title!,
+      tags: [],
+      url: searchUrl,
+      publishedAt: approxPublished,
+      location: j.location || "Latin America",
+      countries: [],
+      remote: /remote|remoto/i.test(j.location || ""),
+      minSalary: null,
+      maxSalary: null,
+      seniority: null,
+    }));
+}
+
 const FETCHERS: [string, () => Promise<RawJob[]>][] = [
   ["getonboard", fetchGetOnBoard],
   ["remoteok", fetchRemoteOK],
   ["remotive", fetchRemotive],
   ["jobicy", fetchJobicy],
+  ["linkedin", fetchLinkedIn],
 ];
 
 function notify(msg: string) {

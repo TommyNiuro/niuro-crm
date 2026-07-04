@@ -44,6 +44,9 @@ export function companyKey(name: string): string {
 export function isLatamRelevant(job: RawJob): boolean {
   const text = [job.location, ...job.countries].join(" ");
   if (LATAM_COUNTRIES_RE.test(text)) return true;
+  // Región LATAM explícita (ej. "Latin America" en LinkedIn): vale aunque no
+  // esté marcado remoto. Las señales amplias (worldwide/anywhere) sí lo exigen.
+  if (/latam|latin america|am[eé]rica latina/i.test(text)) return true;
   return job.remote && LATAM_HINT_RE.test(text);
 }
 
