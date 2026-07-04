@@ -65,6 +65,26 @@ type ApolloPerson = {
   phone_numbers?: { sanitized_number?: string | null }[];
 };
 
+type ApolloOrg = { name: string; primary_domain: string | null };
+
+/** Resuelve el dominio de una empresa por nombre (mixed_companies/search).
+ *  Buscar personas por dominio da mejores resultados que por nombre exacto:
+ *  el nombre de la vacante rara vez coincide con la razón social indexada en
+ *  Apollo (sufijos, abreviaturas). Devuelve null si no encuentra nada. */
+export async function resolveDomain(company: string): Promise<string | null> {
+  const key = apolloKey();
+  if (!key) return null;
+  try {
+    const res = await post<{ organizations: ApolloOrg[] }>("/mixed_companies/search", key, {
+      q_organization_name: company,
+      per_page: 1,
+    });
+    return res.organizations?.[0]?.primary_domain || null;
+  } catch {
+    return null; // best-effort: si falla, se sigue con búsqueda por nombre
+  }
+}
+
 /** Busca decisores tech en la empresa y revela los primeros 2 (consume
  *  créditos de people/match por cada reveal). Devuelve el principal +
  *  alternativos, rankeados por cargo. */
@@ -75,11 +95,17 @@ export async function findHiringContacts(
   const key = apolloKey();
   if (!key) throw new Error("Apollo no configurado: falta apollo_api_key en Ajustes");
 
+  // Resolver dominio primero si no lo tenemos: buscar por
+  // q_organization_domains_list acierta mucho más que por nombre (empresas
+  // chicas casi nunca están indexadas con el nombre exacto de la vacante).
+  const resolvedDomain = domain || (await resolveDomain(company));
+
   // mixed_people/search quedó deprecado para API callers (HTTP 422, 2026-07):
   // el reemplazo oficial es mixed_people/api_search, mismos parámetros.
   const search = await post<{ people: ApolloPerson[] }>("/mixed_people/api_search", key, {
-    q_organization_name: company,
-    ...(domain ? { q_organization_domains_list: [domain] } : {}),
+    ...(resolvedDomain
+      ? { q_organization_domains_list: [resolvedDomain] }
+      : { q_organization_name: company }),
     person_titles: TARGET_TITLES,
     per_page: 5,
   });

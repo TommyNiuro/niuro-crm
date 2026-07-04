@@ -439,6 +439,9 @@ export const prospects = sqliteTable("prospects", {
   contactPhone: text("contact_phone"),
   contactLinkedin: text("contact_linkedin"),
   altContacts: text("alt_contacts"), // JSON array de decisores alternativos [{name,title,email,linkedin}]
+  scoreBreakdown: text("score_breakdown"), // JSON {base,jobCount,daysOpen,stack,seniority,latam,knownContact}
+  contactLog: text("contact_log"), // JSON array de timestamps ms de cada vez que se marcó "Contactada"
+  snoozedUntil: integer("snoozed_until", { mode: "timestamp" }), // posponer: oculto de "Nuevas" hasta esta fecha
   apolloEnrichedAt: integer("apollo_enriched_at", { mode: "timestamp" }),
   msgConnect: text("msg_connect"), // mensaje 1: conexión (IA)
   msgPitch: text("msg_pitch"), // mensaje 2: oferta staffing (IA)

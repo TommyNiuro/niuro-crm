@@ -58,7 +58,19 @@ export function computeUrgency(jobCount: number, daysOpen: number): "baja" | "me
   return "baja";
 }
 
-/** Score 0-100 de la empresa como prospecto de staffing. */
+export interface ScoreBreakdown {
+  base: number;
+  jobCount: number;
+  daysOpen: number;
+  stack: number;
+  seniority: number;
+  latam: number;
+  knownContact: number;
+  total: number;
+}
+
+/** Score 0-100 de la empresa como prospecto de staffing, con desglose por
+ *  factor (se persiste para explicarlo en la UI, ver tooltip del score). */
 export function scoreProspect(p: {
   jobCount: number;
   daysOpen: number;
@@ -66,13 +78,14 @@ export function scoreProspect(p: {
   seniority: string | null;
   latamExplicit: boolean;
   knownContact: boolean;
-}): number {
-  let s = 30;
-  s += Math.min(p.jobCount * 8, 24); // más vacantes = más dolor
-  s += Math.min(Math.floor(p.daysOpen / 7) * 4, 16); // semanas sin llenar
-  if (p.stack.some((t) => HOT_STACK_RE.test(t))) s += 15; // stack que Niuro provee
-  if (p.seniority && /senior|expert|lead|staff/i.test(p.seniority)) s += 8;
-  if (p.latamExplicit) s += 10; // contrata en LATAM explícitamente
-  if (p.knownContact) s += 7; // ya la conocemos: puerta tibia
-  return Math.max(0, Math.min(100, s));
+}): ScoreBreakdown {
+  const base = 30;
+  const jobCount = Math.min(p.jobCount * 8, 24); // más vacantes = más dolor
+  const daysOpen = Math.min(Math.floor(p.daysOpen / 7) * 4, 16); // semanas sin llenar
+  const stack = p.stack.some((t) => HOT_STACK_RE.test(t)) ? 15 : 0; // stack que Niuro provee
+  const seniority = p.seniority && /senior|expert|lead|staff/i.test(p.seniority) ? 8 : 0;
+  const latam = p.latamExplicit ? 10 : 0; // contrata en LATAM explícitamente
+  const knownContact = p.knownContact ? 7 : 0; // ya la conocemos: puerta tibia
+  const total = Math.max(0, Math.min(100, base + jobCount + daysOpen + stack + seniority + latam + knownContact));
+  return { base, jobCount, daysOpen, stack, seniority, latam, knownContact, total };
 }

@@ -18,6 +18,7 @@ const EDITABLE = [
   "contactLinkedin",
   "msgConnect",
   "msgPitch",
+  "snoozedUntil",
 ] as const;
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -40,6 +41,17 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   if (typeof patch.status === "string" && !VALID_STATUS.includes(patch.status)) {
     return NextResponse.json({ error: "Estado inválido" }, { status: 400 });
   }
+  if (typeof patch.snoozedUntil === "number") patch.snoozedUntil = new Date(patch.snoozedUntil);
+
+  // Al marcar "Contactada": registrar el toque en contact_log (historial de
+  // veces que se contactó, mejora #9) para poder mostrar "3 intentos, último
+  // hace 5 días" en vez de solo la etapa actual.
+  if (patch.status === "contacted" && row.status !== "contacted") {
+    let log: number[] = [];
+    try { log = row.contactLog ? (JSON.parse(row.contactLog) as number[]) : []; } catch { log = []; }
+    patch.contactLog = JSON.stringify([...log, Date.now()]);
+  }
+
   if (Object.keys(patch).length === 0) {
     return NextResponse.json(serializeProspect(row));
   }

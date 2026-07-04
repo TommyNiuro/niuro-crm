@@ -18,6 +18,8 @@ import { dbPath } from "../src/lib/paths";
 import { operator } from "../src/lib/operator";
 import { callLinkedinTool, linkedinSessionExists } from "../src/lib/linkedin-mcp";
 import { runClaude, FAST_MODEL } from "../src/lib/claude-subprocess";
+import { findHiringContacts, apolloKey } from "../src/lib/apollo";
+import { readSettings, writeSettings } from "../src/lib/settings";
 import {
   companyKey,
   computeUrgency,
@@ -25,6 +27,19 @@ import {
   scoreProspect,
   type RawJob,
 } from "../src/lib/prospect-score";
+
+// Auto-enrich diario (mejora #6): top N prospectos nuevos de mayor score se
+// enriquecen solos cada corrida, así el operador llega con los decisores ya
+// cargados. Tope bajo a propósito: cada uno consume ~2 créditos de reveal.
+const AUTO_ENRICH_TOP_N = 5;
+const AUTO_ENRICH_MIN_SCORE = 75;
+
+// LinkedIn (mejora #17): el scraping viola sus TOS, así que además del límite
+// de "una búsqueda por corrida" ya existente, capamos a MAX_PER_WEEK búsquedas
+// en 7 días corridos (persistido en crm_settings) para que correr el scan a
+// mano varias veces no dispare más tráfico del que soporta sin arriesgar la
+// cuenta.
+const LINKEDIN_MAX_PER_WEEK = 3;
 
 const CRM_DB = dbPath();
 
@@ -185,6 +200,21 @@ async function fetchLinkedIn(): Promise<RawJob[]> {
     console.log("[prospect] linkedin: sin sesión (~/.linkedin-mcp), salteado");
     return [];
   }
+
+  // Rate limit propio: ventana deslizante de 7 días con timestamps en
+  // crm_settings (mismo patrón que scoring_calibration). Nunca pega si ya se
+  // corrió LINKEDIN_MAX_PER_WEEK veces en los últimos 7 días.
+  const rateLog = readSettings(["linkedin_search_log"]).linkedin_search_log;
+  let log: number[] = [];
+  try { log = rateLog ? (JSON.parse(rateLog) as number[]) : []; } catch { log = []; }
+  const weekAgo = Date.now() - 7 * 86400000;
+  const recent = log.filter((t) => t > weekAgo);
+  if (recent.length >= LINKEDIN_MAX_PER_WEEK) {
+    console.log(`[prospect] linkedin: límite de ${LINKEDIN_MAX_PER_WEEK}/semana alcanzado, salteado`);
+    return [];
+  }
+  writeSettings({ linkedin_search_log: JSON.stringify([...recent, Date.now()]) });
+
   const result = (await callLinkedinTool("search_jobs", {
     keywords: "software engineer",
     location: "Latin America",
@@ -281,13 +311,19 @@ async function main() {
   }
 
   // 3. Empresas ya conocidas en el CRM (puerta tibia): match por companyKey.
+  //    Las que ya son CLIENTE se excluyen del todo (mejora #2): no tiene
+  //    sentido "prospectarlas", ya compraron. contact_type='engineer' no
+  //    cuenta (es candidato propio, no empresa cliente).
   const knownByKey = new Map<string, string>();
+  const clientKeys = new Set<string>();
   const contactRows = db.prepare(
-    "SELECT id, company FROM contacts WHERE company IS NOT NULL AND company != ''"
-  ).all() as { id: string; company: string }[];
+    "SELECT id, company, contact_type FROM contacts WHERE company IS NOT NULL AND company != ''"
+  ).all() as { id: string; company: string; contact_type: string }[];
   for (const c of contactRows) {
     const k = companyKey(c.company);
-    if (k && !knownByKey.has(k)) knownByKey.set(k, c.id);
+    if (!k) continue;
+    if (!knownByKey.has(k)) knownByKey.set(k, c.id);
+    if (c.contact_type === "client") clientKeys.add(k);
   }
 
   // 4. Upsert por empresa. Los datos de contacto/mensajes/status se preservan.
@@ -295,11 +331,11 @@ async function main() {
     INSERT INTO prospects (id, company, company_key, domain, sources, job_count,
       roles, jobs, stack, seniority, countries, remote, min_salary, max_salary,
       first_seen_at, last_seen_at, oldest_job_at, days_open, urgency, score,
-      is_open, status, url, known_contact_id, created_at, updated_at)
+      score_breakdown, is_open, status, url, known_contact_id, created_at, updated_at)
     VALUES (lower(hex(randomblob(8))), @company, @key, NULL, @sources, @jobCount,
       @roles, @jobs, @stack, @seniority, @countries, @remote, @minSalary, @maxSalary,
       @now, @now, @oldestJobAt, @daysOpen, @urgency, @score,
-      1, 'new', @url, @knownContactId, @now, @now)
+      @scoreBreakdown, 1, 'new', @url, @knownContactId, @now, @now)
     ON CONFLICT(company_key) DO UPDATE SET
       job_count = @jobCount,
       sources = @sources,
@@ -316,14 +352,17 @@ async function main() {
       days_open = @daysOpen,
       urgency = @urgency,
       score = @score,
+      score_breakdown = @scoreBreakdown,
       is_open = 1,
       url = @url,
       known_contact_id = COALESCE(known_contact_id, @knownContactId),
       updated_at = @now
   `);
 
+  let excludedClients = 0;
   const tx = db.transaction(() => {
     for (const [key, jobs] of byCompany) {
+      if (clientKeys.has(key)) { excludedClients++; continue; } // ya es cliente: no prospectar
       const oldest = Math.min(...jobs.map((j) => j.publishedAt).filter(Boolean));
       const daysOpen = oldest && isFinite(oldest)
         ? Math.max(0, Math.floor((scanStart - oldest) / 86400))
@@ -336,7 +375,7 @@ async function main() {
       const seniority = jobs.map((j) => j.seniority).find(Boolean) || null;
       const knownContactId = knownByKey.get(key) || null;
       const urgency = computeUrgency(jobs.length, daysOpen);
-      const score = scoreProspect({
+      const breakdown = scoreProspect({
         jobCount: jobs.length,
         daysOpen,
         stack,
@@ -363,7 +402,8 @@ async function main() {
         oldestJobAt: isFinite(oldest) ? oldest : null,
         daysOpen,
         urgency,
-        score,
+        score: breakdown.total,
+        scoreBreakdown: JSON.stringify(breakdown),
         url: jobs[0].url,
         knownContactId,
       });
@@ -372,8 +412,55 @@ async function main() {
     db.prepare(
       "UPDATE prospects SET is_open = 0, updated_at = ? WHERE last_seen_at < ? AND is_open = 1"
     ).run(scanStart, scanStart);
+    // Empresas que se volvieron cliente después de haber sido prospectadas:
+    // sacarlas de las columnas activas (solo si seguían en 'new'/'enriched',
+    // sin pisar el trabajo si el operador ya las movió manualmente).
+    if (clientKeys.size > 0) {
+      const markClient = db.prepare(
+        "UPDATE prospects SET status = 'discarded', updated_at = ? WHERE company_key = ? AND status IN ('new','enriched')"
+      );
+      for (const k of clientKeys) markClient.run(scanStart, k);
+    }
   });
   tx();
+  if (excludedClients > 0) {
+    console.log(`[prospect] ${excludedClients} empresas ya son cliente, excluidas`);
+  }
+
+  // 5. Auto-enrich del top diario (mejora #6): las empresas nuevas de mayor
+  // score se enriquecen solas con Apollo, así el operador llega con el
+  // decisor ya cargado. Secuencial (no paralelo) para no reventar rate limit
+  // de Apollo; una falla no corta las siguientes.
+  if (apolloKey()) {
+    const candidates = db.prepare(`
+      SELECT id, company, domain FROM prospects
+      WHERE status = 'new' AND is_open = 1 AND apollo_enriched_at IS NULL AND score >= ?
+      ORDER BY score DESC LIMIT ?
+    `).all(AUTO_ENRICH_MIN_SCORE, AUTO_ENRICH_TOP_N) as { id: string; company: string; domain: string | null }[];
+
+    let autoEnriched = 0;
+    for (const c of candidates) {
+      try {
+        const found = await findHiringContacts(c.company, c.domain);
+        const contact = found[0];
+        if (!contact) continue;
+        db.prepare(`
+          UPDATE prospects SET contact_name = ?, contact_title = ?, contact_email = ?,
+            contact_phone = ?, contact_linkedin = ?, alt_contacts = ?, domain = COALESCE(domain, ?),
+            apollo_enriched_at = ?, status = 'enriched', updated_at = ?
+          WHERE id = ?
+        `).run(
+          contact.name, contact.title, contact.email, contact.phone, contact.linkedin,
+          JSON.stringify(found.slice(1).map((f) => ({ name: f.name, title: f.title, email: f.email, linkedin: f.linkedin }))),
+          contact.organizationDomain, scanStart, scanStart, c.id
+        );
+        autoEnriched++;
+      } catch (e) {
+        console.error(`[prospect] auto-enrich falló para ${c.company}:`, e instanceof Error ? e.message : e);
+      }
+    }
+    if (autoEnriched > 0) console.log(`[prospect] ${autoEnriched} empresas auto-enriquecidas con Apollo`);
+  }
 
   // Nuevas de verdad = creadas en este scan.
   const inserted = (db.prepare(

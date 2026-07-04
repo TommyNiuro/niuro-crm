@@ -31,6 +31,10 @@ import {
   UserSearch,
   Users,
   X,
+  Clock,
+  Download,
+  SlidersHorizontal,
+  History,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { openExternal } from "@/lib/open-external";
@@ -66,6 +70,9 @@ interface Prospect {
   contactPhone: string | null;
   contactLinkedin: string | null;
   altContacts: string | null; // JSON [{name,title,email,linkedin}]
+  scoreBreakdown: string | null; // JSON ScoreBreakdown
+  contactLog: string | null; // JSON number[] (timestamps ms de cada vez contactada)
+  snoozedUntil: number | null;
   apolloEnrichedAt: number | null;
   msgConnect: string | null;
   msgPitch: string | null;
@@ -111,6 +118,18 @@ const j = (s: string | null): string[] => {
 const scoreColor = (s: number) =>
   s >= 80 ? "text-red-500" : s >= 60 ? "text-amber-500" : "text-slate-400";
 
+function contactLogSummary(raw: string | null): string | null {
+  if (!raw) return null;
+  try {
+    const log = JSON.parse(raw) as number[];
+    if (!Array.isArray(log) || log.length === 0) return null;
+    const last = Math.max(...log);
+    const days = Math.max(0, Math.round((Date.now() - last) / 86400000));
+    const n = log.length;
+    return `${n} contacto${n !== 1 ? "s" : ""} · último hace ${days}d`;
+  } catch { return null; }
+}
+
 function copy(text: string, label: string) {
   navigator.clipboard.writeText(text).then(
     () => toast.success(`${label} copiado`),
@@ -119,10 +138,27 @@ function copy(text: string, label: string) {
 }
 
 /** Anillo de score estilo ficha de contacto: SVG chico con el número adentro. */
-function ScoreRing({ score }: { score: number }) {
+function scoreTooltip(score: number, raw: string | null): string {
+  if (!raw) return `Score ${score}`;
+  try {
+    const b = JSON.parse(raw) as Record<string, number>;
+    return [
+      `Score ${score}/100`,
+      `Base: ${b.base}`,
+      `Vacantes: +${b.jobCount}`,
+      `Días sin llenar: +${b.daysOpen}`,
+      `Stack Niuro: +${b.stack}`,
+      `Seniority: +${b.seniority}`,
+      `LATAM explícito: +${b.latam}`,
+      `Ya en el CRM: +${b.knownContact}`,
+    ].join("\n");
+  } catch { return `Score ${score}`; }
+}
+
+function ScoreRing({ score, breakdown }: { score: number; breakdown?: string | null }) {
   const r = 15, c = 2 * Math.PI * r;
   return (
-    <div className="relative h-10 w-10 shrink-0" title={`Score ${score}`}>
+    <div className="relative h-10 w-10 shrink-0" title={scoreTooltip(score, breakdown ?? null)}>
       <svg viewBox="0 0 36 36" className="h-10 w-10 -rotate-90">
         <circle cx="18" cy="18" r={r} fill="none" strokeWidth="3" className="stroke-muted" />
         <circle
@@ -186,6 +222,10 @@ export default function ProspectingPage() {
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<"score" | "daysOpen" | "jobCount">("score");
   const [view, setView] = useState<"lista" | "embudo">("lista");
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [fCountry, setFCountry] = useState("");
+  const [fSource, setFSource] = useState("");
+  const [fRemote, setFRemote] = useState<"" | "remote" | "onsite">("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [busy, setBusy] = useState<Record<string, string>>({}); // id -> acción en curso
   const [apolloSet, setApolloSet] = useState<boolean | null>(null);
@@ -206,6 +246,16 @@ export default function ProspectingPage() {
       .catch(() => {});
   }, []);
 
+  const filterOptions = useMemo(() => {
+    const countries = new Set<string>();
+    const sourcesSet = new Set<string>();
+    for (const r of rows) {
+      j(r.countries).forEach((c) => countries.add(c));
+      j(r.sources).forEach((s) => sourcesSet.add(s));
+    }
+    return { countries: [...countries].sort(), sources: [...sourcesSet].sort() };
+  }, [rows]);
+
   const counts = useMemo(() => {
     const c: Record<string, number> = { all: rows.length };
     for (const r of rows) c[r.status] = (c[r.status] ?? 0) + 1;
@@ -224,14 +274,46 @@ export default function ProspectingPage() {
 
   const visible = useMemo(() => {
     let list = tab === "all" ? rows : rows.filter((r) => r.status === tab);
+    // Pospuestas: ocultas de las pestañas activas hasta que venza la fecha
+    // (mejora #15). En "Todas" siguen visibles para no esconder nada del todo.
+    if (tab !== "all") {
+      const now = Date.now();
+      list = list.filter((r) => !r.snoozedUntil || r.snoozedUntil <= now);
+    }
     if (query.trim()) {
       const q = query.toLowerCase();
       list = list.filter((r) =>
         [r.company, r.roles ?? "", r.stack ?? "", r.contactName ?? ""].join(" ").toLowerCase().includes(q)
       );
     }
+    if (fCountry) list = list.filter((r) => j(r.countries).includes(fCountry));
+    if (fSource) list = list.filter((r) => j(r.sources).includes(fSource));
+    if (fRemote === "remote") list = list.filter((r) => r.remote);
+    if (fRemote === "onsite") list = list.filter((r) => !r.remote);
     return [...list].sort((a, b) => (b[sort] as number) - (a[sort] as number));
-  }, [rows, tab, query, sort]);
+  }, [rows, tab, query, sort, fCountry, fSource, fRemote]);
+
+  const activeFilterCount = [fCountry, fSource, fRemote].filter(Boolean).length;
+
+  // Exportar CSV de lo visible (mejora #14): columnas planas, sin JSON crudo.
+  const exportCsv = () => {
+    const header = ["Empresa", "Score", "Urgencia", "Estado", "Vacantes", "Días abierta", "Roles", "País", "Decisor", "Email", "URL"];
+    const esc = (v: string) => `"${v.replace(/"/g, '""')}"`;
+    const lines = [header.join(",")];
+    for (const r of visible) {
+      lines.push([
+        r.company, String(r.score), r.urgency, STATUS_LABEL[r.status] ?? r.status,
+        String(r.jobCount), String(r.daysOpen), j(r.roles).join("; "),
+        j(r.countries).join("; "), r.contactName ?? "", r.contactEmail ?? "", r.url ?? "",
+      ].map((v) => esc(String(v))).join(","));
+    }
+    const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `prospeccion-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
 
   const selected = rows.find((r) => r.id === selectedId) ?? null;
 
@@ -285,6 +367,15 @@ export default function ProspectingPage() {
       })
     ).catch(() => {});
 
+  const snooze = (p: Prospect, days: number) =>
+    run(p.id, "snooze", () =>
+      fetch(`/api/prospects/${p.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ snoozedUntil: Date.now() + days * 86400000 }),
+      })
+    ).then(() => toast.success(`${p.company} pospuesta ${days} días`)).catch(() => {});
+
   const saveMsg = (p: Prospect, field: "msgConnect" | "msgPitch", value: string) =>
     fetch(`/api/prospects/${p.id}`, {
       method: "PUT",
@@ -329,6 +420,20 @@ export default function ProspectingPage() {
           <option value="daysOpen">Por días abierta</option>
           <option value="jobCount">Por vacantes</option>
         </select>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setFiltersOpen((v) => !v)}
+          className={cn("gap-1.5", activeFilterCount > 0 && "border-primary text-primary")}
+        >
+          <SlidersHorizontal className="h-3.5 w-3.5" /> Filtros
+          {activeFilterCount > 0 && (
+            <span className="text-[10px] font-bold rounded-full px-1.5 bg-primary text-primary-foreground">{activeFilterCount}</span>
+          )}
+        </Button>
+        <Button variant="outline" size="sm" onClick={exportCsv} className="gap-1.5" title="Exportar la lista visible a CSV">
+          <Download className="h-3.5 w-3.5" /> Exportar
+        </Button>
         <div className="flex rounded-lg border border-border bg-card p-0.5">
           {([["lista", LayoutList], ["embudo", Columns3]] as const).map(([v, Icon]) => (
             <button
@@ -346,6 +451,30 @@ export default function ProspectingPage() {
           ))}
         </div>
       </div>
+
+      {/* Filtros avanzados (mejora #12): país, fuente, remoto/on-site */}
+      {filtersOpen && (
+        <div className="flex items-center gap-2 px-6 pb-3 shrink-0">
+          <select value={fCountry} onChange={(e) => setFCountry(e.target.value)} className="h-8 rounded-lg border border-border bg-card px-2 text-[12.5px] cursor-pointer">
+            <option value="">Todos los países</option>
+            {filterOptions.countries.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <select value={fSource} onChange={(e) => setFSource(e.target.value)} className="h-8 rounded-lg border border-border bg-card px-2 text-[12.5px] cursor-pointer">
+            <option value="">Todas las fuentes</option>
+            {filterOptions.sources.map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+          <select value={fRemote} onChange={(e) => setFRemote(e.target.value as typeof fRemote)} className="h-8 rounded-lg border border-border bg-card px-2 text-[12.5px] cursor-pointer">
+            <option value="">Remoto y presencial</option>
+            <option value="remote">Solo remoto</option>
+            <option value="onsite">Solo presencial</option>
+          </select>
+          {activeFilterCount > 0 && (
+            <button onClick={() => { setFCountry(""); setFSource(""); setFRemote(""); }} className="text-[12px] text-muted-foreground hover:text-foreground cursor-pointer">
+              Limpiar filtros
+            </button>
+          )}
+        </div>
+      )}
 
       {/* KPIs */}
       <div className="grid grid-cols-4 gap-3 px-6 pb-3 shrink-0">
@@ -467,6 +596,11 @@ export default function ProspectingPage() {
                               {p.contactTitle && <span className="text-muted-foreground"> · {p.contactTitle}</span>}
                             </div>
                           )}
+                          {contactLogSummary(p.contactLog) && (
+                            <div className="flex items-center gap-1 text-[10.5px] text-muted-foreground">
+                              <History className="h-3 w-3" /> {contactLogSummary(p.contactLog)}
+                            </div>
+                          )}
                         </div>
                       );
                     })}
@@ -508,7 +642,7 @@ export default function ProspectingPage() {
                   onClick={() => setSelectedId(p.id)}
                   className="group flex items-center gap-3.5 rounded-xl border border-border bg-card px-4 py-3 cursor-pointer transition-colors hover:border-ring/40 hover:bg-[var(--hover)]"
                 >
-                  <ScoreRing score={p.score} />
+                  <ScoreRing score={p.score} breakdown={p.scoreBreakdown} />
 
                   {/* Empresa + señales */}
                   <div className="w-56 shrink-0 min-w-0">
@@ -568,6 +702,11 @@ export default function ProspectingPage() {
                     ) : (
                       <span className="text-muted-foreground/60">Sin decisor aún</span>
                     )}
+                    {contactLogSummary(p.contactLog) && (
+                      <div className="flex items-center gap-1 text-[10.5px] text-muted-foreground mt-0.5">
+                        <History className="h-3 w-3" /> {contactLogSummary(p.contactLog)}
+                      </div>
+                    )}
                   </div>
 
                   {/* Acciones rápidas */}
@@ -596,6 +735,9 @@ export default function ProspectingPage() {
                             <ArrowRightCircle className="h-3.5 w-3.5" />
                           </Button>
                         )}
+                        <Button variant="ghost" size="sm" title="Posponer 3 días" className="h-7 w-7 p-0 text-muted-foreground" onClick={() => snooze(p, 3)}>
+                          <Clock className="h-3.5 w-3.5" />
+                        </Button>
                         <Button variant="ghost" size="sm" title="Descartar" className="h-7 w-7 p-0 text-muted-foreground" onClick={() => setStatus(p, "discarded")}>
                           <X className="h-3.5 w-3.5" />
                         </Button>

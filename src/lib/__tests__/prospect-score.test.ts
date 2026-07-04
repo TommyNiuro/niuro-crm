@@ -68,8 +68,15 @@ describe("scoreProspect", () => {
       jobCount: 4, daysOpen: 35, stack: ["react", "node"], seniority: "Senior",
       latamExplicit: true, knownContact: true,
     });
-    expect(hot).toBeGreaterThan(cold);
-    expect(hot).toBeLessThanOrEqual(100);
-    expect(cold).toBeGreaterThan(0);
+    expect(hot.total).toBeGreaterThan(cold.total);
+    expect(hot.total).toBeLessThanOrEqual(100);
+    expect(cold.total).toBeGreaterThan(0);
+  });
+  it("el desglose suma exactamente al total", () => {
+    const b = scoreProspect({
+      jobCount: 2, daysOpen: 20, stack: ["python"], seniority: "Senior",
+      latamExplicit: true, knownContact: false,
+    });
+    expect(b.base + b.jobCount + b.daysOpen + b.stack + b.seniority + b.latam + b.knownContact).toBe(b.total);
   });
 });

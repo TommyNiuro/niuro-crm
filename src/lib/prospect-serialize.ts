@@ -11,6 +11,7 @@ export function serializeProspect(row: typeof prospects.$inferSelect) {
     lastSeenAt: ms(row.lastSeenAt),
     oldestJobAt: ms(row.oldestJobAt),
     apolloEnrichedAt: ms(row.apolloEnrichedAt),
+    snoozedUntil: ms(row.snoozedUntil),
     createdAt: ms(row.createdAt),
     updatedAt: ms(row.updatedAt),
   };
