@@ -73,7 +73,9 @@ export async function findHiringContact(
   const key = apolloKey();
   if (!key) throw new Error("Apollo no configurado: falta apollo_api_key en Ajustes");
 
-  const search = await post<{ people: ApolloPerson[] }>("/mixed_people/search", key, {
+  // mixed_people/search quedó deprecado para API callers (HTTP 422, 2026-07):
+  // el reemplazo oficial es mixed_people/api_search, mismos parámetros.
+  const search = await post<{ people: ApolloPerson[] }>("/mixed_people/api_search", key, {
     q_organization_name: company,
     ...(domain ? { q_organization_domains_list: [domain] } : {}),
     person_titles: TARGET_TITLES,
