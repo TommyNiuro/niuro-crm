@@ -6,6 +6,7 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
 import { CommandPalette } from "@/components/layout/CommandPalette";
 import { CopilotPanel } from "@/components/ai/CopilotPanel";
+import { AssistantFab } from "@/components/ai/AssistantFab";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
 import { NotificationChecker } from "@/components/shared/NotificationChecker";
@@ -48,6 +49,7 @@ export default function RootLayout({
             <BridgeStatusPoller />
             <CommandPalette />
             <CopilotPanel />
+            <AssistantFab />
           </TooltipProvider>
       </body>
     </html>

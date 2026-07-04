@@ -21,13 +21,11 @@ import {
   Handshake,
   Star,
   X,
-  Sparkles,
   Boxes,
   Activity,
   LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { COPILOT_OPEN_EVENT } from "@/components/ai/CopilotPanel";
 
 interface Favorite {
   id: string;
@@ -216,18 +214,6 @@ export function Sidebar() {
           </div>
         </div>
       )}
-
-      {/* Asistente IA: accion, no ruta. Abre el slide-over via evento global. */}
-      <div className="px-2 pt-3">
-        <button
-          type="button"
-          onClick={() => window.dispatchEvent(new CustomEvent(COPILOT_OPEN_EVENT))}
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] text-muted-foreground transition-colors cursor-pointer hover:bg-[var(--hover)] hover:text-sidebar-foreground"
-        >
-          <Sparkles className="h-[18px] w-[18px] shrink-0 text-primary" />
-          <span className="flex-1 text-left">Asistente IA</span>
-        </button>
-      </div>
 
       {/* Nav */}
       <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto">
