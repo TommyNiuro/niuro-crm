@@ -31,7 +31,6 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -492,9 +491,9 @@ export default function ProspectingPage() {
         )}
       </div>
 
-      {/* Panel de detalle */}
-      <Sheet open={!!selected} onOpenChange={(o) => !o && setSelectedId(null)}>
-        <SheetContent side="right" className="w-full sm:max-w-xl overflow-y-auto p-0">
+      {/* Popup de detalle */}
+      <Dialog open={!!selected} onOpenChange={(o) => !o && setSelectedId(null)}>
+        <DialogContent className="p-0 gap-0 sm:max-w-4xl w-[min(96vw,56rem)] max-h-[88vh] overflow-hidden flex flex-col">
           {selected && (
             <ProspectDetail
               key={selected.id}
@@ -507,8 +506,8 @@ export default function ProspectingPage() {
               onSaveMsg={(f, v) => saveMsg(selected, f, v)}
             />
           )}
-        </SheetContent>
-      </Sheet>
+        </DialogContent>
+      </Dialog>
 
       <ApolloConfigDialog
         open={apolloDialog}
@@ -545,158 +544,183 @@ function ProspectDetail({
     : null;
 
   return (
-    <div className="flex flex-col">
-      {/* Header */}
-      <SheetHeader className="px-5 pt-5 pb-4 border-b border-border space-y-2">
-        <div className="flex items-center gap-3">
+    <>
+      {/* Header band */}
+      <DialogHeader className="px-6 pt-5 pb-4 border-b border-border shrink-0 space-y-0">
+        <div className="flex items-start gap-4">
           <ScoreRing score={p.score} />
           <div className="flex-1 min-w-0">
-            <SheetTitle className="text-[17px] truncate">{p.company}</SheetTitle>
-            <SheetDescription className="text-[12.5px] flex items-center gap-1.5">
+            <DialogTitle className="text-[19px] font-semibold tracking-tight truncate">
+              {p.company}
+            </DialogTitle>
+            <DialogDescription className="text-[12.5px] flex flex-wrap items-center gap-x-1.5 gap-y-0.5 mt-0.5">
               <span className={cn("rounded-full px-1.5 py-px font-medium", URGENCY_STYLE[p.urgency])}>
                 urgencia {p.urgency}
               </span>
-              {p.isOpen ? "sigue publicando" : "dejó de publicar"} · {sources.join(", ")}
-              {countries.length > 0 && <> · {countries.join(", ")}</>}
-            </SheetDescription>
+              <span>{p.isOpen ? "sigue publicando" : "dejó de publicar"}</span>
+              <span>· {sources.join(", ")}</span>
+              {countries.length > 0 && <span>· {countries.join(", ")}</span>}
+              {p.seniority && <span>· {p.seniority}</span>}
+            </DialogDescription>
           </div>
-          <select
-            value={p.status}
-            onChange={(e) => onStatus(e.target.value)}
-            className="h-8 rounded-lg border border-border bg-card px-2 text-[12.5px] cursor-pointer shrink-0"
-          >
-            {Object.entries(STATUS_LABEL).map(([v, l]) => (
-              <option key={v} value={v}>{l}</option>
-            ))}
-          </select>
-        </div>
-        <div className="flex gap-2">
-          {!p.knownContactId && (
-            <Button size="sm" className="gap-1.5 flex-1" onClick={onConvert} disabled={!!busy}>
-              {busy === "convert" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ArrowRightCircle className="h-3.5 w-3.5" />}
-              Pasar al Pipeline
-            </Button>
-          )}
-          {p.url && (
-            <Button size="sm" variant="outline" className="gap-1.5" onClick={() => window.open(p.url!, "_blank")}>
-              <ExternalLink className="h-3.5 w-3.5" /> Ver aviso
-            </Button>
-          )}
-        </div>
-      </SheetHeader>
-
-      {/* Vacantes */}
-      <section className="px-5 py-4 border-b border-border">
-        <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">
-          Qué están buscando
-        </h3>
-        <div className="flex items-center gap-3 text-[12.5px] mb-2 tabular-nums">
-          <span className="font-medium">{p.jobCount} vacante{p.jobCount !== 1 ? "s" : ""} abierta{p.jobCount !== 1 ? "s" : ""}</span>
-          <span className={cn(p.daysOpen >= 30 ? "text-red-500 font-medium" : "text-muted-foreground")}>
-            {p.daysOpen >= 30 && <Flame className="h-3.5 w-3.5 inline mr-0.5 -mt-0.5" />}
-            la más vieja lleva {p.daysOpen} días
-          </span>
-          {salary && <span className="text-muted-foreground">{salary}</span>}
-        </div>
-        <ul className="space-y-1 mb-2">
-          {roles.map((r) => (
-            <li key={r} className="text-[13px] flex items-start gap-1.5">
-              <Briefcase className="h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0" />
-              {r}
-            </li>
-          ))}
-        </ul>
-        {stack.length > 0 && (
-          <div className="flex flex-wrap gap-1">
-            {stack.map((s) => (
-              <span key={s} className="text-[11px] rounded-md bg-muted px-2 py-0.5 text-muted-foreground">{s}</span>
-            ))}
+          <div className="flex items-center gap-2 shrink-0 mr-6">
+            <select
+              value={p.status}
+              onChange={(e) => onStatus(e.target.value)}
+              className="h-8 rounded-lg border border-border bg-card px-2 text-[12.5px] cursor-pointer"
+            >
+              {Object.entries(STATUS_LABEL).map(([v, l]) => (
+                <option key={v} value={v}>{l}</option>
+              ))}
+            </select>
+            {!p.knownContactId && (
+              <Button size="sm" className="gap-1.5" onClick={onConvert} disabled={!!busy}>
+                {busy === "convert" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ArrowRightCircle className="h-3.5 w-3.5" />}
+                Pasar al Pipeline
+              </Button>
+            )}
+            {p.url && (
+              <Button size="sm" variant="outline" className="gap-1.5" onClick={() => window.open(p.url!, "_blank")}>
+                <ExternalLink className="h-3.5 w-3.5" /> Ver aviso
+              </Button>
+            )}
           </div>
-        )}
-      </section>
-
-      {/* Decisor */}
-      <section className="px-5 py-4 border-b border-border">
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Decisor de contratación
-          </h3>
-          <Button size="sm" variant="outline" className="h-7 gap-1.5 text-[12px]" onClick={onEnrich} disabled={!!busy}>
-            {busy === "enrich" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UserSearch className="h-3.5 w-3.5" />}
-            {p.contactName ? "Re-buscar" : "Buscar con Apollo"}
-          </Button>
         </div>
-        {p.contactName ? (
-          <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-1.5">
-            <div className="text-[13.5px] font-medium">{p.contactName}</div>
-            {p.contactTitle && <div className="text-[12px] text-muted-foreground">{p.contactTitle}</div>}
-            <div className="flex flex-col gap-1 pt-1">
-              {p.contactEmail && (
-                <button onClick={() => copy(p.contactEmail!, "Email")} className="flex items-center gap-1.5 text-[12.5px] text-primary hover:underline cursor-pointer w-fit">
-                  <Mail className="h-3.5 w-3.5" /> {p.contactEmail} <Copy className="h-3 w-3 opacity-50" />
-                </button>
-              )}
-              {p.contactPhone && (
-                <button onClick={() => copy(p.contactPhone!, "Teléfono")} className="flex items-center gap-1.5 text-[12.5px] hover:underline cursor-pointer w-fit">
-                  <Phone className="h-3.5 w-3.5" /> {p.contactPhone} <Copy className="h-3 w-3 opacity-50" />
-                </button>
-              )}
-              {p.contactLinkedin && (
-                <a href={p.contactLinkedin} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-[12.5px] text-primary hover:underline w-fit">
-                  <ExternalLink className="h-3.5 w-3.5" /> Perfil de LinkedIn
-                </a>
-              )}
-              {!p.contactEmail && !p.contactPhone && (
-                <span className="text-[12px] text-muted-foreground">Apollo no reveló email ni teléfono (créditos o plan)</span>
+        {/* Métricas de dolor */}
+        <div className="flex items-center gap-6 pt-3 text-[13px] tabular-nums">
+          <div className="flex items-center gap-1.5">
+            <Briefcase className="h-4 w-4 text-muted-foreground" />
+            <span className="font-semibold">{p.jobCount}</span>
+            <span className="text-muted-foreground">vacante{p.jobCount !== 1 ? "s" : ""} abierta{p.jobCount !== 1 ? "s" : ""}</span>
+          </div>
+          <div className={cn("flex items-center gap-1.5", p.daysOpen >= 30 ? "text-red-500" : "")}>
+            {p.daysOpen >= 30 ? <Flame className="h-4 w-4" /> : <Check className="h-4 w-4 text-muted-foreground" />}
+            <span className="font-semibold">{p.daysOpen}</span>
+            <span className={p.daysOpen >= 30 ? "" : "text-muted-foreground"}>días sin llenar la más vieja</span>
+          </div>
+          {salary && (
+            <div className="flex items-center gap-1.5 text-muted-foreground">
+              <span className="font-semibold text-foreground">{salary}</span> USD/mes
+            </div>
+          )}
+        </div>
+      </DialogHeader>
+
+      {/* Cuerpo: 2 columnas */}
+      <div className="flex-1 min-h-0 overflow-y-auto">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-0 md:divide-x divide-border">
+          {/* Columna izquierda: qué buscan */}
+          <div className="px-6 py-5 space-y-4">
+            <div>
+              <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+                Qué están buscando
+              </h3>
+              <ul className="space-y-1.5">
+                {roles.map((r) => (
+                  <li key={r} className="text-[13px] flex items-start gap-2 leading-snug">
+                    <Briefcase className="h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0" />
+                    {r}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            {stack.length > 0 && (
+              <div>
+                <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+                  Stack
+                </h3>
+                <div className="flex flex-wrap gap-1">
+                  {stack.map((s) => (
+                    <span key={s} className="text-[11px] rounded-md bg-muted px-2 py-0.5 text-muted-foreground">{s}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {/* Decisor */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Decisor de contratación
+                </h3>
+                <Button size="sm" variant="outline" className="h-7 gap-1.5 text-[12px]" onClick={onEnrich} disabled={!!busy}>
+                  {busy === "enrich" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UserSearch className="h-3.5 w-3.5" />}
+                  {p.contactName ? "Re-buscar" : "Buscar con Apollo"}
+                </Button>
+              </div>
+              {p.contactName ? (
+                <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-1.5">
+                  <div className="text-[13.5px] font-medium">{p.contactName}</div>
+                  {p.contactTitle && <div className="text-[12px] text-muted-foreground">{p.contactTitle}</div>}
+                  <div className="flex flex-col gap-1 pt-1">
+                    {p.contactEmail && (
+                      <button onClick={() => copy(p.contactEmail!, "Email")} className="flex items-center gap-1.5 text-[12.5px] text-primary hover:underline cursor-pointer w-fit">
+                        <Mail className="h-3.5 w-3.5" /> {p.contactEmail} <Copy className="h-3 w-3 opacity-50" />
+                      </button>
+                    )}
+                    {p.contactPhone && (
+                      <button onClick={() => copy(p.contactPhone!, "Teléfono")} className="flex items-center gap-1.5 text-[12.5px] hover:underline cursor-pointer w-fit">
+                        <Phone className="h-3.5 w-3.5" /> {p.contactPhone} <Copy className="h-3 w-3 opacity-50" />
+                      </button>
+                    )}
+                    {p.contactLinkedin && (
+                      <a href={p.contactLinkedin} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 text-[12.5px] text-primary hover:underline w-fit">
+                        <ExternalLink className="h-3.5 w-3.5" /> Perfil de LinkedIn
+                      </a>
+                    )}
+                    {!p.contactEmail && !p.contactPhone && (
+                      <span className="text-[12px] text-muted-foreground">Apollo no reveló email ni teléfono (créditos o plan)</span>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-[12.5px] text-muted-foreground">
+                  Todavía no buscamos quién decide acá (CTO, VP de Ingeniería, Head of Talent).
+                </p>
               )}
             </div>
           </div>
-        ) : (
-          <p className="text-[12.5px] text-muted-foreground">
-            Todavía no buscamos quién decide acá (CTO, VP de Ingeniería, Head of Talent).
-          </p>
-        )}
-      </section>
 
-      {/* Mensajes */}
-      <section className="px-5 py-4 space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Mensajes de outreach
-          </h3>
-          <Button size="sm" variant="outline" className="h-7 gap-1.5 text-[12px]" onClick={onMessages} disabled={!!busy}>
-            {busy === "messages" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-            {p.msgConnect ? "Regenerar con IA" : "Generar con IA"}
-          </Button>
-        </div>
-        {[
-          { field: "msgConnect" as const, label: "1 · Conexión (sin vender)", value: connect, set: setConnect },
-          { field: "msgPitch" as const, label: "2 · Oferta de staffing", value: pitch, set: setPitch },
-        ].map((m) => (
-          <div key={m.field}>
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-[12px] font-medium">{m.label}</span>
-              {m.value && (
-                <button onClick={() => copy(m.value, "Mensaje")} className="flex items-center gap-1 text-[11.5px] text-muted-foreground hover:text-foreground cursor-pointer">
-                  <Copy className="h-3 w-3" /> Copiar
-                </button>
-              )}
+          {/* Columna derecha: mensajes */}
+          <div className="px-6 py-5 space-y-3 bg-muted/20">
+            <div className="flex items-center justify-between">
+              <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Mensajes de outreach
+              </h3>
+              <Button size="sm" variant="outline" className="h-7 gap-1.5 text-[12px]" onClick={onMessages} disabled={!!busy}>
+                {busy === "messages" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                {p.msgConnect ? "Regenerar con IA" : "Generar con IA"}
+              </Button>
             </div>
-            <Textarea
-              value={m.value}
-              onChange={(e) => m.set(e.target.value)}
-              onBlur={() => m.value !== (p[m.field] ?? "") && onSaveMsg(m.field, m.value)}
-              placeholder="Generá con IA o escribilo a mano..."
-              className="min-h-24 text-[13px]"
-            />
+            {[
+              { field: "msgConnect" as const, label: "1 · Conexión (sin vender)", value: connect, set: setConnect },
+              { field: "msgPitch" as const, label: "2 · Oferta de staffing", value: pitch, set: setPitch },
+            ].map((m) => (
+              <div key={m.field}>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[12px] font-medium">{m.label}</span>
+                  {m.value && (
+                    <button onClick={() => copy(m.value, "Mensaje")} className="flex items-center gap-1 text-[11.5px] text-muted-foreground hover:text-foreground cursor-pointer">
+                      <Copy className="h-3 w-3" /> Copiar
+                    </button>
+                  )}
+                </div>
+                <Textarea
+                  value={m.value}
+                  onChange={(e) => m.set(e.target.value)}
+                  onBlur={() => m.value !== (p[m.field] ?? "") && onSaveMsg(m.field, m.value)}
+                  placeholder="Generá con IA o escribilo a mano..."
+                  className="min-h-32 text-[13px] bg-card"
+                />
+              </div>
+            ))}
+            {p.msgConnect && (
+              <p className="text-[11.5px] text-muted-foreground flex items-center gap-1">
+                <Check className="h-3 w-3" /> Los cambios se guardan al salir del campo
+              </p>
+            )}
           </div>
-        ))}
-        {p.msgConnect && (
-          <p className="text-[11.5px] text-muted-foreground flex items-center gap-1">
-            <Check className="h-3 w-3" /> Los cambios se guardan al salir del campo
-          </p>
-        )}
-      </section>
-    </div>
+        </div>
+      </div>
+    </>
   );
 }
