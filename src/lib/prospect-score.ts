@@ -39,6 +39,37 @@ export function companyKey(name: string): string {
     .trim();
 }
 
+/** Distancia de edición clásica (DP), para el dedup difuso de abajo. */
+export function levenshtein(a: string, b: string): number {
+  const dp: number[] = Array(b.length + 1).fill(0).map((_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    let prev = dp[0];
+    dp[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const tmp = dp[j];
+      dp[j] = a[i - 1] === b[j - 1] ? prev : 1 + Math.min(prev, dp[j], dp[j - 1]);
+      prev = tmp;
+    }
+  }
+  return dp[b.length];
+}
+
+/** Dedup difuso: companyKey normaliza sufijos/símbolos, pero variantes como
+ *  "bctecnologia" vs "bctecnologiachile" o un typo de una letra siguen
+ *  quedando como empresas distintas. Si `key` está a distancia de edición
+ *  chica de alguna de `existingKeys`, devuelve esa existente (fusiona);
+ *  si no, devuelve `key` tal cual. Umbral conservador (1-2 según largo) para
+ *  no fusionar empresas genuinamente distintas por casualidad. */
+export function resolveCompanyKey(key: string, existingKeys: string[]): string {
+  if (existingKeys.includes(key)) return key;
+  const threshold = key.length <= 6 ? 1 : 2;
+  for (const ex of existingKeys) {
+    if (Math.abs(key.length - ex.length) > threshold) continue;
+    if (levenshtein(key, ex) <= threshold) return ex;
+  }
+  return key;
+}
+
 /** ¿El aviso es contratable desde LATAM? País LATAM explícito, o remoto
  *  con ubicación amplia (worldwide/latam/americas). */
 export function isLatamRelevant(job: RawJob): boolean {

@@ -16,14 +16,14 @@ import { execFileSync } from "child_process";
 import { openDb } from "../src/lib/db-open";
 import { dbPath } from "../src/lib/paths";
 import { operator } from "../src/lib/operator";
-import { callLinkedinTool, linkedinSessionExists } from "../src/lib/linkedin-mcp";
+import { callLinkedinTool, linkedinSessionExists, checkAndRecordLinkedinBudget } from "../src/lib/linkedin-mcp";
 import { runClaude, FAST_MODEL } from "../src/lib/claude-subprocess";
 import { findHiringContacts, apolloKey } from "../src/lib/apollo";
-import { readSettings, writeSettings } from "../src/lib/settings";
 import {
   companyKey,
   computeUrgency,
   isLatamRelevant,
+  resolveCompanyKey,
   scoreProspect,
   type RawJob,
 } from "../src/lib/prospect-score";
@@ -34,12 +34,7 @@ import {
 const AUTO_ENRICH_TOP_N = 5;
 const AUTO_ENRICH_MIN_SCORE = 75;
 
-// LinkedIn (mejora #17): el scraping viola sus TOS, así que además del límite
-// de "una búsqueda por corrida" ya existente, capamos a MAX_PER_WEEK búsquedas
-// en 7 días corridos (persistido en crm_settings) para que correr el scan a
-// mano varias veces no dispare más tráfico del que soporta sin arriesgar la
-// cuenta.
-const LINKEDIN_MAX_PER_WEEK = 3;
+
 
 const CRM_DB = dbPath();
 
@@ -201,19 +196,13 @@ async function fetchLinkedIn(): Promise<RawJob[]> {
     return [];
   }
 
-  // Rate limit propio: ventana deslizante de 7 días con timestamps en
-  // crm_settings (mismo patrón que scoring_calibration). Nunca pega si ya se
-  // corrió LINKEDIN_MAX_PER_WEEK veces en los últimos 7 días.
-  const rateLog = readSettings(["linkedin_search_log"]).linkedin_search_log;
-  let log: number[] = [];
-  try { log = rateLog ? (JSON.parse(rateLog) as number[]) : []; } catch { log = []; }
-  const weekAgo = Date.now() - 7 * 86400000;
-  const recent = log.filter((t) => t > weekAgo);
-  if (recent.length >= LINKEDIN_MAX_PER_WEEK) {
-    console.log(`[prospect] linkedin: límite de ${LINKEDIN_MAX_PER_WEEK}/semana alcanzado, salteado`);
+  // Rate limit propio (presupuesto COMPARTIDO con el enriquecimiento manual
+  // de empresa vía LinkedIn, ver linkedin-mcp.ts): nunca pega si ya se usó
+  // el cupo semanal.
+  if (!checkAndRecordLinkedinBudget()) {
+    console.log("[prospect] linkedin: presupuesto semanal alcanzado, salteado");
     return [];
   }
-  writeSettings({ linkedin_search_log: JSON.stringify([...recent, Date.now()]) });
 
   const result = (await callLinkedinTool("search_jobs", {
     keywords: "software engineer",
@@ -303,10 +292,20 @@ async function main() {
   console.log(`[prospect] ${all.length} avisos totales, ${relevant.length} relevantes LATAM`);
 
   const selfKey = companyKey(operator.company); // no prospectarse a sí mismo
+
+  // Dedup difuso (mejora): companyKey ya normaliza sufijos/símbolos, pero
+  // variantes chicas ("bctecnologia" vs "bctecnologiachile", un typo de la
+  // fuente) seguían quedando como empresas separadas. resolveCompanyKey
+  // fusiona contra las keys YA conocidas por el CRM (estables entre corridas,
+  // así el canónico no "salta" de un día a otro) antes de agrupar avisos.
+  const existingProspectKeys = (db.prepare("SELECT company_key FROM prospects").all() as { company_key: string }[])
+    .map((r) => r.company_key);
+
   const byCompany = new Map<string, RawJob[]>();
   for (const j of relevant) {
-    const key = companyKey(j.company);
-    if (!key || key === selfKey) continue;
+    const rawKey = companyKey(j.company);
+    if (!rawKey || rawKey === selfKey) continue;
+    const key = resolveCompanyKey(rawKey, existingProspectKeys);
     (byCompany.get(key) ?? byCompany.set(key, []).get(key)!).push(j);
   }
 

@@ -4,6 +4,8 @@ import {
   isLatamRelevant,
   computeUrgency,
   scoreProspect,
+  levenshtein,
+  resolveCompanyKey,
   type RawJob,
 } from "@/lib/prospect-score";
 
@@ -45,6 +47,32 @@ describe("isLatamRelevant", () => {
   it("rechaza remoto sin señal de región y on-site fuera de LATAM", () => {
     expect(isLatamRelevant(job({ remote: true, location: "US only" }))).toBe(false);
     expect(isLatamRelevant(job({ location: "Berlin, Germany" }))).toBe(false);
+  });
+});
+
+describe("resolveCompanyKey", () => {
+  it("fusiona un typo de una letra", () => {
+    expect(resolveCompanyKey("bctecnologia", ["bctecnologla"])).toBe("bctecnologla");
+  });
+  it("fusiona variante con sufijo extra corto", () => {
+    expect(resolveCompanyKey("agilesoft", ["agilesoftt"])).toBe("agilesoftt");
+  });
+  it("NO fusiona empresas genuinamente distintas", () => {
+    expect(resolveCompanyKey("mercadolibre", ["mercadopago"])).toBe("mercadolibre");
+    expect(resolveCompanyKey("tcit", ["2brains"])).toBe("tcit");
+  });
+  it("devuelve la key tal cual si ya existe exacta", () => {
+    expect(resolveCompanyKey("globant", ["globant"])).toBe("globant");
+  });
+});
+
+describe("levenshtein", () => {
+  it("distancia 0 para strings iguales", () => {
+    expect(levenshtein("acme", "acme")).toBe(0);
+  });
+  it("cuenta ediciones simples", () => {
+    expect(levenshtein("acme", "acne")).toBe(1);
+    expect(levenshtein("acme", "acmes")).toBe(1);
   });
 });
 

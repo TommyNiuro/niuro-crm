@@ -275,6 +275,7 @@ function initTables(db: Database.Database): void {
       score_breakdown TEXT,
       contact_log TEXT,
       snoozed_until INTEGER,
+      linkedin_company_info TEXT,
       apollo_enriched_at INTEGER,
       msg_connect TEXT,
       msg_pitch TEXT,
@@ -626,6 +627,7 @@ function initTables(db: Database.Database): void {
     `ALTER TABLE prospects ADD COLUMN score_breakdown TEXT`,
     `ALTER TABLE prospects ADD COLUMN contact_log TEXT`,
     `ALTER TABLE prospects ADD COLUMN snoozed_until INTEGER`,
+    `ALTER TABLE prospects ADD COLUMN linkedin_company_info TEXT`,
   ];
   // Control de versiones (auditoria SaaS 2026-07-01, fase 1). Antes se re-corrian
   // TODOS los ALTER en cada arranque (idempotentes, pero re-ejecutados) y un error

@@ -35,6 +35,7 @@ import {
   Download,
   SlidersHorizontal,
   History,
+  Globe2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { openExternal } from "@/lib/open-external";
@@ -73,6 +74,7 @@ interface Prospect {
   scoreBreakdown: string | null; // JSON ScoreBreakdown
   contactLog: string | null; // JSON number[] (timestamps ms de cada vez contactada)
   snoozedUntil: number | null;
+  linkedinCompanyInfo: string | null; // JSON {industry,size,headquarters,founded,description,fetchedAt}
   apolloEnrichedAt: number | null;
   msgConnect: string | null;
   msgPitch: string | null;
@@ -367,6 +369,13 @@ export default function ProspectingPage() {
       })
     ).catch(() => {});
 
+  const linkedinEnrich = (p: Prospect) => {
+    toast.info("Buscando la empresa en LinkedIn...");
+    run(p.id, "linkedin", () => fetch(`/api/prospects/${p.id}/linkedin`, { method: "POST" }))
+      .then(() => toast.success(`Info de ${p.company} lista`))
+      .catch(() => {});
+  };
+
   const snooze = (p: Prospect, days: number) =>
     run(p.id, "snooze", () =>
       fetch(`/api/prospects/${p.id}`, {
@@ -525,7 +534,29 @@ export default function ProspectingPage() {
 
       {/* Embudo de contacto: columnas por estado, drag & drop */}
       {view === "embudo" && (
-        <div className="flex-1 min-h-0 overflow-x-auto px-6 pb-6">
+        <div className="flex-1 min-h-0 flex flex-col overflow-hidden px-6 pb-6">
+          {/* Conversión entre etapas: cuántas de las que pasaron por la
+              etapa anterior llegaron a esta (no es "% del total", es del
+              flujo real, así que empresas descartadas no distorsionan). */}
+          <div className="flex items-center gap-2 pb-3 shrink-0 text-[12px] text-muted-foreground">
+            {FUNNEL_COLS.map((col, i) => {
+              const n = rows.filter((r) => r.status === col.key).length;
+              // "llegó hasta acá o más adelante": suma de esta etapa en
+              // adelante sobre el total del embudo (descartadas no cuentan,
+              // viven aparte). La primera etapa es siempre 100% por definición.
+              const total = FUNNEL_COLS.reduce((sum, c) => sum + rows.filter((r) => r.status === c.key).length, 0);
+              const atOrBeyond = FUNNEL_COLS.slice(i).reduce((sum, c) => sum + rows.filter((r) => r.status === c.key).length, 0);
+              const pct = total > 0 ? Math.round((atOrBeyond / total) * 100) : 0;
+              return (
+                <span key={col.key} className="flex items-center gap-2">
+                  {i > 0 && <span className="text-muted-foreground/40">→</span>}
+                  <span>{col.label} <b className="text-foreground">{n}</b></span>
+                  {i > 0 && <span className="text-[10.5px]">({pct}% llegó hasta acá)</span>}
+                </span>
+              );
+            })}
+          </div>
+          <div className="flex-1 min-h-0 overflow-x-auto">
           <div className="flex gap-3 h-full min-w-max">
             {FUNNEL_COLS.map((col) => {
               const items = rows
@@ -608,6 +639,7 @@ export default function ProspectingPage() {
                 </div>
               );
             })}
+          </div>
           </div>
         </div>
       )}
@@ -761,6 +793,7 @@ export default function ProspectingPage() {
               p={selected}
               busy={busy[selected.id]}
               onEnrich={() => enrich(selected)}
+              onLinkedin={() => linkedinEnrich(selected)}
               onMessages={() => genMessages(selected)}
               onConvert={() => convert(selected)}
               onStatus={(s) => setStatus(selected, s)}
@@ -782,11 +815,12 @@ export default function ProspectingPage() {
 // ---------- panel de detalle ----------
 
 function ProspectDetail({
-  p, busy, onEnrich, onMessages, onConvert, onStatus, onSaveMsg,
+  p, busy, onEnrich, onLinkedin, onMessages, onConvert, onStatus, onSaveMsg,
 }: {
   p: Prospect;
   busy?: string;
   onEnrich: () => void;
+  onLinkedin: () => void;
   onMessages: () => void;
   onConvert: () => void;
   onStatus: (s: string) => void;
@@ -808,6 +842,13 @@ function ProspectDetail({
   const stack = j(p.stack);
   const sources = j(p.sources);
   const countries = j(p.countries);
+  const linkedinInfo = (() => {
+    try {
+      return p.linkedinCompanyInfo
+        ? (JSON.parse(p.linkedinCompanyInfo) as { industry: string | null; size: string | null; headquarters: string | null; founded: string | null; description: string | null })
+        : null;
+    } catch { return null; }
+  })();
   // key={p.id} en el mount: el estado arranca de props y se resetea por prospecto.
   const [connect, setConnect] = useState(p.msgConnect ?? "");
   const [pitch, setPitch] = useState(p.msgPitch ?? "");
@@ -976,6 +1017,35 @@ function ProspectDetail({
               ) : (
                 <p className="text-[12.5px] text-muted-foreground">
                   Todavía no buscamos quién decide acá (CTO, VP de Ingeniería, Head of Talent).
+                </p>
+              )}
+            </div>
+
+            {/* Sobre la empresa (LinkedIn): industria, tamaño, sede — para
+                estudiar al cliente antes de contactarlo. */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Sobre la empresa
+                </h3>
+                <Button size="sm" variant="outline" className="h-7 gap-1.5 text-[12px]" onClick={onLinkedin} disabled={!!busy}>
+                  {busy === "linkedin" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Globe2 className="h-3.5 w-3.5" />}
+                  {linkedinInfo ? "Actualizar" : "Buscar en LinkedIn"}
+                </Button>
+              </div>
+              {linkedinInfo ? (
+                <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-1 text-[12.5px]">
+                  {linkedinInfo.description && <p className="text-foreground">{linkedinInfo.description}</p>}
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-1 pt-1 text-muted-foreground">
+                    {linkedinInfo.industry && <span><span className="text-foreground font-medium">Industria:</span> {linkedinInfo.industry}</span>}
+                    {linkedinInfo.size && <span><span className="text-foreground font-medium">Tamaño:</span> {linkedinInfo.size}</span>}
+                    {linkedinInfo.headquarters && <span><span className="text-foreground font-medium">Sede:</span> {linkedinInfo.headquarters}</span>}
+                    {linkedinInfo.founded && <span><span className="text-foreground font-medium">Fundada:</span> {linkedinInfo.founded}</span>}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-[12.5px] text-muted-foreground">
+                  Sin datos todavía. Buscar en LinkedIn trae industria, tamaño y sede de la empresa.
                 </p>
               )}
             </div>
