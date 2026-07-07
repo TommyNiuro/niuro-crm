@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { loggedErrorDetail } from "@/lib/api-error";
 import { listChats, dbExists } from "@/lib/whatsapp";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +19,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(listChats({ query, limit, includeArchived }));
   } catch (error) {
     return NextResponse.json(
-      { error: `Error al leer chats: ${error instanceof Error ? error.message : "desconocido"}` },
+      { error: `Error al leer chats: ${loggedErrorDetail(error)}` },
       { status: 500 }
     );
   }

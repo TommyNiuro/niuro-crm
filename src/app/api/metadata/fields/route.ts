@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { loggedErrorDetail } from "@/lib/api-error";
 import { rawDb } from "@/db";
 import { isValidFieldType, FIELD_TYPES } from "@/lib/custom-fields";
 
@@ -59,7 +60,7 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
-    const msg = error instanceof Error ? error.message : "Unknown";
+    const msg = loggedErrorDetail(error);
     const dup = /UNIQUE|constraint/i.test(msg);
     return NextResponse.json(
       { error: dup ? "Ya existe un campo con ese name en el objeto" : `Error al crear campo: ${msg}` },

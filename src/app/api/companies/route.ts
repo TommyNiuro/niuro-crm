@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { loggedErrorDetail } from "@/lib/api-error";
 import { db } from "@/db";
 import { companies, contacts } from "@/db/schema";
 import { eq, like, or, asc, and, sql, isNull, isNotNull } from "drizzle-orm";
@@ -95,7 +96,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(result, { status: 201 });
   } catch (error) {
     // El índice único NOCASE rebota nombres duplicados con un mensaje legible.
-    const msg = error instanceof Error ? error.message : "Unknown";
+    const msg = loggedErrorDetail(error);
     const dup = /UNIQUE|constraint/i.test(msg);
     return NextResponse.json(
       { error: dup ? "Ya existe una empresa con ese nombre" : `Error al crear empresa: ${msg}` },

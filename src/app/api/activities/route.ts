@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { loggedErrorDetail } from "@/lib/api-error";
 import { db } from "@/db";
 import { activities, contacts } from "@/db/schema";
 import { eq, desc, and } from "drizzle-orm";
@@ -72,7 +73,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(result, { status: 201 });
   } catch (error) {
-    const msg = error instanceof Error ? error.message : "Unknown";
+    const msg = loggedErrorDetail(error);
     return NextResponse.json(
       { error: `Error al crear actividad: ${msg}` },
       { status: 500 }

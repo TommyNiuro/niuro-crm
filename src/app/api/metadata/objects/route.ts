@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { loggedErrorDetail } from "@/lib/api-error";
 import { rawDb } from "@/db";
 
 export const dynamic = "force-dynamic";
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest) {
       .run(id, name, labelSingular, labelPlural, icon, Math.floor(Date.now() / 1000));
     return NextResponse.json({ id, name, labelSingular, labelPlural, icon, isCustom: 1 }, { status: 201 });
   } catch (error) {
-    const msg = error instanceof Error ? error.message : "Unknown";
+    const msg = loggedErrorDetail(error);
     const dup = /UNIQUE|constraint/i.test(msg);
     return NextResponse.json(
       { error: dup ? "Ya existe un objeto con ese name" : `Error al crear objeto: ${msg}` },

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { loggedErrorDetail } from "@/lib/api-error";
 import { db } from "@/db";
 import { contacts, activities, leadCandidates, tasks, stepTransitions } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
@@ -215,7 +216,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("[save-lead] Error al crear contacto:", error);
     return NextResponse.json(
-      { error: `Error al crear contacto: ${error instanceof Error ? error.message : "desconocido"}` },
+      { error: `Error al crear contacto: ${loggedErrorDetail(error)}` },
       { status: 500 }
     );
   }

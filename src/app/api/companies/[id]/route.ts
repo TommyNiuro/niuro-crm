@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { loggedErrorDetail } from "@/lib/api-error";
 import { db } from "@/db";
 import { companies, contacts, deals } from "@/db/schema";
 import { eq, and, inArray, sql } from "drizzle-orm";
@@ -93,7 +94,7 @@ export async function PUT(
     dispatchRecordEvent("companies", "updated", result as { id: string } & Record<string, unknown>);
     return NextResponse.json(merged);
   } catch (error) {
-    const msg = error instanceof Error ? error.message : "Unknown";
+    const msg = loggedErrorDetail(error);
     const dup = /UNIQUE|constraint/i.test(msg);
     return NextResponse.json(
       { error: dup ? "Ya existe una empresa con ese nombre" : `Error al actualizar: ${msg}` },

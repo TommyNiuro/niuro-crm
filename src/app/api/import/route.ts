@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { loggedErrorDetail } from "@/lib/api-error";
 import { db } from "@/db";
 import { contacts } from "@/db/schema";
 
@@ -66,7 +67,7 @@ export async function POST(request: NextRequest) {
     } catch (error) {
       results.failed++;
       results.errors.push(
-        `Error importando ${contact.name}: ${error instanceof Error ? error.message : "Unknown error"}`
+        `Error importando ${contact.name}: ${loggedErrorDetail(error)}`
       );
     }
   }

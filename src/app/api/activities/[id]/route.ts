@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { loggedErrorDetail } from "@/lib/api-error";
 import { db } from "@/db";
 import { activities, contacts } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -94,7 +95,7 @@ export async function PUT(
     return NextResponse.json(result);
   } catch (error) {
     return NextResponse.json(
-      { error: `Error al actualizar: ${error instanceof Error ? error.message : "Unknown"}` },
+      { error: `Error al actualizar: ${loggedErrorDetail(error)}` },
       { status: 500 }
     );
   }
@@ -124,7 +125,7 @@ export async function DELETE(
     return NextResponse.json({ success: true });
   } catch (error) {
     return NextResponse.json(
-      { error: `Error al eliminar: ${error instanceof Error ? error.message : "Unknown"}` },
+      { error: `Error al eliminar: ${loggedErrorDetail(error)}` },
       { status: 500 }
     );
   }

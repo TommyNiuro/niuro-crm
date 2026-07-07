@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { loggedErrorDetail } from "@/lib/api-error";
 import { db } from "@/db";
 import { contacts, stepTransitions } from "@/db/schema";
 import { eq, like, or, desc, and, inArray, isNull, isNotNull } from "drizzle-orm";
@@ -133,7 +134,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(result, { status: 201 });
   } catch (error) {
     return NextResponse.json(
-      { error: `Error al crear contacto: ${error instanceof Error ? error.message : "Unknown"}` },
+      { error: `Error al crear contacto: ${loggedErrorDetail(error)}` },
       { status: 500 }
     );
   }

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { loggedErrorDetail } from "@/lib/api-error";
 import { db } from "@/db";
 import { deals, contacts, pipelineStages } from "@/db/schema";
 import { eq, desc, isNull, isNotNull } from "drizzle-orm";
@@ -99,7 +100,7 @@ export async function POST(request: NextRequest) {
     dispatchRecordEvent("deals", "created", result as { id: string } & Record<string, unknown>);
     return NextResponse.json(result, { status: 201 });
   } catch (error) {
-    const msg = error instanceof Error ? error.message : "Unknown";
+    const msg = loggedErrorDetail(error);
     if (msg.includes("FOREIGN KEY")) {
       return NextResponse.json(
         { error: "Contacto no encontrado" },

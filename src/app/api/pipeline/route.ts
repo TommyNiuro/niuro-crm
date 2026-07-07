@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { loggedErrorDetail } from "@/lib/api-error";
 import { db } from "@/db";
 import { pipelineStages, deals, contacts, stepTransitions } from "@/db/schema";
 import { eq, asc } from "drizzle-orm";
@@ -42,7 +43,7 @@ export async function GET() {
     return NextResponse.json(pipeline);
   } catch (error) {
     return NextResponse.json(
-      { error: `Error al obtener pipeline: ${error instanceof Error ? error.message : "Unknown"}` },
+      { error: `Error al obtener pipeline: ${loggedErrorDetail(error)}` },
       { status: 500 }
     );
   }
