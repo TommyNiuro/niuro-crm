@@ -107,13 +107,18 @@ export function ChatList({
     setGroupMode((m) => (m === "hide" ? "only" : m === "only" ? "show" : "hide"));
   };
 
+  // ponytail: statusFor puede escanear linealmente por jid. Indexarlo una sola vez
+  // por render (Map) evita llamarlo O(n log n) veces dentro del comparador del sort,
+  // que era el jank del inbox con muchos chats.
+  const statusByJid = new Map(chats.map((c) => [c.jid, statusFor?.(c.jid)] as const));
+
   const filtered = chats.filter((c) => {
     if (groupMode === "hide" && c.isGroup) return false;
     if (groupMode === "only" && !c.isGroup) return false;
     if (filter === "unread") return !c.lastIsFromMe;
-    if (filter === "unassigned") return statusFor?.(c.jid)?.kind !== "contact";
+    if (filter === "unassigned") return statusByJid.get(c.jid)?.kind !== "contact";
     if (filter === "lead") {
-      const s = statusFor?.(c.jid);
+      const s = statusByJid.get(c.jid);
       return s?.kind === "lead" && (s.score ?? 0) >= LEAD_SIGNAL_MIN;
     }
     return true;
@@ -124,8 +129,8 @@ export function ChatList({
     sortMode === "recent"
       ? filtered
       : [...filtered].sort((a, b) => {
-          const sa = statusFor?.(a.jid);
-          const sb = statusFor?.(b.jid);
+          const sa = statusByJid.get(a.jid);
+          const sb = statusByJid.get(b.jid);
           const ra = TEMP_RANK[sa?.temperature ?? ""] ?? 0;
           const rb = TEMP_RANK[sb?.temperature ?? ""] ?? 0;
           if (ra !== rb) return rb - ra;

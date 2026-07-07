@@ -145,6 +145,7 @@ function toDriverValue(col: DrizzleCol, jsValue: unknown): unknown {
  * default local). SKIP_ROW = la fila entera no se puede sincronizar. */
 function resolveField(
   db: Database.Database,
+  findMapping: Database.Statement,
   table: SyncableTable,
   jsKey: string,
   col: DrizzleCol,
@@ -167,9 +168,7 @@ function resolveField(
   if (fkTable) {
     const remoteRef = rec[jsKey];
     if (remoteRef == null) return col.notNull ? SKIP_ROW : null;
-    const mapped = db
-      .prepare("SELECT local_id FROM sync_mappings WHERE table_name = ? AND remote_id = ?")
-      .get(fkTable, String(remoteRef)) as { local_id: string } | undefined;
+    const mapped = findMapping.get(fkTable, String(remoteRef)) as { local_id: string } | undefined;
     if (mapped) return mapped.local_id;
     // Padre no sincronizado (ej. contacto archivado, excluido a proposito):
     // si la columna es NOT NULL no hay valor seguro, se salta la fila entera
@@ -219,6 +218,11 @@ export async function syncTable(db: Database.Database, table: SyncableTable): Pr
   const insertMapping = db.prepare(
     "INSERT INTO sync_mappings (table_name, local_id, remote_id, last_synced_at) VALUES (?, ?, ?, ?)"
   );
+  // ponytail: statement fijo por tabla, izado fuera del loop (antes se re-preparaba
+  // el mismo SELECT por cada fila ya sincronizada).
+  const findUpdatedAt = hasUpdatedAt
+    ? db.prepare(`SELECT updated_at FROM ${table} WHERE id = ?`)
+    : null;
   const nowSec = Math.floor(Date.now() / 1000);
 
   for (const rec of remote) {
@@ -229,7 +233,7 @@ export async function syncTable(db: Database.Database, table: SyncableTable): Pr
       const existing = findMapping.get(table, remoteId) as { local_id: string } | undefined;
 
       if (!existing) {
-        const rawEntries = jsKeys.map((k) => [k, resolveField(db, table, k, cols[k], rec)] as const);
+        const rawEntries = jsKeys.map((k) => [k, resolveField(db, findMapping, table, k, cols[k], rec)] as const);
         if (rawEntries.some(([, v]) => v === SKIP_ROW)) {
           stats.skipped++; // FK NOT NULL sin padre sincronizado (ej. contacto archivado)
           continue;
@@ -252,9 +256,7 @@ export async function syncTable(db: Database.Database, table: SyncableTable): Pr
         continue;
       }
 
-      const localRow = db
-        .prepare(`SELECT updated_at FROM ${table} WHERE id = ?`)
-        .get(existing.local_id) as { updated_at: number } | undefined;
+      const localRow = findUpdatedAt!.get(existing.local_id) as { updated_at: number } | undefined;
       if (!localRow) {
         stats.skipped++;
         continue;
@@ -266,7 +268,7 @@ export async function syncTable(db: Database.Database, table: SyncableTable): Pr
         continue;
       }
 
-      const rawSetEntries = jsKeys.map((k) => [k, resolveField(db, table, k, cols[k], rec)] as const);
+      const rawSetEntries = jsKeys.map((k) => [k, resolveField(db, findMapping, table, k, cols[k], rec)] as const);
       if (rawSetEntries.some(([, v]) => v === SKIP_ROW)) {
         stats.skipped++;
         continue;
