@@ -687,6 +687,14 @@ function initTables(db: Database.Database): void {
     `ALTER TABLE job_descriptions ADD COLUMN template TEXT NOT NULL DEFAULT 'intermediate'`,
     `ALTER TABLE job_descriptions ADD COLUMN benefits TEXT`,
     `ALTER TABLE job_descriptions ADD COLUMN start_date TEXT`,
+    // --- Auditoría 2026-07-07 (append-only, seguro) ---
+    // Saneo del default divergente de contacts.stage: la migración vieja usó
+    // DEFAULT 'Inbox' pero el pipeline real arranca en 'Prospecto' (Drizzle y
+    // NIURO_STAGES), así que los contactos con 'Inbox' quedaban huérfanos del kanban.
+    `UPDATE contacts SET stage = 'Prospecto' WHERE stage = 'Inbox'`,
+    // Índice de expresión para el filtro por empresa del detalle (lower(trim(company)));
+    // antes GET /api/companies/[id] escaneaba la tabla contacts entera en cada apertura.
+    `CREATE INDEX IF NOT EXISTS idx_contacts_company_lower ON contacts(lower(trim(company)))`,
   ];
   // Control de versiones (auditoria SaaS 2026-07-01, fase 1). Antes se re-corrian
   // TODOS los ALTER en cada arranque (idempotentes, pero re-ejecutados) y un error
@@ -720,7 +728,7 @@ function initTables(db: Database.Database): void {
       }
       // benigno (columna ya existe): cuenta como aplicada, se registra abajo
     }
-    record.run(i + 1, Date.now());
+    record.run(i + 1, Math.floor(Date.now() / 1000));
   }
 }
 
