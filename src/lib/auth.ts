@@ -59,6 +59,14 @@ export function verifyAccountPassword(password: string): boolean {
 
 export function changePassword(newPassword: string): void {
   writeSettings({ auth_password_hash: hashPassword(newPassword) });
+  // ponytail: invalidar todas las sesiones al cambiar la contraseña (igual que
+  // deleteAccount). Sin esto una cookie robada seguía viva hasta su TTL de 30 días.
+  const db = openDb();
+  try {
+    db.prepare("DELETE FROM auth_sessions").run();
+  } finally {
+    db.close();
+  }
   appendAudit({ actor: actorEmail(), action: "auth.password_changed" });
 }
 

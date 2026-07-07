@@ -16,6 +16,9 @@ export async function POST(req: NextRequest) {
   res.cookies.set(SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",
+    // secure solo si se sirve por HTTPS o se opta explícitamente; en Tauri/localhost
+    // http queda false para no romper el login local.
+    secure: req.nextUrl.protocol === "https:" || process.env.CRM_SECURE_COOKIES === "1",
     maxAge: 30 * 24 * 60 * 60,
     path: "/",
   });

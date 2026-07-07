@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { contacts } from "@/db/schema";
 
+const VALID_TEMP = new Set(["hot", "warm", "cold"]);
+function clampScore(v: unknown): number {
+  const n = Number(v);
+  return Number.isFinite(n) ? Math.min(100, Math.max(0, Math.round(n))) : 0;
+}
+
 export async function POST(request: NextRequest) {
   let body;
   try {
@@ -16,6 +22,9 @@ export async function POST(request: NextRequest) {
       { error: "Se requiere un array de contactos" },
       { status: 400 }
     );
+  }
+  if (contactList.length > 5000) {
+    return NextResponse.json({ error: "Máximo 5000 contactos por importación" }, { status: 413 });
   }
 
   const results = {
@@ -44,8 +53,10 @@ export async function POST(request: NextRequest) {
           phone: contact.phone || null,
           company: contact.company || null,
           source: contact.source || "import",
-          temperature: contact.temperature || "cold",
-          score: contact.score || 0,
+          // ponytail: normalizar al enum/rango que asume el resto del CRM (badges,
+          // orden por score). El import era la única vía de escritura que lo saltaba.
+          temperature: VALID_TEMP.has(contact.temperature) ? contact.temperature : "cold",
+          score: clampScore(contact.score),
           notes: contact.notes || null,
           createdAt: now,
           updatedAt: now,

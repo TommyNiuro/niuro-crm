@@ -139,7 +139,10 @@ export function migrateToEncryptedIfNeeded(file: string, key: string): void {
     db.close();
   } catch (e) {
     try { db.close(); } catch { /* ya cerrada */ }
-    try { fs.copyFileSync(bak, file); } catch { /* best-effort restore */ }
+    try {
+      fs.copyFileSync(bak, file);
+      fs.rmSync(bak, { force: true }); // restore OK: quitar la copia plana (no dejar datos sin cifrar)
+    } catch { /* restore fallo: NO borrar el backup, es la única copia intacta */ }
     throw new Error(
       `migrateToEncryptedIfNeeded: fallo el rekey, DB restaurada del backup: ${
         e instanceof Error ? e.message : String(e)
@@ -160,7 +163,10 @@ export function migrateToEncryptedIfNeeded(file: string, key: string): void {
     check.prepare("SELECT count(*) FROM sqlite_master").get(); // fuerza una lectura real
     check.close();
   } catch (e) {
-    try { fs.copyFileSync(bak, file); } catch { /* best-effort restore */ }
+    try {
+      fs.copyFileSync(bak, file);
+      fs.rmSync(bak, { force: true }); // restore OK: quitar la copia plana
+    } catch { /* restore fallo: NO borrar el backup, es la única copia intacta */ }
     throw new Error(
       `migrateToEncryptedIfNeeded: DB cifrada ilegible con la llave, restaurada del backup: ${
         e instanceof Error ? e.message : String(e)

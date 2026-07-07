@@ -36,6 +36,9 @@ export async function POST(request: NextRequest) {
   if (!targetType || !targetId || !text) {
     return NextResponse.json({ error: "targetType, targetId y body son requeridos" }, { status: 400 });
   }
+  if (text.length > 5000) {
+    return NextResponse.json({ error: "La nota supera el máximo de 5000 caracteres" }, { status: 400 });
+  }
   const row = db
     .insert(notes)
     .values({ targetType, targetId, body: text, createdAt: new Date() })
