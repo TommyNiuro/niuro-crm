@@ -1,4 +1,5 @@
 import { rawDb } from "@/db";
+import { mirrorDealsToContact } from "@/lib/deal-sync";
 
 // Tools del copiloto IA (b6-chat-backend). Dos familias:
 //  - READ: query_records / get_record / count_records / search -> ejecutan SQL
@@ -215,24 +216,33 @@ export function executeAction(action: ProposedAction): { id: string } {
   const fields = filterWritable(def, action.fields); // re-valida: el cliente no es de fiar
   const nowSec = Math.floor(Date.now() / 1000);
   const keys = Object.keys(fields);
+  let resultId: string;
 
   if (action.kind === "create") {
-    const id = crypto.randomUUID();
+    resultId = crypto.randomUUID();
     const colNames = ["id", ...keys, "created_at", ...(def.hasUpdatedAt ? ["updated_at"] : [])];
-    const values = [id, ...keys.map((k) => bind(fields[k])), nowSec, ...(def.hasUpdatedAt ? [nowSec] : [])];
+    const values = [resultId, ...keys.map((k) => bind(fields[k])), nowSec, ...(def.hasUpdatedAt ? [nowSec] : [])];
     rawDb
       .prepare(`INSERT INTO ${def.table} (${colNames.map((c) => `"${c}"`).join(", ")}) VALUES (${colNames.map(() => "?").join(", ")})`)
       .run(...values);
-    return { id };
+  } else {
+    if (typeof action.id !== "string" || !action.id) throw new Error("execute update: id vacio");
+    const setSql = [...keys.map((k) => `"${k}" = ?`), ...(def.hasUpdatedAt ? [`"updated_at" = ?`] : [])].join(", ");
+    const params = [...keys.map((k) => bind(fields[k])), ...(def.hasUpdatedAt ? [nowSec] : []), action.id];
+    const info = rawDb.prepare(`UPDATE ${def.table} SET ${setSql} WHERE id = ?`).run(...params);
+    if (info.changes === 0) throw new Error(`${def.table}/${action.id} no existe`);
+    resultId = action.id;
   }
 
-  // update
-  if (typeof action.id !== "string" || !action.id) throw new Error("execute update: id vacio");
-  const setSql = [...keys.map((k) => `"${k}" = ?`), ...(def.hasUpdatedAt ? [`"updated_at" = ?`] : [])].join(", ");
-  const params = [...keys.map((k) => bind(fields[k])), ...(def.hasUpdatedAt ? [nowSec] : []), action.id];
-  const info = rawDb.prepare(`UPDATE ${def.table} SET ${setSql} WHERE id = ?`).run(...params);
-  if (info.changes === 0) throw new Error(`${def.table}/${action.id} no existe`);
-  return { id: action.id };
+  // ponytail: tras escribir un deal, re-espejar el contacto (value_cents/probability)
+  // como hacen las rutas REST; sin esto el pipeline quedaba con montos viejos.
+  if (action.objectName === "deals") {
+    const row = rawDb.prepare(`SELECT contact_id FROM deals WHERE id = ?`).get(resultId) as
+      | { contact_id?: string }
+      | undefined;
+    if (row?.contact_id) mirrorDealsToContact(row.contact_id);
+  }
+  return { id: resultId };
 }
 
 // Describe los objetos + sus columnas para el system prompt del copiloto.

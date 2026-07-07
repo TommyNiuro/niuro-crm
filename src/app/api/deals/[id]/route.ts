@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { deals, contacts, proposals } from "@/db/schema";
+import { deals, contacts, proposals, activities } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { dealUpdateSchema, validate } from "@/lib/validation";
 import { mergeCustomFields, applyCustomFieldsFromBody } from "@/lib/custom-fields";
@@ -137,8 +137,13 @@ export async function DELETE(
     );
   }
 
-  if (hard) db.delete(deals).where(eq(deals.id, id)).run();
-  else db.update(deals).set({ deletedAt: new Date() }).where(eq(deals.id, id)).run();
+  if (hard) {
+    // ponytail: limpiar las hijas antes del hard-delete o el FK revienta (500).
+    // activities.deal_id referencia deals; sin esto ?hard=1 sobre un deal con
+    // actividades tiraba "FOREIGN KEY constraint failed".
+    db.delete(activities).where(eq(activities.dealId, id)).run();
+    db.delete(deals).where(eq(deals.id, id)).run();
+  } else db.update(deals).set({ deletedAt: new Date() }).where(eq(deals.id, id)).run();
   mirrorDealsToContact(existing.contactId); // el espejo del contacto baja a lo que quede vivo
   logActivity("deals", id, hard ? "deleted" : "deleted");
   dispatchRecordEvent("deals", "deleted", existing as { id: string } & Record<string, unknown>);

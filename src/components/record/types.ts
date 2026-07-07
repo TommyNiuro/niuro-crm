@@ -9,7 +9,7 @@ export type FieldType =
   | "text"
   | "number"
   | "currency" // se guarda en centavos (valueCents)
-  | "amount" // moneda en unidades enteras (deals.value)
+  | "amount" // DEPRECADO, no usar: deals.value se guarda en CENTAVOS (usa "currency")
   | "score" // 0-100 con punto de temperatura
   | "select" // dropdown de opciones (source, channel...)
   | "status" // chip de color desde options (value -> label+color); para etapas FK / estados

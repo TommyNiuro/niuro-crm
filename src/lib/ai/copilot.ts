@@ -48,7 +48,7 @@ ${describeSchema()}
 
 Notas de datos:
 - "caliente" / "hot" = contacts.temperature = 'hot'; "tibio"/"warm"; "frio"/"cold".
-- Montos de contacts en value_cents (centavos). deals.value en la unidad cruda.
+- Montos en CENTAVOS: contacts.value_cents Y deals.value (ambos en centavos, misma escala). Para MOSTRAR o proponer un monto en pesos/dólares dividí por 100; al ESCRIBIR un monto multiplicá por 100 (ej. USD 5.000 -> value 500000). Nunca escribas el monto en unidad cruda.
 - Fechas (created_at, updated_at, ...) son epoch en segundos.
 
 Para responder usas HERRAMIENTAS. En cada turno respondes EXCLUSIVAMENTE un objeto JSON (sin texto fuera del JSON, sin markdown) con UNA de estas formas:

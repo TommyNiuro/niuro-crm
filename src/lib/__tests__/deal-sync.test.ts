@@ -76,6 +76,18 @@ describe("syncMoneyFromContact", () => {
     const ds = openDeals(c.id).sort((a, b) => b.value - a.value);
     expect(ds.map((d) => d.value)).toEqual([400_000, 100_000]);
   });
+
+  it("si el total baja por debajo de la suma de los deals secundarios, reparte proporcional sin perder plata", () => {
+    const c = makeContact({ valueCents: 0 });
+    const sid = stageIdByName("Discovery")!;
+    db.insert(deals).values({ title: "A", value: 300_000, stageId: sid, contactId: c.id }).run();
+    db.insert(deals).values({ title: "B", value: 100_000, stageId: sid, contactId: c.id }).run();
+    syncMoneyFromContact({ ...c, valueCents: 50_000, probability: 30 } as ContactRow);
+    const ds = openDeals(c.id).sort((a, b) => b.value - a.value);
+    // 50k repartido proporcional (37.5k + 12.5k); la suma cuadra exacto, nada de clamp a 0
+    expect(ds.map((d) => d.value)).toEqual([37_500, 12_500]);
+    expect(ds.reduce((a, d) => a + d.value, 0)).toBe(50_000);
+  });
 });
 
 describe("mirrorDealsToContact", () => {
@@ -88,6 +100,17 @@ describe("mirrorDealsToContact", () => {
     const after = getContact(c.id);
     expect(after.valueCents).toBe(400_000);
     expect(after.probability).toBe(65); // (300k*80 + 100k*20) / 400k
+  });
+
+  it("con deals de valor 0 promedia la probabilidad en vez de ponderar por valor", () => {
+    const c = makeContact();
+    const sid = stageIdByName("Propuesta")!;
+    db.insert(deals).values({ title: "A", value: 0, probability: 40, stageId: sid, contactId: c.id }).run();
+    db.insert(deals).values({ title: "B", value: 0, probability: 60, stageId: sid, contactId: c.id }).run();
+    mirrorDealsToContact(c.id);
+    const after = getContact(c.id);
+    expect(after.valueCents).toBe(0);
+    expect(after.probability).toBe(50); // promedio (40+60)/2, no ponderado por valor
   });
 
   it("sin deals vivos el espejo queda en cero", () => {
@@ -105,6 +128,17 @@ describe("alignDealStage", () => {
     syncMoneyFromContact(c);
     alignDealStage(c.id, "Cierre");
     expect(openDeals(c.id)[0].stageId).toBe(stageIdByName("Cierre"));
+  });
+
+  it("con varios deals mueve solo el principal (mayor valor), deja los secundarios", () => {
+    const c = makeContact({ valueCents: 0 });
+    const disc = stageIdByName("Discovery")!;
+    db.insert(deals).values({ title: "A", value: 300_000, stageId: disc, contactId: c.id }).run();
+    db.insert(deals).values({ title: "B", value: 100_000, stageId: disc, contactId: c.id }).run();
+    alignDealStage(c.id, "Cierre");
+    const ds = openDeals(c.id).sort((a, b) => b.value - a.value);
+    expect(ds[0].stageId).toBe(stageIdByName("Cierre")); // principal A movido
+    expect(ds[1].stageId).toBe(disc); // secundario B intacto
   });
 
   it("etapa inexistente (huérfana) no toca nada", () => {

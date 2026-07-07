@@ -89,14 +89,34 @@ export function syncMoneyFromContact(c: ContactRow): void {
   }
   const [principal, ...rest] = [...open].sort((a, b) => (b.value || 0) - (a.value || 0));
   const others = rest.reduce((a, d) => a + (d.value || 0), 0);
-  db.update(deals)
-    .set({
-      value: Math.max(0, (c.valueCents || 0) - others),
-      probability: c.probability || 0,
-      updatedAt: now,
-    })
-    .where(eq(deals.id, principal.id))
-    .run();
+  const total = c.valueCents || 0;
+  if (total >= others) {
+    // caso normal: el principal absorbe la diferencia
+    db.update(deals)
+      .set({ value: total - others, probability: c.probability || 0, updatedAt: now })
+      .where(eq(deals.id, principal.id))
+      .run();
+    return;
+  }
+  // ponytail: el total del contacto quedó por debajo de la suma de los deals
+  // secundarios. Antes se clampeaba el principal a 0 y se PERDÍA plata en silencio.
+  // Ahora se reparte el total proporcional entre todos los deals vivos para que la
+  // suma cuadre exacto (el último se lleva el remanente del redondeo).
+  const sum = open.reduce((a, d) => a + (d.value || 0), 0);
+  let assigned = 0;
+  open.forEach((d, i) => {
+    const last = i === open.length - 1;
+    const share = last
+      ? total - assigned
+      : sum > 0
+        ? Math.round((total * (d.value || 0)) / sum)
+        : Math.round(total / open.length);
+    assigned += share;
+    db.update(deals)
+      .set({ value: Math.max(0, share), probability: c.probability || 0, updatedAt: now })
+      .where(eq(deals.id, d.id))
+      .run();
+  });
 }
 
 /** Alinea los deals vivos con la etapa (por nombre) del contacto. Si la etapa
@@ -104,8 +124,14 @@ export function syncMoneyFromContact(c: ContactRow): void {
 export function alignDealStage(contactId: string, stageName: string): void {
   const sid = stageIdByName(stageName);
   if (!sid) return;
+  const open = openDealsOf(contactId);
+  if (!open.length) return;
+  // ponytail: mover la etapa del contacto arrastra SOLO el deal principal (mayor
+  // valor). Los deals secundarios conservan su etapa propia (el deal es la fuente
+  // de verdad del pipeline). Antes pisaba la etapa de TODOS los deals del contacto.
+  const principal = open.reduce((a, d) => ((d.value || 0) >= (a.value || 0) ? d : a));
   db.update(deals)
     .set({ stageId: sid, updatedAt: new Date() })
-    .where(and(eq(deals.contactId, contactId), isNull(deals.deletedAt)))
+    .where(eq(deals.id, principal.id))
     .run();
 }
