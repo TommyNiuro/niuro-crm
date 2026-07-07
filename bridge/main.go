@@ -89,7 +89,7 @@ func NewMessageStore() (*MessageStore, error) {
 	}
 
 	// Open SQLite database for messages
-	db, err := sql.Open("sqlite3", "file:store/messages.db?_foreign_keys=on")
+	db, err := sql.Open("sqlite3", "file:store/messages.db?_foreign_keys=on&_busy_timeout=5000&_journal_mode=WAL")
 	if err != nil {
 		return nil, fmt.Errorf("failed to open message database: %v", err)
 	}
@@ -784,6 +784,13 @@ func requireAuth(token string, next http.HandlerFunc) http.HandlerFunc {
 		return next
 	}
 	return func(w http.ResponseWriter, r *http.Request) {
+		// Fail-closed: sin token configurado rechazar TODO. Antes, token vacío +
+		// header ausente daba ConstantTimeCompare==1 y la request pasaba SIN auth
+		// (cualquiera en loopback podía enviar mensajes o leer archivos via media_path).
+		if token == "" {
+			http.Error(w, "Unauthorized (bridge sin token)", http.StatusUnauthorized)
+			return
+		}
 		got := r.Header.Get("X-Bridge-Token")
 		if subtle.ConstantTimeCompare([]byte(got), []byte(token)) != 1 {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -797,7 +804,7 @@ func requireAuth(token string, next http.HandlerFunc) http.HandlerFunc {
 func startRESTServer(client *whatsmeow.Client, messageStore *MessageStore, port int) {
 	authToken := os.Getenv("BRIDGE_AUTH_TOKEN")
 	if authToken == "" {
-		fmt.Println("BRIDGE_AUTH_TOKEN no seteado: el REST del bridge queda sin auth (ver requireAuth)")
+		fmt.Println("BRIDGE_AUTH_TOKEN no seteado: el REST del bridge rechaza TODO (fail-closed, ver requireAuth)")
 	}
 
 	// Handler for sending messages
@@ -1009,8 +1016,12 @@ func startRESTServer(client *whatsmeow.Client, messageStore *MessageStore, port 
 
 	// Run server in a goroutine so it doesn't block
 	go func() {
+		// Bind failure es fatal: si el REST no levanta, el bridge quedaba vivo y
+		// conectado a WhatsApp pero sin API, y el watchdog no lo reiniciaba. os.Exit
+		// hace que el watchdog lo relance.
 		if err := http.ListenAndServe(serverAddr, nil); err != nil {
-			fmt.Printf("REST API server error: %v\n", err)
+			fmt.Printf("REST API server error (fatal): %v\n", err)
+			os.Exit(1)
 		}
 	}()
 }
@@ -1090,6 +1101,9 @@ func main() {
 
 		case *events.LoggedOut:
 			logger.Warnf("Device logged out, please scan QR code to log in again")
+			// Sin esto qrState quedaba en "connected" para siempre: el CRM no se
+			// enteraba del logout y no se podía re-vincular sin matar el proceso.
+			setQRState("logged_out", "")
 		}
 	})
 
