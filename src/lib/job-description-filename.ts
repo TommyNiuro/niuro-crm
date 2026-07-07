@@ -5,6 +5,8 @@
  * (pdf/route.ts) y puede usarlo un componente cliente. Formato:
  * "{Rol} - {Empresa} - Descripcion de cargo - Niuro - {YYYY-MM-DD}.ext".
  */
+import { sanitizeFileName, fileDateStamp } from "./filename-util";
+
 export function buildJobDescriptionFileName(
   opts: { roleTitle?: string | null; clientName: string; createdAt?: Date | number | null },
   ext: string,
@@ -14,15 +16,6 @@ export function buildJobDescriptionFileName(
   parts.push(opts.clientName.trim() || "Empresa");
   parts.push("Descripcion de cargo");
   parts.push("Niuro");
-  const d = opts.createdAt ? new Date(opts.createdAt) : new Date();
-  parts.push(isNaN(d.getTime()) ? new Date().toISOString().slice(0, 10) : d.toISOString().slice(0, 10));
-
-  const safe = parts
-    .join(" - ")
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "") // quita tildes
-    .replace(/[/\\:*?"<>|]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-  return `${safe || "Descripcion de cargo - Niuro"}.${ext}`;
+  parts.push(fileDateStamp(opts.createdAt));
+  return sanitizeFileName(parts, "Descripcion de cargo - Niuro", ext);
 }

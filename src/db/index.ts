@@ -695,6 +695,9 @@ function initTables(db: Database.Database): void {
     // Índice de expresión para el filtro por empresa del detalle (lower(trim(company)));
     // antes GET /api/companies/[id] escaneaba la tabla contacts entera en cada apertura.
     `CREATE INDEX IF NOT EXISTS idx_contacts_company_lower ON contacts(lower(trim(company)))`,
+    // whatsapp_jid único parcial: idempotencia de promote-lead a nivel DB (además
+    // del check-then-insert). Verificado: 0 duplicados en prod, así que no falla.
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_contacts_whatsapp_jid_unique ON contacts(whatsapp_jid) WHERE whatsapp_jid IS NOT NULL`,
   ];
   // Control de versiones (auditoria SaaS 2026-07-01, fase 1). Antes se re-corrian
   // TODOS los ALTER en cada arranque (idempotentes, pero re-ejecutados) y un error

@@ -12,6 +12,8 @@
  * asi que se omite ese segmento. Fecha = createdAt (cuando se armo la
  * propuesta), formato YYYY-MM-DD para que ordene bien en Finder/Explorer.
  */
+import { sanitizeFileName, fileDateStamp } from "./filename-util";
+
 export function buildProposalFileName(
   opts: { role?: string | null; mode: string; clientName: string; createdAt?: Date | number | null },
   ext: string,
@@ -21,15 +23,6 @@ export function buildProposalFileName(
   parts.push(opts.clientName.trim() || "Cliente");
   parts.push(opts.mode === "sprint" ? "Sprint" : "Staffing");
   parts.push("Niuro");
-  const d = opts.createdAt ? new Date(opts.createdAt) : new Date();
-  parts.push(isNaN(d.getTime()) ? new Date().toISOString().slice(0, 10) : d.toISOString().slice(0, 10));
-
-  const safe = parts
-    .join(" - ")
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "") // quita tildes
-    .replace(/[/\\:*?"<>|]/g, "") // caracteres invalidos en nombres de archivo
-    .replace(/\s+/g, " ")
-    .trim();
-  return `${safe || "Propuesta - Niuro"}.${ext}`;
+  parts.push(fileDateStamp(opts.createdAt));
+  return sanitizeFileName(parts, "Propuesta - Niuro", ext);
 }

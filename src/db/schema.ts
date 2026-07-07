@@ -287,8 +287,11 @@ export const proposals = sqliteTable("proposals", {
   id: text("id")
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
-  contactId: text("contact_id").references(() => contacts.id),
-  dealId: text("deal_id").references(() => deals.id),
+  // Sin .references: el DDL real (db/index.ts) crea estas columnas sin REFERENCES,
+  // así que SQLite no enforcea la FK. Se declaran igual para que Drizzle coincida
+  // con la tabla real y no haya divergencia declarativa (auditoría 2026-07-07).
+  contactId: text("contact_id"),
+  dealId: text("deal_id"),
   mode: text("mode").notNull(), // 'staff-aug' | 'sprint'
   status: text("status").notNull().default("draft"), // draft|sent|in-review|negotiation|signed|lost|archived
   date: text("date"), // human-readable, ej "Mayo 2026"
@@ -355,8 +358,10 @@ export const jobDescriptions = sqliteTable("job_descriptions", {
   id: text("id")
     .primaryKey()
     .$defaultFn(() => crypto.randomUUID()),
-  contactId: text("contact_id").references(() => contacts.id),
-  dealId: text("deal_id").references(() => deals.id),
+  // Sin .references: el DDL real no crea estas FK; se declaran así para coincidir
+  // con la tabla real (auditoría 2026-07-07).
+  contactId: text("contact_id"),
+  dealId: text("deal_id"),
   status: text("status").notNull().default("draft"), // draft|sent|archived
   template: text("template").notNull().default("intermediate"), // compact|intermediate|full
   client: text("client").notNull(), // JSON JobDescriptionClient

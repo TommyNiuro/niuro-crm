@@ -262,7 +262,7 @@ async function runStep(step: Step, ctx: Ctx): Promise<void> {
       break;
     }
     case "branch": {
-      const truthy = evalCondition(resolve(step.condition, ctx));
+      const truthy = evalCondition(step.condition, ctx);
       const branch = (truthy ? step.then : step.else) as Step[] | undefined;
       if (Array.isArray(branch)) {
         for (const s of branch) await runStep(s, ctx);
@@ -274,28 +274,34 @@ async function runStep(step: Step, ctx: Ctx): Promise<void> {
   }
 }
 
-// Condición ya resuelta (las {{vars}} fueron sustituidas). Acepta un boolean
-// directo o un string "a == b" / "a != b" / "a" (truthy). Comparación simple por
-// igualdad de strings; suficiente para el motor reducido.
-function evalCondition(cond: unknown): boolean {
-  if (typeof cond === "boolean") return cond;
-  if (cond == null) return false;
-  const s = String(cond).trim();
-  const m = s.match(/^(.*?)\s*(==|!=|>=|<=|>|<)\s*(.*)$/);
-  if (m) {
-    const [, a, op, b] = m;
-    const na = Number(a), nb = Number(b);
-    const numeric = !Number.isNaN(na) && !Number.isNaN(nb);
-    switch (op) {
-      case "==": return a.trim() === b.trim();
-      case "!=": return a.trim() !== b.trim();
-      case ">": return numeric && na > nb;
-      case "<": return numeric && na < nb;
-      case ">=": return numeric && na >= nb;
-      case "<=": return numeric && na <= nb;
-    }
+// Evalúa la condición de un branch. Recibe la PLANTILLA sin resolver: parsea el
+// operador sobre la plantilla y resuelve cada operando por separado, para que un
+// valor interpolado (ej. salida de IA o dato del lead) no pueda inyectar un
+// operador y cambiar la comparación. Acepta boolean directo, "a == b" / "a != b"
+// / comparadores numéricos, o "a" (truthy del valor resuelto).
+function evalCondition(rawCond: unknown, ctx: Ctx): boolean {
+  if (typeof rawCond === "boolean") return rawCond;
+  if (rawCond == null) return false;
+  const raw = String(rawCond).trim();
+  const m = raw.match(/^(.*?)\s*(==|!=|>=|<=|>|<)\s*(.*)$/);
+  if (!m) {
+    const v = String(resolve(raw, ctx) ?? "").trim();
+    return v !== "" && v !== "false" && v !== "0";
   }
-  return s !== "" && s !== "false" && s !== "0";
+  const [, lTpl, op, rTpl] = m;
+  const a = String(resolve(lTpl.trim(), ctx) ?? "").trim();
+  const b = String(resolve(rTpl.trim(), ctx) ?? "").trim();
+  const na = Number(a), nb = Number(b);
+  const numeric = !Number.isNaN(na) && !Number.isNaN(nb);
+  switch (op) {
+    case "==": return a === b;
+    case "!=": return a !== b;
+    case ">": return numeric && na > nb;
+    case "<": return numeric && na < nb;
+    case ">=": return numeric && na >= nb;
+    case "<=": return numeric && na <= nb;
+  }
+  return false;
 }
 
 export interface RunResult {

@@ -20,6 +20,27 @@ export function isValidFieldType(t: unknown): t is FieldType {
   return typeof t === "string" && (FIELD_TYPES as string[]).includes(t);
 }
 
+// Coacciona el valor entrante al tipo declarado del campo antes de persistirlo,
+// para que un campo number/currency/score/boolean no acepte basura (string
+// arbitrario u objeto) que después rompe orden/segmentación/badges.
+export function coerceCustomValue(type: FieldType, value: unknown): unknown {
+  if (value == null || value === "") return value;
+  switch (type) {
+    case "number":
+    case "currency":
+    case "amount":
+    case "score":
+    case "rating": {
+      const n = Number(value);
+      return Number.isFinite(n) ? n : null; // no numérico -> limpia la celda
+    }
+    case "boolean":
+      return value === true || value === "true" || value === 1 || value === "1" ? 1 : 0;
+    default:
+      return value; // text/select/date/tags/link/email/...: el editor ya restringe
+  }
+}
+
 export interface CustomFieldMeta {
   id: string;
   name: string;
@@ -134,7 +155,7 @@ export function applyCustomFieldsFromBody(
   const rest: Record<string, unknown> = {};
   for (const [key, val] of Object.entries(body)) {
     const f = byName.get(key);
-    if (f) saveCustomField(objectName, recordId, f.name, val, f.id);
+    if (f) saveCustomField(objectName, recordId, f.name, coerceCustomValue(f.type, val), f.id);
     else rest[key] = val;
   }
   return rest;

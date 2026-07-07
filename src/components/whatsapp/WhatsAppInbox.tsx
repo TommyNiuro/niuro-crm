@@ -146,7 +146,19 @@ export function WhatsAppInbox() {
         echoRef.current = echoRef.current.filter(
           (e) =>
             nowMs - e.at < 10 * 60_000 &&
-            !(e.jid === jid && fetched.some((f) => f.isFromMe && f.content === e.msg.content))
+            // ponytail: dar por "llegó el mensaje real" solo si el fetched propio
+            // coincide en contenido Y su timestamp está cerca del envío. Antes, un
+            // mensaje propio idéntico VIEJO ya en la ventana descartaba el eco antes
+            // de tiempo y el recién enviado "desaparecía" de la UI (timestamp ISO -> ms).
+            !(
+              e.jid === jid &&
+              fetched.some(
+                (f) =>
+                  f.isFromMe &&
+                  f.content === e.msg.content &&
+                  Math.abs(new Date(f.timestamp ?? 0).getTime() - e.at) < 5 * 60_000
+              )
+            )
         );
         const extras = echoRef.current.filter((e) => e.jid === jid).map((e) => e.msg);
         setMessages([...fetched, ...extras]);
