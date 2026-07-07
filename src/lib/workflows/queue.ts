@@ -127,7 +127,22 @@ export async function drainJobs(opts?: { max?: number; db?: DB; runner?: Runner 
     try { ctx = JSON.parse(job.trigger_context || "{}"); } catch { ctx = {}; }
 
     try {
-      const result = await runner(loadWorkflow(wfRow), ctx);
+      // ponytail: heartbeat mientras corre. Un workflow legítimamente largo (ai_step,
+      // http lento) superaba STUCK_SEC y reclaimStuck lo devolvía a pending -> otro
+      // drain lo corría EN PARALELO (side effects duplicados). Refrescar locked_at
+      // durante los awaits evita que se lo reclamen estando vivo.
+      const hb = setInterval(() => {
+        try {
+          db.prepare(`UPDATE workflow_jobs SET locked_at=? WHERE id=? AND status='running'`).run(nowSec(), id);
+        } catch { /* noop */ }
+      }, Math.floor((STUCK_SEC * 1000) / 3));
+      (hb as { unref?: () => void }).unref?.();
+      let result: Awaited<ReturnType<Runner>>;
+      try {
+        result = await runner(loadWorkflow(wfRow), ctx);
+      } finally {
+        clearInterval(hb);
+      }
       if (result.status === "success") {
         markDone(db, id);
         stats.done++;

@@ -150,7 +150,18 @@ function resolveField(
   col: DrizzleCol,
   rec: Record<string, unknown>
 ): unknown {
-  if (SKIP_FIELDS[table]?.includes(jsKey)) return undefined;
+  if (SKIP_FIELDS[table]?.includes(jsKey)) {
+    // deals.stageId es NOT NULL y no hay mapeo de etapas entre instancias: omitirlo
+    // hacía fallar el INSERT (NOT NULL constraint) y el sync de deals nunca copiaba
+    // nada. Usar la primera etapa local del pipeline como destino; el usuario re-etapa.
+    if (table === "deals" && jsKey === "stageId") {
+      const row = db
+        .prepare(`SELECT id FROM pipeline_stages WHERE pipeline = 'prospectos' ORDER BY "order" ASC LIMIT 1`)
+        .get() as { id: string } | undefined;
+      return row?.id ?? SKIP_ROW;
+    }
+    return undefined;
+  }
 
   const fkTable = FK_REFS[table]?.[jsKey];
   if (fkTable) {

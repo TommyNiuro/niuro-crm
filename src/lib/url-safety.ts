@@ -4,6 +4,8 @@
  * hostname, sin resolución DNS: no cubre DNS rebinding, pero cierra el ataque
  * simple de apuntar directo a un rango privado/localhost/metadata.
  */
+import net from "node:net";
+
 const PRIVATE_OR_LOOPBACK_RE =
   /^(127\.|10\.|192\.168\.|169\.254\.|0\.0\.0\.0$)|^172\.(1[6-9]|2\d|3[01])\.|^(\[?::1\]?|localhost)$/i;
 
@@ -24,10 +26,30 @@ function parseHttpUrl(raw: string): URL {
   return url;
 }
 
+// Bloquea host privado/local cubriendo las codificaciones que evaden el regex
+// dotted: entero decimal (2130706433 = 127.0.0.1), hex (0x7f000001), octal, e
+// IPv6 (::1, ::ffff:127.x mapeadas, link-local fe80::, ULA fc00::/7). NO resuelve
+// DNS: el DNS rebinding sigue fuera de alcance (documentado).
+function isBlockedPublicHost(hostname: string): boolean {
+  const h = hostname.toLowerCase();
+  if (h === "localhost") return true;
+  if (/^0x[0-9a-f]+$/.test(h)) return true; // hex
+  if (/^0[0-7]+$/.test(h)) return true; // octal
+  if (/^\d+$/.test(h)) return true; // entero decimal (nunca es un host público legítimo)
+  if (net.isIP(h) === 6) {
+    if (h === "::1" || h === "::") return true;
+    if (h.startsWith("fe80:") || h.startsWith("fc") || h.startsWith("fd")) return true; // link-local / ULA
+    const mapped = h.match(/::ffff:(\d+\.\d+\.\d+\.\d+)$/);
+    if (mapped) return PRIVATE_OR_LOOPBACK_RE.test(mapped[1]);
+    return false;
+  }
+  return PRIVATE_OR_LOOPBACK_RE.test(h);
+}
+
 /** Para destinos externos configurables (ej. steps de workflow): bloquea red interna. */
 export function assertPublicHttpUrl(raw: string): URL {
   const url = parseHttpUrl(raw);
-  if (PRIVATE_OR_LOOPBACK_RE.test(url.hostname)) {
+  if (isBlockedPublicHost(url.hostname)) {
     throw new Error(`URL insegura: destino privado/local no permitido (${url.hostname})`);
   }
   return url;

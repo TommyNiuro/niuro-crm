@@ -192,6 +192,10 @@ async function runStep(step: Step, ctx: Ctx): Promise<void> {
       break;
     }
     case "http_request": {
+      // ponytail: mismo gate anti-taint que los write steps. Sin esto, la salida de
+      // un ai_step (contenido no confiable) podía dirigir url/headers/body y hacer
+      // SSRF o exfiltrar el ctx a un host arbitrario sin revisión.
+      assertNoUnreviewedAiInput(step, ctx, step.url, step.headers, step.body);
       const method = (resolve(step.method, ctx) as string) || "GET";
       const url = resolve(step.url, ctx) as string;
       if (!url) throw new Error("http_request: url vacia");
@@ -211,6 +215,9 @@ async function runStep(step: Step, ctx: Ctx): Promise<void> {
       break;
     }
     case "send_email": {
+      // ponytail: gate anti-taint (igual que write steps): que salida de IA no
+      // dispare un email a un destinatario arbitrario sin revisión.
+      assertNoUnreviewedAiInput(step, ctx, step.to, step.subject, step.body);
       const to = resolve(step.to, ctx) as string;
       const subject = resolve(step.subject, ctx) as string;
       const html = resolve(step.body, ctx) as string;

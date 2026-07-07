@@ -71,9 +71,18 @@ export function mergeCustomFields<T extends { id: string }>(
   return rows.map((r) => {
     // Default: cada campo custom presente como null aunque no tenga valor, para
     // que el record-view sepa que la columna existe en la fila.
+    // ponytail: si un campo custom tiene el mismo name que una columna real, la
+    // columna real GANA (antes el custom la anulaba/pisaba en toda lectura).
     const merged: Record<string, unknown> = {};
-    for (const f of fields) merged[f.name] = null;
-    return { ...r, ...merged, ...(byRecord.get(r.id) ?? {}) };
+    for (const f of fields) {
+      if (f.name in r) continue;
+      merged[f.name] = null;
+    }
+    for (const [k, v] of Object.entries(byRecord.get(r.id) ?? {})) {
+      if (k in r) continue;
+      merged[k] = v;
+    }
+    return { ...r, ...merged };
   });
 }
 
