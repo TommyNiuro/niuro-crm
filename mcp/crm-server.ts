@@ -23,6 +23,7 @@
 import crypto from "crypto";
 import Database from "better-sqlite3";
 import { openDb } from "../src/lib/db-open";
+import { appendAudit } from "../src/lib/audit";
 import path from "path";
 import fs from "fs";
 
@@ -183,6 +184,24 @@ const tools = [
 ];
 
 // Tool handlers
+// Re-espeja value_cents/probability del contacto desde sus deals vivos (misma
+// lógica que src/lib/deal-sync.mirrorDealsToContact, inline con SQL crudo para no
+// arrastrar @/db al proceso del MCP). Mantiene el pipeline consistente tras escrituras.
+function mirrorContact(contactId: string): void {
+  const rows = db
+    .prepare("SELECT value, probability FROM deals WHERE contact_id = ? AND deleted_at IS NULL")
+    .all(contactId) as { value: number | null; probability: number | null }[];
+  const total = rows.reduce((a, d) => a + (d.value || 0), 0);
+  let prob = 0;
+  if (rows.length) {
+    prob = total > 0
+      ? Math.round(rows.reduce((a, d) => a + (d.value || 0) * (d.probability || 0), 0) / total)
+      : Math.round(rows.reduce((a, d) => a + (d.probability || 0), 0) / rows.length);
+  }
+  db.prepare("UPDATE contacts SET value_cents = ?, probability = ?, updated_at = ? WHERE id = ?")
+    .run(total, prob, Math.floor(Date.now() / 1000), contactId);
+}
+
 function handleTool(name: string, args: Record<string, unknown>): unknown {
   switch (name) {
     case "crm_list_contacts": {
@@ -247,6 +266,7 @@ function handleTool(name: string, args: Record<string, unknown>): unknown {
         now
       );
 
+      appendAudit({ actor: "mcp", action: "contact.create", objectType: "contacts", objectId: id, detail: { name: String(args.name ?? "") } });
       return { id, message: `Contacto "${args.name}" creado exitosamente` };
     }
 
@@ -297,6 +317,8 @@ function handleTool(name: string, args: Record<string, unknown>): unknown {
         now
       );
 
+      appendAudit({ actor: "mcp", action: "deal.create", objectType: "deals", objectId: id, detail: { title: String(args.title ?? ""), value: Number(args.value) || 0 } });
+      if (args.contactId) mirrorContact(String(args.contactId));
       return { id, message: `Deal "${args.title}" creado exitosamente` };
     }
 
@@ -307,6 +329,9 @@ function handleTool(name: string, args: Record<string, unknown>): unknown {
         now,
         args.dealId
       );
+      const moved = db.prepare("SELECT contact_id FROM deals WHERE id = ?").get(args.dealId) as { contact_id?: string } | undefined;
+      appendAudit({ actor: "mcp", action: "deal.move", objectType: "deals", objectId: String(args.dealId ?? ""), detail: { stageId: String(args.stageId ?? "") } });
+      if (moved?.contact_id) mirrorContact(moved.contact_id);
       return { message: "Deal movido exitosamente" };
     }
 
@@ -322,6 +347,7 @@ function handleTool(name: string, args: Record<string, unknown>): unknown {
          VALUES (?, ?, ?, ?, ?, ?, NULL, ?)`
       ).run(id, args.type, args.description, args.contactId, args.dealId || null, scheduledAt, now);
 
+      appendAudit({ actor: "mcp", action: "activity.create", objectType: "activities", objectId: id, detail: { type: String(args.type ?? "") } });
       return { id, message: "Actividad registrada exitosamente" };
     }
 
