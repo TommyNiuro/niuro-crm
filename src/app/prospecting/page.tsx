@@ -671,8 +671,16 @@ export default function ProspectingPage() {
               return (
                 <div
                   key={p.id}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => setSelectedId(p.id)}
-                  className="group flex items-center gap-3.5 rounded-xl border border-border bg-card px-4 py-3 cursor-pointer transition-colors hover:border-ring/40 hover:bg-[var(--hover)]"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setSelectedId(p.id);
+                    }
+                  }}
+                  className="group flex items-center gap-3.5 rounded-xl border border-border bg-card px-4 py-3 cursor-pointer transition-colors hover:border-ring/40 hover:bg-[var(--hover)] focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <ScoreRing score={p.score} breakdown={p.scoreBreakdown} />
 
@@ -743,7 +751,7 @@ export default function ProspectingPage() {
 
                   {/* Acciones rápidas */}
                   <div
-                    className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                    className="flex items-center gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 group-focus-within:opacity-100 transition-opacity shrink-0"
                     onClick={(e) => e.stopPropagation()}
                   >
                     {acting ? (

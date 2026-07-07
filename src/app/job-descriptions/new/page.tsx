@@ -134,6 +134,7 @@ export default function NewJobDescriptionPage() {
             <Textarea
               value={transcript}
               onChange={(e) => setTranscript(e.target.value)}
+              aria-label="Transcripción o notas de la reunión"
               placeholder="Pegá acá lo que dijo el cliente: qué rol necesita, stack, seniority, compensación, modalidad, a quién reporta, la cultura del equipo..."
               className="min-h-[220px] text-[13.5px] leading-relaxed"
             />
@@ -144,6 +145,7 @@ export default function NewJobDescriptionPage() {
             <Textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
+              aria-label="Notas adicionales"
               placeholder="Conclusiones tuyas post-reunión, prioridades, cosas a resaltar..."
               className="min-h-[90px] text-[13.5px] leading-relaxed"
             />

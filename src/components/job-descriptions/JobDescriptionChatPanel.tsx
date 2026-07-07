@@ -133,12 +133,14 @@ export function JobDescriptionChatPanel({ jobDescriptionId, disabled, onUpdated 
             }
           }}
           disabled={sending || disabled}
+          aria-label="Mensaje para ajustar la descripción"
           placeholder='Pedí un cambio: "agregá React Native a lo deseable"...'
           className="flex-1 bg-background rounded-lg px-2.5 py-2 text-[12.5px] border border-input focus:border-ring outline-none disabled:opacity-50"
         />
         <button
           onClick={() => send(input)}
           disabled={sending || disabled || !input.trim()}
+          aria-label="Enviar"
           className={cn(buttonVariants({ variant: "default", size: "sm" }), "cursor-pointer shrink-0")}
         >
           <Send className="h-3.5 w-3.5" />
