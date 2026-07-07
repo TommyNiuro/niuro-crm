@@ -28,6 +28,21 @@ export function readSettings(keys: string[]): Record<string, string> {
   return out;
 }
 
+/** Lee varias claves sobre una conexión YA ABIERTA por el caller (no la
+ * cierra). Contraparte de writeSettingsOn: para componer un read-check-write
+ * atómico (ej. un contador que no debe pisarse bajo llamadas concurrentes),
+ * usá esta función + writeSettingsOn dentro de la MISMA transacción. */
+export function readSettingsOn(sqlite: Database.Database, keys: string[]): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (keys.length === 0) return out;
+  const q = sqlite.prepare("SELECT value FROM crm_settings WHERE key = ?");
+  for (const k of keys) {
+    const row = q.get(k) as { value: string } | undefined;
+    if (row?.value != null) out[k] = row.value;
+  }
+  return out;
+}
+
 /** Upsert de varias claves sobre una conexión YA ABIERTA por el caller (no la
  * cierra). Para componer con otra escritura en la MISMA transacción, ej. un
  * caller que también actualiza otra tabla y necesita atomicidad entre ambas

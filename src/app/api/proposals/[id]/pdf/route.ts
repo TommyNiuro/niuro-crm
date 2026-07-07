@@ -14,37 +14,11 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { proposals } from "@/db/schema";
 import { generateProposalPdf } from "@/lib/proposals-pdf";
+import { buildProposalFileName } from "@/lib/proposal-filename";
 
 // Playwright necesita el runtime Node (no edge). force-dynamic: nunca cachear.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-/**
- * Deriva un nombre de archivo seguro a partir del cliente de la propuesta. El
- * campo `client` es JSON en una columna TEXT: {name, industry, country, ...}.
- */
-function fileNameFromClient(clientRaw: string | null): string {
-  let name = "propuesta";
-  if (clientRaw) {
-    try {
-      const parsed = JSON.parse(clientRaw) as { name?: unknown };
-      if (typeof parsed.name === "string" && parsed.name.trim()) {
-        name = parsed.name.trim();
-      }
-    } catch {
-      // client no era JSON valido: usamos el fallback.
-    }
-  }
-  // Solo caracteres seguros para un header Content-Disposition / filename.
-  const safe = name
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "") // quita tildes
-    .replace(/[^\w\-]+/g, "_")
-    .replace(/_+/g, "_")
-    .replace(/^_|_$/g, "")
-    .slice(0, 50);
-  return `${safe || "propuesta"}.pdf`;
-}
 
 export async function GET(
   _request: NextRequest,
@@ -53,7 +27,13 @@ export async function GET(
   const { id } = await params;
 
   const proposal = db
-    .select({ id: proposals.id, client: proposals.client })
+    .select({
+      id: proposals.id,
+      client: proposals.client,
+      role: proposals.role,
+      mode: proposals.mode,
+      createdAt: proposals.createdAt,
+    })
     .from(proposals)
     .where(eq(proposals.id, id))
     .get();
@@ -73,13 +53,25 @@ export async function GET(
     return NextResponse.json({ error: message }, { status: 500 });
   }
 
-  const fileName = fileNameFromClient(proposal.client);
+  let clientName = "Cliente";
+  try {
+    const parsed = JSON.parse(proposal.client) as { name?: unknown };
+    if (typeof parsed.name === "string" && parsed.name.trim()) clientName = parsed.name.trim();
+  } catch {
+    // client no era JSON valido: usamos el fallback.
+  }
+  const fileName = buildProposalFileName(
+    { role: proposal.role, mode: proposal.mode, clientName, createdAt: proposal.createdAt },
+    "pdf",
+  );
 
   return new NextResponse(new Uint8Array(pdf), {
     status: 200,
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="${fileName}"`,
+      // filename= (ASCII, ya sin tildes) + filename*= (UTF-8 percent-encoded)
+      // para que navegadores viejos y nuevos muestren el nombre completo.
+      "Content-Disposition": `attachment; filename="${fileName}"; filename*=UTF-8''${encodeURIComponent(fileName)}`,
       "Content-Length": String(pdf.length),
       "Cache-Control": "no-store",
     },

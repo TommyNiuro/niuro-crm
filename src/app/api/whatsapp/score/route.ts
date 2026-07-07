@@ -13,6 +13,8 @@ import {
 import { getRubricConfig } from "@/lib/score-lead-server";
 import type { Temperature } from "@/types";
 
+export const dynamic = "force-dynamic";
+
 const VALID_TEMPS: Temperature[] = ["cold", "warm", "hot"];
 
 interface CachedBreakdown {

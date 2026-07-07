@@ -3,6 +3,8 @@ import { db } from "@/db";
 import { groupOpportunities } from "@/db/schema";
 import { desc, eq } from "drizzle-orm";
 
+export const dynamic = "force-dynamic";
+
 // Radar de grupos: lista de oportunidades detectadas en grupos de WhatsApp.
 // ?counts=1 devuelve solo los totales por estado (para las pestañas).
 export async function GET(request: NextRequest) {

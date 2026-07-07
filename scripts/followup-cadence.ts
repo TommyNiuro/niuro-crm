@@ -18,23 +18,11 @@
  */
 import { openDb } from "../src/lib/db-open";
 import { dbPath } from "../src/lib/paths";
+import { computeNextTouch, toMillis, MAX_TOUCHES } from "../src/lib/followup-cadence-calc";
 
 // Misma resolución que la app: CRM_DB_PATH > CRM_DATA_DIR/crm.db > cwd/data.
 const CRM_DB = dbPath();
 const WORKING_STAGES = ["Prospecto", "Discovery", "Propuesta", "Perfil", "Entrevistas"];
-const MAX_TOUCHES = 5;
-
-// Título por número de toque — encode el playbook para que la Agenda te diga
-// exactamente QUÉ hacer, no solo "dar seguimiento".
-function touchTitle(n: number): string {
-  switch (n) {
-    case 1: return "Seguimiento 1: retomar por WhatsApp con valor nuevo (no '¿pudiste verlo?')";
-    case 2: return "Seguimiento 2: cambiar de ángulo, no repetir el mensaje anterior";
-    case 3: return "Seguimiento 3: COMBO llamada corta + WhatsApp si no contesta";
-    case 4: return "Seguimiento 4: enviar caso de éxito o perfil concreto que le calce";
-    default: return "Seguimiento 5 (último): mensaje de cierre, si no responde marcar Lead perdido";
-  }
-}
 
 type ContactRow = {
   id: string; name: string; stage: string; whatsapp_jid: string | null;
@@ -94,16 +82,14 @@ const run = db.transaction(() => {
     } else {
       // El operador habló último (o no hay mensajes): siguiente toque de la cadencia.
       // Base temporal: último mensaje saliente, o última interacción registrada.
-      const baseTs = lastMsgTs ?? (c.last_interaction_at ? Number(c.last_interaction_at) * (String(c.last_interaction_at).length <= 10 ? 1000 : 1) : now - DAY);
+      const baseTs = lastMsgTs ?? (c.last_interaction_at ? toMillis(Number(c.last_interaction_at)) : now - DAY);
       // Reset de cadencia: toques desde el último mensaje entrante (si lo hay).
       const sinceTs = msg && msg.is_from_me ? 0 : 0; // sin entrante conocido → contar todos
       const prevTouches = (touchesSince.get(c.id, sinceTs) as { c: number }).c;
-      const touch = Math.min(MAX_TOUCHES, prevTouches + 1);
-      title = touchTitle(touch);
-      // Gap incremental: toque n vence n días después del último contacto,
-      // pero nunca en el pasado (si ya pasó, vence hoy).
-      dueAt = Math.max(now, baseTs + touch * DAY);
-      if (touch >= MAX_TOUCHES) lastCall++;
+      const next = computeNextTouch({ hasIncomingMsg: false, baseTs, prevTouches, now });
+      title = next.title;
+      dueAt = next.dueAt;
+      if (next.touch !== null && next.touch >= MAX_TOUCHES) lastCall++;
     }
 
     // Al borde SQL siempre en SEGUNDOS: drizzle define estas columnas con

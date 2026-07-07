@@ -344,6 +344,39 @@ function initTables(db: Database.Database): void {
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     )`,
+    // Descripciones de cargo (Job Descriptions). Espejo de proposals; contenido
+    // editorial como columnas JSON. viability es interno (nunca va al PDF).
+    `CREATE TABLE IF NOT EXISTS job_descriptions (
+      id TEXT PRIMARY KEY,
+      contact_id TEXT,
+      deal_id TEXT,
+      status TEXT NOT NULL DEFAULT 'draft',
+      template TEXT NOT NULL DEFAULT 'intermediate',
+      client TEXT NOT NULL,
+      role_title TEXT,
+      transcript TEXT,
+      notes TEXT,
+      pitch TEXT,
+      conditions TEXT,
+      about TEXT,
+      role_objective TEXT,
+      responsibilities TEXT,
+      profile TEXT,
+      power_skills TEXT,
+      not_looking_for TEXT,
+      why_company TEXT,
+      conditions_closing TEXT,
+      benefits TEXT,
+      start_date TEXT,
+      success_indicators TEXT,
+      onboarding TEXT,
+      viability TEXT,
+      generated INTEGER NOT NULL DEFAULT 0,
+      gen_status TEXT,
+      gen_error TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    )`,
   ];
 
   for (const sql of tables) {
@@ -628,6 +661,32 @@ function initTables(db: Database.Database): void {
     `ALTER TABLE prospects ADD COLUMN contact_log TEXT`,
     `ALTER TABLE prospects ADD COLUMN snoozed_until INTEGER`,
     `ALTER TABLE prospects ADD COLUMN linkedin_company_info TEXT`,
+    // Rediseño del módulo de Propuestas (2026-07-04): share_token habilita la
+    // página pública /p/[token] (sin auth) para enviar por mail/WhatsApp; el
+    // link se genera on-demand (NULL hasta la primera vez que se comparte).
+    `ALTER TABLE proposals ADD COLUMN share_token TEXT`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_proposals_share_token ON proposals(share_token) WHERE share_token IS NOT NULL`,
+    // Versionado simple (guardar/listar/restaurar): snapshot = fila completa de
+    // proposals al momento de guardar. Sin diff visual (no pedido, v2 si hace falta).
+    `CREATE TABLE IF NOT EXISTS proposal_versions (
+      id TEXT PRIMARY KEY,
+      proposal_id TEXT NOT NULL,
+      snapshot TEXT NOT NULL,
+      label TEXT,
+      created_at INTEGER NOT NULL
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_proposal_versions_proposal ON proposal_versions(proposal_id, created_at DESC)`,
+    // Índices de job_descriptions (la tabla se crea en el bloque `tables`).
+    `CREATE INDEX IF NOT EXISTS idx_job_descriptions_contact ON job_descriptions(contact_id)`,
+    `CREATE INDEX IF NOT EXISTS idx_job_descriptions_status ON job_descriptions(status)`,
+    `CREATE INDEX IF NOT EXISTS idx_job_descriptions_created ON job_descriptions(created_at)`,
+    // Gancho de una linea (rediseno 2026-07-06); columna nueva sobre instalaciones
+    // que ya tenian la tabla.
+    `ALTER TABLE job_descriptions ADD COLUMN pitch TEXT`,
+    // Plantillas + condiciones estructuradas (2026-07-06).
+    `ALTER TABLE job_descriptions ADD COLUMN template TEXT NOT NULL DEFAULT 'intermediate'`,
+    `ALTER TABLE job_descriptions ADD COLUMN benefits TEXT`,
+    `ALTER TABLE job_descriptions ADD COLUMN start_date TEXT`,
   ];
   // Control de versiones (auditoria SaaS 2026-07-01, fase 1). Antes se re-corrian
   // TODOS los ALTER en cada arranque (idempotentes, pero re-ejecutados) y un error
@@ -845,7 +904,7 @@ function seedCompaniesFromContacts(db: Database.Database): void {
       .all() as { name: string }[];
     // Drizzle (mode: "timestamp") lee created_at/updated_at en SEGUNDOS epoch,
     // no ms: insertar Date.now() daba fechas en el año 58464 (mismo gotcha que
-    // reconcileStuckProposals). Guardar segundos.
+    // reconcileStuckGenerations). Guardar segundos.
     const now = Math.floor(Date.now() / 1000);
     const insert = db.prepare(
       `INSERT OR IGNORE INTO companies (id, name, created_at, updated_at) VALUES (?, ?, ?, ?)`
@@ -923,29 +982,32 @@ function seedDefaultStages(db: Database.Database): void {
   }
 }
 
-// Reconciliador de arranque: propuestas que quedaron en genStatus='generating'
-// tras un reinicio (el proceso fire-and-forget murio) jamas vuelven a 'ready' ni
+// Reconciliador de arranque: filas que quedaron en genStatus='generating' tras
+// un reinicio (el proceso fire-and-forget murio) jamas vuelven a 'ready' ni
 // 'error', y la UI hace polling infinito. Las que llevan >15 min generando se
-// marcan 'error' para cortar el polling (auditoria 2026-06-29). Idempotente.
-function reconcileStuckProposals(db: Database.Database): void {
-  try {
-    // Drizzle (mode: "timestamp") guarda epoch en SEGUNDOS, no ms.
-    const nowSec = Math.floor(Date.now() / 1000);
-    const cutoff = nowSec - 15 * 60;
-    const info = db
-      .prepare(
-        `UPDATE proposals SET gen_status = 'error',
-           gen_error = COALESCE(gen_error, 'Generacion interrumpida por reinicio'),
-           updated_at = ?
-         WHERE gen_status = 'generating' AND updated_at < ?`
-      )
-      .run(nowSec, cutoff);
-    if (info.changes > 0) {
-      console.error(`[db] reconcileStuckProposals: ${info.changes} propuesta(s) colgada(s) -> error`);
+// marcan 'error' para cortar el polling (auditoria 2026-06-29). Aplica a
+// proposals y job_descriptions (mismo patron de generacion). Idempotente.
+function reconcileStuckGenerations(db: Database.Database): void {
+  // Drizzle (mode: "timestamp") guarda epoch en SEGUNDOS, no ms.
+  const nowSec = Math.floor(Date.now() / 1000);
+  const cutoff = nowSec - 15 * 60;
+  for (const table of ["proposals", "job_descriptions"]) {
+    try {
+      const info = db
+        .prepare(
+          `UPDATE ${table} SET gen_status = 'error',
+             gen_error = COALESCE(gen_error, 'Generacion interrumpida por reinicio'),
+             updated_at = ?
+           WHERE gen_status = 'generating' AND updated_at < ?`
+        )
+        .run(nowSec, cutoff);
+      if (info.changes > 0) {
+        console.error(`[db] reconcileStuckGenerations: ${info.changes} fila(s) colgada(s) en ${table} -> error`);
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(`[db] reconcileStuckGenerations (${table}) fallo: ${msg}`);
     }
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    console.error(`[db] reconcileStuckProposals fallo: ${msg}`);
   }
 }
 
@@ -956,7 +1018,7 @@ migrateStagesNiuro(sqlite);
 seedProtoData(sqlite);
 backfillContacts(sqlite);
 seedCompaniesFromContacts(sqlite);
-reconcileStuckProposals(sqlite);
+reconcileStuckGenerations(sqlite);
 seedStandardObjects(sqlite);
 
 export const db = drizzle(sqlite, { schema });

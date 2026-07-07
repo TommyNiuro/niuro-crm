@@ -6,6 +6,8 @@ import { companyCreateSchema, validate } from "@/lib/validation";
 import { mergeCustomFields } from "@/lib/custom-fields";
 import { dispatchRecordEvent } from "@/lib/workflows/dispatch";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const search = searchParams.get("search");

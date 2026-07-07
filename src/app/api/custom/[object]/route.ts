@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { rawDb } from "@/db";
 import { mergeCustomFields, applyCustomFieldsFromBody } from "@/lib/custom-fields";
 
+export const dynamic = "force-dynamic";
+
 /**
  * CRUD genérico de registros de objetos 100% custom. Las filas viven en
  * custom_records (id, object_name, timestamps) y sus valores en custom_field_values

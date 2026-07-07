@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { quickReplies } from "@/db/schema";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   return NextResponse.json(db.select().from(quickReplies).all());
 }

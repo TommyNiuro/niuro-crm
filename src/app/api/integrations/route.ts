@@ -5,6 +5,8 @@ import { integrations } from "@/db/schema";
 import { getStatus } from "@/lib/whatsapp";
 import { CLAUDE_BIN } from "@/lib/claude-subprocess";
 
+export const dynamic = "force-dynamic";
+
 // Estado de integraciones con verificación EN VIVO.
 export async function GET() {
   const rows = db.select().from(integrations).all();

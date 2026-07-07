@@ -11,6 +11,8 @@ import {
 import { runProposalGeneration } from "@/lib/proposals-ai/run-generation";
 import { dispatchRecordEvent } from "@/lib/workflows/dispatch";
 
+export const dynamic = "force-dynamic";
+
 // GET /api/proposals                        -> todas (newest first)
 // GET /api/proposals?contactId=<id>         -> filtra por contacto
 // GET /api/proposals?status=<status>        -> filtra por estado
@@ -126,6 +128,14 @@ export async function POST(request: NextRequest) {
       const c = db.select().from(contacts).where(eq(contacts.id, contactId)).get();
       if (c) clientName = c.company || c.name || clientName;
     }
+    // Logo subido en el modo turbo (data URL base64): la IA no lo genera, asi
+    // que se guarda ahora y run-generation.ts lo preserva cuando pisa `client`
+    // con el resultado de la IA (ver ese archivo).
+    const logoSrc = str(body.logoSrc);
+    // Clausula de incorporacion directa al payroll marcada en el modo turbo
+    // (solo staff-aug, 17% anualizado pago unico). Se guarda como pricing
+    // placeholder; run-generation.ts la preserva cuando la IA pisa `pricing`.
+    const absorption = mode === "staff-aug" && body.absorption === true;
     const now = new Date();
     const created = db
       .insert(proposals)
@@ -134,7 +144,16 @@ export async function POST(request: NextRequest) {
         dealId: str(body.dealId),
         mode,
         status: "draft",
-        client: JSON.stringify({ name: clientName }),
+        client: JSON.stringify({ name: clientName, logoSrc: logoSrc ?? undefined }),
+        pricing: absorption
+          ? JSON.stringify({
+              currency: "USD",
+              monthlyMin: null,
+              monthlyMax: null,
+              iva: true,
+              absorption: { enabled: true, installments: 1 },
+            })
+          : null,
         transcript,
         notes: typeof body.notes === "string" ? body.notes : null,
         generated: false,

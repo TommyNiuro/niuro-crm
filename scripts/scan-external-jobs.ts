@@ -34,7 +34,7 @@ const SINCE_DAYS = sinceIdx > -1 ? Math.max(1, Number(process.argv[sinceIdx + 1]
 // Stacks que Niuro cubre bien — suben el score.
 const HOT_STACK_RE = /react|node|python|typescript|next\.?js|golang|\bgo\b|java\b|kotlin|swift|flutter|aws|devops|data engineer|machine learning|\bia\b|\bai\b|fullstack|full stack|backend|frontend/i;
 
-type Job = {
+export type Job = {
   id: string;
   attributes: {
     title: string;
@@ -74,7 +74,7 @@ function notify(msg: string) {
   } catch { /* sin sesión gráfica */ }
 }
 
-function scoreJob(a: Job["attributes"], stack: string[]): number {
+export function scoreJob(a: Job["attributes"], stack: string[]): number {
   let s = 40;
   const seniorityId = Number(a.seniority?.data?.id) || 0;
   if (seniorityId >= 4) s += 15;        // Senior/Expert: el perfil que Niuro provee
@@ -196,4 +196,9 @@ async function main() {
   db.close();
 }
 
-main().catch((e) => { console.error("[radar-ext] error:", e); process.exit(1); });
+// ponytail: guardado porque este módulo es el único script importado por un test
+// (src/lib/__tests__/scan-external-jobs.test.ts, solo para scoreJob/Job); el resto
+// de scripts/*.ts corre siempre vía tsx directo y no necesita el guard.
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main().catch((e) => { console.error("[radar-ext] error:", e); process.exit(1); });
+}

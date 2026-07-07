@@ -6,13 +6,40 @@ import type { ProposalRenderData, TeamMember } from "../render-types";
 import { SectionTitle } from "./SectionTitle";
 import { SectionIcons } from "../icons";
 import { defaultTeamStaff, defaultTeamSprint } from "../defaults";
+import { fmtAmount, PENDING_LABEL } from "../utils";
 
 type Props = { proposal: ProposalRenderData };
 
-function StaffRow({ t }: { t: TeamMember }) {
+/* Valor mensual del miembro. La IA NO genera value* por miembro (su schema es
+ * role/stack/modality/responsibilities), asi que sin este derive la columna
+ * "Valor mensual" salia SIEMPRE vacia en propuestas generadas. Prioridad:
+ * valueMain explicito del miembro (ediciones manuales / datos migrados) y, si
+ * no hay, el pricing global de la propuesta (base referencial + "hasta X" si
+ * hay rango, mismo formato que los PDF de referencia). */
+function staffValue(t: TeamMember, pricing: ProposalRenderData["pricing"]) {
+  if (t.valueMain) {
+    return { main: t.valueMain, mainNote: t.valueMainNote, alt: t.valueAlt, altNote: t.valueAltNote };
+  }
+  const currency = pricing?.currency ?? "USD";
+  const min = pricing?.monthlyMin;
+  const max = pricing?.monthlyMax;
+  if (!min) return { main: PENDING_LABEL as string, mainNote: undefined, alt: undefined, altNote: undefined };
+  if (max && max > min) {
+    return {
+      main: `${fmtAmount(min, currency)} + IVA`,
+      mainNote: "/ mes (base referencial)",
+      alt: `Hasta ${fmtAmount(max, currency)} + IVA`,
+      altNote: "/ mes (segun perfil final)",
+    };
+  }
+  return { main: `${fmtAmount(min, currency)} + IVA`, mainNote: "/ mes", alt: undefined, altNote: undefined };
+}
+
+function StaffRow({ t, pricing }: { t: TeamMember; pricing: ProposalRenderData["pricing"] }) {
   const responsibilities = Array.isArray(t.responsibilities)
     ? t.responsibilities
     : [t.responsibilities];
+  const value = staffValue(t, pricing);
   return (
     <tr>
       <td>
@@ -30,17 +57,17 @@ function StaffRow({ t }: { t: TeamMember }) {
       </td>
       <td>
         <div className="bold" style={{ color: "var(--cobalt)", fontSize: "13px" }}>
-          {t.valueMain ?? ""}
+          {value.main}
         </div>
-        {t.valueMainNote && <div className="text-xs text-muted">{t.valueMainNote}</div>}
-        {t.valueAlt && (
+        {value.mainNote && <div className="text-xs text-muted">{value.mainNote}</div>}
+        {value.alt && (
           <>
             <div style={{ margin: "6px 0", borderTop: "1px solid var(--bord-soft)" }} />
             <div className="bold" style={{ color: "var(--cobalt)", fontSize: "13px" }}>
-              {t.valueAlt}
+              {value.alt}
             </div>
-            {t.valueAltNote && (
-              <div className="text-xs text-muted">{t.valueAltNote}</div>
+            {value.altNote && (
+              <div className="text-xs text-muted">{value.altNote}</div>
             )}
           </>
         )}
@@ -108,7 +135,11 @@ export function TeamSection({ proposal }: Props) {
         </thead>
         <tbody>
           {team.map((t, i) =>
-            isSprint ? <SprintRow key={i} t={t} /> : <StaffRow key={i} t={t} />,
+            isSprint ? (
+              <SprintRow key={i} t={t} />
+            ) : (
+              <StaffRow key={i} t={t} pricing={proposal.pricing} />
+            ),
           )}
         </tbody>
       </table>

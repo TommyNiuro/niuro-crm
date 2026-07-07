@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getStatus } from "@/lib/whatsapp";
 
+export const dynamic = "force-dynamic";
+
 /**
  * Endpoint compacto para el watchdog. Devuelve 200 si todo OK, 503 si bridge caido.
  * El watchdog (scripts/watchdog-bridge.sh) lo consume cada 2 min.

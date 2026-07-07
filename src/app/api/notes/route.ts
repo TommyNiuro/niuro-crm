@@ -3,6 +3,8 @@ import { db } from "@/db";
 import { notes } from "@/db/schema";
 import { and, eq, desc } from "drizzle-orm";
 
+export const dynamic = "force-dynamic";
+
 // GET /api/notes?targetType=&targetId=  → notas del registro, mas recientes primero.
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);

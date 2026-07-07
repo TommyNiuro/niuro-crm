@@ -8,12 +8,13 @@
  * ahí crea su store/ (messages.db + whatsapp.db). Autoconfiguramos las settings
  * whatsapp_* para que el resto del CRM (getStatus, sync-wa) encuentre esas DBs.
  */
+import { randomBytes } from "crypto";
 import { spawn } from "child_process";
 import fs from "fs";
 import path from "path";
 import { dataDir } from "@/lib/paths";
-import { writeSettings } from "@/lib/settings";
-import { getSince } from "@/lib/whatsapp";
+import { readSettings, writeSettings } from "@/lib/settings";
+import { getSince, getBridgeAuthToken } from "@/lib/whatsapp";
 
 // Puerto propio y poco común: el 8080 (http-alt) lo usan mil servicios (incluida
 // la instancia de producción auto-crm en la misma Mac), y si está ocupado el
@@ -39,12 +40,27 @@ export type QrState = { status: string; code?: string };
 /** Consulta el estado de pairing del bridge. null si el bridge no responde. */
 export async function getQr(): Promise<QrState | null> {
   try {
-    const res = await fetch(`${BRIDGE_URL}/api/qr`, { cache: "no-store" });
+    const res = await fetch(`${BRIDGE_URL}/api/qr`, {
+      cache: "no-store",
+      headers: { "X-Bridge-Token": getBridgeAuthToken() },
+    });
     if (!res.ok) return null;
     return (await res.json()) as QrState;
   } catch {
     return null;
   }
+}
+
+/** Token compartido con el bridge (ver requireAuth en bridge/main.go): se
+ *  genera UNA vez y se persiste en crm_settings, para que sobreviva a
+ *  reinicios del bridge y del CRM (auditoría 2026-07-04: el REST del bridge
+ *  no tenía ninguna auth). */
+function ensureBridgeAuthToken(): string {
+  const existing = readSettings(["bridge_auth_token"]).bridge_auth_token;
+  if (existing) return existing;
+  const token = randomBytes(32).toString("hex");
+  writeSettings({ bridge_auth_token: token });
+  return token;
 }
 
 /**
@@ -76,7 +92,12 @@ export async function ensureBridge(): Promise<{ running: boolean; error?: string
   try {
     const child = spawn(bin, [], {
       cwd,
-      env: { ...process.env, BRIDGE_PORT, WHATSAPP_SINCE: getSince() },
+      env: {
+        ...process.env,
+        BRIDGE_PORT,
+        WHATSAPP_SINCE: getSince(),
+        BRIDGE_AUTH_TOKEN: ensureBridgeAuthToken(),
+      },
       detached: true, // sobrevive al request; el bridge es un daemon
       stdio: "ignore",
     });

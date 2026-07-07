@@ -3,6 +3,8 @@ import { db } from "@/db";
 import { pipelineStages, contacts } from "@/db/schema";
 import { eq, and, asc, sql, inArray } from "drizzle-orm";
 
+export const dynamic = "force-dynamic";
+
 // CRUD de etapas multi-pipeline desde Ajustes. Tres pipelines:
 //   prospectos (ventas, contact_type='lead') | clientes ('client') | ingenieros ('engineer')
 // Los contactos y tareas referencian la etapa POR NOMBRE, así que renombrar

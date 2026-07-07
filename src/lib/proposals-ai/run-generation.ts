@@ -40,14 +40,49 @@ export async function runProposalGeneration(id: string): Promise<void> {
       mode: row.mode as FullGenerateMode,
     });
 
+    // El logo se subio al crear (modo turbo) y vive en el placeholder de
+    // `client`; la IA no lo genera, asi que hay que preservarlo al pisar
+    // `client` con el resultado (si no, un logo ya subido desaparecia al
+    // terminar la generacion).
+    let existingLogoSrc: string | undefined;
+    try {
+      const existingClient = JSON.parse(row.client) as { logoSrc?: string };
+      existingLogoSrc = existingClient.logoSrc;
+    } catch {
+      existingLogoSrc = undefined;
+    }
+
+    // Idem con la clausula de payroll marcada al crear: vive en el pricing
+    // placeholder y la IA no la conoce, asi que se re-inyecta en el pricing
+    // generado (o en uno vacio si la IA no encontro montos).
+    let existingAbsorption: { enabled: boolean; installments: number } | undefined;
+    try {
+      const existingPricing = JSON.parse(row.pricing ?? "{}") as {
+        absorption?: { enabled: boolean; installments: number };
+      };
+      existingAbsorption = existingPricing.absorption;
+    } catch {
+      existingAbsorption = undefined;
+    }
+    const pricingOut = result.pricing
+      ? existingAbsorption
+        ? { ...result.pricing, absorption: existingAbsorption }
+        : result.pricing
+      : existingAbsorption
+        ? { currency: "USD", monthlyMin: null, monthlyMax: null, iva: true, absorption: existingAbsorption }
+        : null;
+
     const now = new Date();
     db.update(proposals)
       .set({
-        // El cliente generado por la IA reemplaza el placeholder del contacto.
-        client: JSON.stringify(result.client),
+        // El cliente generado por la IA reemplaza el placeholder del contacto,
+        // preservando el logo si ya se habia subido.
+        client: JSON.stringify(
+          existingLogoSrc ? { ...result.client, logoSrc: existingLogoSrc } : result.client,
+        ),
         role: result.role ?? null,
         duration: result.duration ?? null,
-        pricing: result.pricing ? JSON.stringify(result.pricing) : null,
+        pricing: pricingOut ? JSON.stringify(pricingOut) : null,
         summary: result.summary || null,
         context: JSON.stringify(result.context),
         cards: JSON.stringify(result.cards),

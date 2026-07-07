@@ -33,6 +33,11 @@ export const REPLACEMENTS: Record<string, string> = {
   profundamente: "mucho",
   seamless: "fluido",
   adicionalmente: "además",
+  fundamental: "esencial",
+  panorama: "contexto",
+  outsourcing: "colaboración",
+  reclutamiento: "búsqueda de talento",
+  reclutador: "especialista en talento",
 };
 
 /**
@@ -49,6 +54,11 @@ export function cleanVoice(text: string): string {
     cleaned = cleaned.replace(re, good);
   }
   cleaned = cleaned.replace(/\s—\s/g, ": ").replace(/—/g, ",");
+  // Negrita markdown -> <strong>: el renderer espera HTML inline. Haiku a veces
+  // devuelve **texto** aunque el prompt pida <strong>, y los asteriscos
+  // aparecian literales en el documento (detectado 2026-07-05 con la
+  // generacion rapida en paralelo).
+  cleaned = cleaned.replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>");
   return cleaned;
 }
 

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { rawDb } from "@/db";
 
+export const dynamic = "force-dynamic";
+
 // CRUD de workflows (b4-engine). steps/trigger_config se guardan como JSON TEXT.
 // Sin Drizzle: usa rawDb (mismo patrón que el metadata engine). Timestamps en
 // SEGUNDOS (Math.floor(Date.now()/1000)).

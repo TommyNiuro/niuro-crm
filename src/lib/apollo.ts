@@ -8,6 +8,7 @@
  * email/teléfono, se devuelve lo que haya (campos null), no se inventa.
  */
 import { readSettings } from "@/lib/settings";
+import { logger } from "@/lib/logger";
 
 const API = "https://api.apollo.io/api/v1";
 
@@ -80,7 +81,8 @@ export async function resolveDomain(company: string): Promise<string | null> {
       per_page: 1,
     });
     return res.organizations?.[0]?.primary_domain || null;
-  } catch {
+  } catch (err) {
+    logger.warn("apollo", "resolveDomain fallo, sigue con busqueda por nombre", { error: String(err) });
     return null; // best-effort: si falla, se sigue con búsqueda por nombre
   }
 }

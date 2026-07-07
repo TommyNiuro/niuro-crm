@@ -94,6 +94,33 @@ export function createSession(): string {
   return token;
 }
 
+// TTL corto: alcanza para un render (Playwright navega, espera fuentes, saca
+// el PDF/HTML y cierra). No es un login real del operador: sin appendAudit,
+// para no ensuciar el log de auth con una entrada por cada export.
+const INTERNAL_RENDER_SESSION_TTL_MS = 2 * 60 * 1000;
+
+/**
+ * Sesion efimera para llamadas internas server-to-server (Playwright
+ * renderizando /proposals/[id]/print para el PDF o el HTML standalone). Sin
+ * esto, el middleware de auth bloquea esa navegacion (browser headless sin
+ * cookie) y el render sale vacio ("No se pudo cargar la propuesta").
+ */
+export function createInternalRenderSession(): string {
+  const token = crypto.randomBytes(32).toString("hex");
+  const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+  const now = Date.now();
+  const db = openDb();
+  try {
+    db.prepare("DELETE FROM auth_sessions WHERE expires_at < ?").run(now);
+    db.prepare(
+      "INSERT INTO auth_sessions (id, token_hash, created_at, expires_at) VALUES (?, ?, ?, ?)"
+    ).run(crypto.randomUUID(), tokenHash, now, now + INTERNAL_RENDER_SESSION_TTL_MS);
+  } finally {
+    db.close();
+  }
+  return token;
+}
+
 export function verifySessionToken(token: string | undefined | null): boolean {
   if (!token) return false;
   const tokenHash = crypto.createHash("sha256").update(token).digest("hex");

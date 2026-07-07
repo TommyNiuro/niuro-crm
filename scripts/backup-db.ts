@@ -27,6 +27,22 @@ import { dbPath } from "../src/lib/paths";
 const DEST_DIR = path.join(os.homedir(), "niuro", "backups", "crm");
 const KEEP = 14;
 
+/**
+ * Rotación pura: dado un listado de backups (nombre + mtime) y cuántos
+ * conservar, devuelve los nombres a borrar (los más viejos primero).
+ * Sin fs: testeable sin tocar disco.
+ */
+export function selectBackupsToDelete(
+  files: { name: string; mtime: number }[],
+  keep: number
+): string[] {
+  return files
+    .slice()
+    .sort((a, b) => b.mtime - a.mtime)
+    .slice(keep)
+    .map((f) => f.name);
+}
+
 function notifyFail(msg: string): never {
   console.error(`[db-backup] ERROR: ${msg}`);
   try {
@@ -74,11 +90,10 @@ async function main() {
   // Rotación: conservar las KEEP más recientes.
   const files = readdirSync(DEST_DIR)
     .filter((f) => f.startsWith("crm-") && f.endsWith(".db.gz"))
-    .map((f) => ({ f, t: statSync(path.join(DEST_DIR, f)).mtimeMs }))
-    .sort((a, b) => b.t - a.t);
-  for (const old of files.slice(KEEP)) {
-    unlinkSync(path.join(DEST_DIR, old.f));
-    console.log(`[db-backup] rotado: ${old.f}`);
+    .map((f) => ({ name: f, mtime: statSync(path.join(DEST_DIR, f)).mtimeMs }));
+  for (const name of selectBackupsToDelete(files, KEEP)) {
+    unlinkSync(path.join(DEST_DIR, name));
+    console.log(`[db-backup] rotado: ${name}`);
   }
   const remaining = Math.min(files.length, KEEP);
 
@@ -86,4 +101,8 @@ async function main() {
   console.log(`[db-backup] OK: ${path.basename(gz)} (${sizeKb} KB) — ${remaining} copias en ${DEST_DIR}`);
 }
 
-main().catch((e) => notifyFail(e instanceof Error ? e.message : String(e)));
+// ponytail: no correr main() al importar el módulo desde tests (Vitest importa
+// selectBackupsToDelete de acá; sin el gate, main() pisaba data/crm.db real).
+if (!process.env.VITEST) {
+  main().catch((e) => notifyFail(e instanceof Error ? e.message : String(e)));
+}

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getMessages, dbExists } from "@/lib/whatsapp";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(request: NextRequest) {
   if (!dbExists()) {
     return NextResponse.json(

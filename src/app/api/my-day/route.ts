@@ -3,6 +3,8 @@ import { db } from "@/db";
 import { contacts, tasks, leadCandidates, groupOpportunities } from "@/db/schema";
 import { desc, eq, not } from "drizzle-orm";
 
+export const dynamic = "force-dynamic";
+
 // GET /api/my-day — lista única y priorizada de acciones del día.
 // Prioridad: tareas vencidas → tareas de hoy → leads calientes sin trabajar
 // → oportunidades nuevas del radar → contactos activos sin próximo paso.

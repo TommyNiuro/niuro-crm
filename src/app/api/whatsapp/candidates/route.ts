@@ -5,6 +5,8 @@ import { eq, and, desc, inArray, sql } from "drizzle-orm";
 import { promoteCandidate, AUTO_PROMOTE_THRESHOLD } from "@/lib/promote-lead";
 import { logger } from "@/lib/logger";
 
+export const dynamic = "force-dynamic";
+
 function isAutoPromoteEnabled(): boolean {
   const row = db.select().from(crmSettings).where(eq(crmSettings.key, "auto_promote_hot")).get();
   // Default ON

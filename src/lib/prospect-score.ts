@@ -30,11 +30,15 @@ export interface RawJob {
   seniority: string | null;
 }
 
+// Sufijos legales a sacar antes de armar una clave o un slug de empresa
+// (compartido con el slug de LinkedIn en linkedin-mcp.ts).
+export const LEGAL_SUFFIX_RE = /\b(inc|llc|ltd|ltda|s\.?a\.?|s\.?a\.?s\.?|spa|corp|co|gmbh|srl)\b\.?/g;
+
 /** Clave de dedup por empresa: minúsculas, sin sufijos legales ni símbolos. */
 export function companyKey(name: string): string {
   return name
     .toLowerCase()
-    .replace(/\b(inc|llc|ltd|ltda|s\.?a\.?|s\.?a\.?s\.?|spa|corp|co|gmbh|srl)\b\.?/g, "")
+    .replace(LEGAL_SUFFIX_RE, "")
     .replace(/[^a-z0-9]+/g, "")
     .trim();
 }

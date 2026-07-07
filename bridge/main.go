@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/subtle"
 	"database/sql"
 	"encoding/binary"
 	"encoding/json"
@@ -773,10 +774,34 @@ func extractDirectPathFromURL(url string) string {
 	return "/" + pathPart
 }
 
+// requireAuth exige el header X-Bridge-Token si BRIDGE_AUTH_TOKEN esta seteado.
+// El REST bindea solo a loopback (ver abajo), pero loopback no es aislamiento:
+// cualquier proceso local (u otra pestana del navegador) puede pegarle. Sin
+// token configurado (instalaciones viejas que todavia no reiniciaron el
+// bridge), no rompe nada: sigue abierto como antes (auditoria 2026-07-04).
+func requireAuth(token string, next http.HandlerFunc) http.HandlerFunc {
+	if token == "" {
+		return next
+	}
+	return func(w http.ResponseWriter, r *http.Request) {
+		got := r.Header.Get("X-Bridge-Token")
+		if subtle.ConstantTimeCompare([]byte(got), []byte(token)) != 1 {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+		next(w, r)
+	}
+}
+
 // Start a REST API server to expose the WhatsApp client functionality
 func startRESTServer(client *whatsmeow.Client, messageStore *MessageStore, port int) {
+	authToken := os.Getenv("BRIDGE_AUTH_TOKEN")
+	if authToken == "" {
+		fmt.Println("BRIDGE_AUTH_TOKEN no seteado: el REST del bridge queda sin auth (ver requireAuth)")
+	}
+
 	// Handler for sending messages
-	http.HandleFunc("/api/send", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/api/send", requireAuth(authToken, func(w http.ResponseWriter, r *http.Request) {
 		// Only allow POST requests
 		if r.Method != http.MethodPost {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -819,12 +844,12 @@ func startRESTServer(client *whatsmeow.Client, messageStore *MessageStore, port 
 			Success: success,
 			Message: message,
 		})
-	})
+	}))
 
 	// Handler for requesting older history for a specific chat
 	// POST /api/request-history-sync?jid=123456789@s.whatsapp.net
 	// Finds the oldest stored message for that chat and asks WhatsApp for messages before it.
-	http.HandleFunc("/api/request-history-sync", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/api/request-history-sync", requireAuth(authToken, func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 			return
@@ -911,10 +936,10 @@ func startRESTServer(client *whatsmeow.Client, messageStore *MessageStore, port 
 			"success": true,
 			"message": fmt.Sprintf("History sync requested for %s before %s", chatJID, ts.Format("2006-01-02 15:04:05")),
 		})
-	})
+	}))
 
 	// Handler for downloading media
-	http.HandleFunc("/api/download", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/api/download", requireAuth(authToken, func(w http.ResponseWriter, r *http.Request) {
 		// Only allow POST requests
 		if r.Method != http.MethodPost {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -962,16 +987,18 @@ func startRESTServer(client *whatsmeow.Client, messageStore *MessageStore, port 
 			Filename: filename,
 			Path:     path,
 		})
-	})
+	}))
 
 	// Pairing: el CRM lee este estado y renderiza el codigo como QR en su UI.
-	http.HandleFunc("/api/qr", func(w http.ResponseWriter, r *http.Request) {
+	// Nota: se protege igual que el resto aunque solo exponga el estado/codigo
+	// de pairing (no mensajes), para no dejar un cuarto endpoint sin auth.
+	http.HandleFunc("/api/qr", requireAuth(authToken, func(w http.ResponseWriter, r *http.Request) {
 		qrState.Lock()
 		resp := map[string]string{"status": qrState.Status, "code": qrState.Code}
 		qrState.Unlock()
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(resp)
-	})
+	}))
 
 	// Start the server. Bind to loopback only: el REST permite enviar mensajes
 	// y leer historial sin auth, asi que NUNCA debe escuchar en la LAN. ":port"

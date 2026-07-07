@@ -196,6 +196,14 @@ export interface ProposalClient {
   website?: string;
 }
 
+// Clausula opcional de incorporacion directa al payroll (solo staff-aug): si
+// el cliente quiere quedarse con el ingeniero, paga un % del valor anualizado
+// del contrato. installments: en cuantas cuotas se paga esa compensacion.
+export interface ProposalAbsorption {
+  enabled: boolean;
+  installments: 1 | 3 | 5;
+}
+
 // Pricing discriminado por mode. Guardado en proposals.pricing (JSON).
 // staff-aug: rango mensual. sprint: total cerrado con fecha de inicio.
 export type ProposalPricing =
@@ -204,6 +212,7 @@ export type ProposalPricing =
       monthlyMin: number | null;
       monthlyMax: number | null;
       iva: boolean;
+      absorption?: ProposalAbsorption;
     }
   | {
       currency: string;
@@ -255,4 +264,69 @@ export interface ProposalTeamMember {
 export interface ProposalRisk {
   title: string;
   body: string;
+}
+
+// ============================================================================
+// Job Descriptions (Descripciones de Cargo)
+// Motor espejo de propuestas: transcripción -> JD profesional en PDF (máx 3 págs).
+// El contenido editorial se guarda como columnas JSON en job_descriptions.
+// ============================================================================
+
+export type JobDescriptionStatus = "draft" | "sent" | "archived";
+
+// Nivel de plantilla (controla qué secciones genera la IA y su profundidad).
+// compact: lo esencial (1-2 págs). intermediate: default (2-3 págs, con pitch,
+// indicadores, power skills, qué no, por qué). full: intermediate + sobre-empresa
+// en 2 párrafos + onboarding 30/60/90 (3 págs, estilo CER sin proceso de selección).
+export type JobDescriptionTemplate = "compact" | "intermediate" | "full";
+
+// Empresa del cargo. job_descriptions.client (JSON, NOT NULL). Mismo shape que
+// ProposalClient para reusar el patrón de logo/initial. country define la moneda.
+export interface JobDescriptionClient {
+  name: string;
+  industry?: string;
+  country?: string;
+  initial?: string;
+  logoColor?: string;
+  logoSrc?: string;
+  website?: string;
+}
+
+// Tabla de condiciones (chips duros arriba del documento). Solo se muestran las
+// celdas con dato real; los huecos quedan "(por confirmar)" y se cierran por chat.
+export interface JobDescriptionConditions {
+  location?: string;
+  compensation?: string; // explícito con moneda: "$4.500.000 CLP líquidos" o "USD 6,000"
+  dedication?: string;
+  modality?: string;
+  reportsTo?: string;
+  teamSize?: string;
+}
+
+// Perfil buscado. job_descriptions.profile (JSON). indispensable vs deseable
+// separados: de eso depende el universo de candidatos.
+export interface JobDescriptionProfile {
+  experience: string; // prosa: años, tipo de roles previos, contexto
+  stackMust: string[]; // indispensable (no negociable)
+  stackNice: string[]; // deseable (suma, no excluye)
+}
+
+// OPCIONAL: indicadores de éxito, en tabla de ejes.
+export interface JobDescriptionSuccessIndicator {
+  axis: string; // ej "Backlog", "Negocio", "Producto"
+  meaning: string; // qué significa cumplir en ese eje
+}
+
+// OPCIONAL: plan de onboarding 30/60/90 (off por defecto).
+export interface JobDescriptionOnboarding {
+  d30: string;
+  d60: string;
+  d90: string;
+}
+
+// Análisis de viabilidad de mercado (Frankenstein). SOLO conversación interna
+// con Tomás: se muestra en el detalle/chat, NUNCA se renderiza en el PDF.
+export interface JobDescriptionViability {
+  status: "viable" | "warning";
+  note: string; // si warning: qué se cruza, impacto y alternativa de aterrizaje
 }

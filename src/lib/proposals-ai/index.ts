@@ -17,13 +17,16 @@
  * NO guarda en DB: eso lo hace el modulo API (Agente B). Devuelve el JSON listo.
  */
 import { callLLM } from "@/lib/proposals-ai/client";
+import { FAST_MODEL } from "@/lib/claude-subprocess";
 import { getVoiceRules } from "@/lib/proposals-ai/voice";
 import { cleanObject } from "@/lib/proposals-ai/voice-sanitizer";
 import {
   buildFullGeneratePrompts,
+  buildFullGenerateChunkPrompts,
   calcMilestones,
   compressIfNeeded,
   type FullGenerateMode,
+  type FullGenerateChunk,
   type Milestone,
 } from "@/lib/proposals-ai/prompts/full-generate";
 import type {
@@ -244,8 +247,59 @@ export function findMissingFields(result: GeneratedProposal): string[] {
 /**
  * Genera el contenido editorial de una propuesta a partir de una transcripcion.
  * No persiste nada: devuelve el shape tipado listo para que el modulo API lo guarde.
+ *
+ * Estrategia de velocidad (2026-07-05): el camino RAPIDO corre 3 llamadas
+ * Haiku EN PARALELO (core / cards / plan): el wall time pasa de ~4 min
+ * (una sola llamada Sonnet con TODO el output en serie) a ~30-60s. Si el
+ * camino rapido falla por lo que sea (parse, completitud, timeout), cae al
+ * camino original (Sonnet, una llamada) sin intervencion del usuario: el peor
+ * caso es exactamente el comportamiento de antes.
  */
 export async function generateProposal(
+  args: GenerateProposalArgs,
+): Promise<GeneratedProposal> {
+  try {
+    return await generateProposalFast(args);
+  } catch (e) {
+    console.error(
+      "[proposals-ai] camino rapido (Haiku paralelo) fallo, fallback a Sonnet:",
+      e instanceof Error ? e.message : e,
+    );
+    return await generateProposalSingle(args);
+  }
+}
+
+/** Camino rapido: 3 bloques en paralelo con el modelo rapido (Haiku). */
+async function generateProposalFast(
+  args: GenerateProposalArgs,
+): Promise<GeneratedProposal> {
+  const { transcript, notes, mode } = args;
+  const compressed = await compressIfNeeded(transcript, notes);
+  const voiceRules = getVoiceRules();
+  const input = {
+    transcript: compressed.transcript,
+    notes: compressed.notes,
+    mode,
+    compressed: compressed.compressed,
+  };
+
+  const chunks: FullGenerateChunk[] = ["core", "cards", "plan"];
+  const parts = await Promise.all(
+    chunks.map((chunk) => {
+      const { system, user } = buildFullGenerateChunkPrompts(input, voiceRules, chunk);
+      // Timeout por bloque: cada uno es ~1/3 del output total. 240s es holgado
+      // (esperado ~20-40s con Haiku) sin arriesgar cortar una cola de semaforo.
+      return callLLM<RawLLMProposal>({ system, user, model: FAST_MODEL, timeoutMs: 240_000 });
+    }),
+  );
+
+  // Merge de los 3 bloques (claves disjuntas por diseño del schema).
+  const rawContent: RawLLMProposal = { ...parts[0], ...parts[1], ...parts[2] };
+  return postProcess(rawContent, mode);
+}
+
+/** Camino original (fallback): una sola llamada Sonnet con el schema completo. */
+async function generateProposalSingle(
   args: GenerateProposalArgs,
 ): Promise<GeneratedProposal> {
   const { transcript, notes, mode } = args;
@@ -270,10 +324,17 @@ export async function generateProposal(
   // 4. Llamada al modelo (Claude CLI, JSON robusto).
   const rawContent = await callLLM<RawLLMProposal>({ system, user });
 
-  // 5-8. Post-proceso. Si algo falla (sanitizado, normalizacion o el check de
-  // completitud), preservamos el rawContent caro (varios minutos de Sonnet)
-  // adjuntandolo al error: run-generation lo escribe a disco para no perder el
-  // trabajo y poder re-parsear sin re-generar.
+  return postProcess(rawContent, mode);
+}
+
+// Post-proceso compartido por ambos caminos. Si algo falla (sanitizado,
+// normalizacion o el check de completitud), preserva el rawContent caro
+// adjuntandolo al error: run-generation lo escribe a disco para no perder el
+// trabajo y poder re-parsear sin re-generar.
+function postProcess(
+  rawContent: RawLLMProposal,
+  mode: FullGenerateMode,
+): GeneratedProposal {
   try {
     // 5. Sanitizado de voz recursivo (cero guiones largos, dict de reemplazos).
     const clean = cleanObject(rawContent);
@@ -342,3 +403,18 @@ export type {
   FullGenerateMode,
   Milestone,
 } from "@/lib/proposals-ai/prompts/full-generate";
+
+// Normalizadores reusados por el endpoint de refine (merge granular de un
+// patch parcial sobre una propuesta existente, sin re-normalizar desde cero).
+export {
+  normClient,
+  normCards,
+  normRoadmapPhase,
+  normTeamMember,
+  normRisk,
+  normPricing,
+  asString,
+  asStringArray,
+  asOptString,
+};
+export type { RawLLMProposal };

@@ -3,6 +3,8 @@ import { db } from "@/db";
 import { imageLeads } from "@/db/schema";
 import { desc, eq, ne } from "drizzle-orm";
 
+export const dynamic = "force-dynamic";
+
 type ImageLeadRow = typeof imageLeads.$inferSelect;
 
 const VALID_STATUS = ["analyzing", "ready", "approved", "dismissed"];

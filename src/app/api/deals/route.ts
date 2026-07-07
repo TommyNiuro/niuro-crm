@@ -7,6 +7,8 @@ import { mergeCustomFields } from "@/lib/custom-fields";
 import { dispatchRecordEvent } from "@/lib/workflows/dispatch";
 import { mirrorDealsToContact } from "@/lib/deal-sync";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(request: NextRequest) {
   // Papelera (b7): por defecto solo vivos; ?deleted=1 lista solo los borrados.
   const deleted = new URL(request.url).searchParams.get("deleted") === "1";

@@ -3,6 +3,8 @@ import { db } from "@/db";
 import { contacts, leadCandidates } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
+export const dynamic = "force-dynamic";
+
 /**
  * Mapa de enlaces WhatsApp ↔ CRM: para cada chat, indica si ya es un contacto
  * y/o un candidato pendiente. Lo usan el inbox y la lista de leads para mostrar

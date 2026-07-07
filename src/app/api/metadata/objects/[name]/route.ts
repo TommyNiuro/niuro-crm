@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { rawDb } from "@/db";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ name: string }> }

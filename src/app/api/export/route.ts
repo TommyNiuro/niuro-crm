@@ -6,6 +6,8 @@ import { formatDate, formatCurrency } from "@/lib/constants";
 import { SOURCE_LABELS } from "@/lib/constants";
 import type { LeadSource } from "@/types";
 
+export const dynamic = "force-dynamic";
+
 function escapeCSV(value: string | null | undefined): string {
   if (value === null || value === undefined) return "";
   let str = String(value);

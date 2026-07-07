@@ -4,6 +4,8 @@ import { prospects } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { serializeProspect } from "@/lib/prospect-serialize";
 
+export const dynamic = "force-dynamic";
+
 const VALID_STATUS = ["new", "enriched", "contacted", "conversation", "discarded"];
 
 // Campos editables desde la UI (edición inline del record-view + acciones).

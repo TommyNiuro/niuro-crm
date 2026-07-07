@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { rawDb } from "@/db";
 
+export const dynamic = "force-dynamic";
+
 interface Row {
   id: string;
   type: string;

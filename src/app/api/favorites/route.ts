@@ -3,6 +3,8 @@ import { db } from "@/db";
 import { favorites } from "@/db/schema";
 import { and, eq, asc } from "drizzle-orm";
 
+export const dynamic = "force-dynamic";
+
 // GET /api/favorites  → todos los favoritos, en orden de position.
 export async function GET() {
   const rows = db.select().from(favorites).orderBy(asc(favorites.position), asc(favorites.createdAt)).all();

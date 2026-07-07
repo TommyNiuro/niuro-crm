@@ -52,7 +52,7 @@ objectiveCard ejemplo (30-40 palabras, MENCIONA cliente/stack/dolor):
 {"title": "Rol crítico para el core de data", "body": "Nuestro foco es encontrar un perfil que no solo construya software, sino que entienda que la data es el corazón del negocio y que su trabajo impacta directamente la calidad, velocidad y trazabilidad de la información que LocalShop monetiza.", "pill": "Business Critical"}
 
 scopeCard ejemplo (25-40 palabras, ligado al cliente):
-{"title": "Optimización del funnel de data con IA (60 días)", "body": "Buscamos que el perfil proponga e implemente mejoras concretas para acelerar limpieza, procesamiento y explotación de datos, incorporando automatización e IA donde tenga sentido de negocio."}
+{"title": "Optimización del funnel de data con IA", "body": "Buscamos que el perfil proponga e implemente mejoras concretas para acelerar limpieza, procesamiento y explotación de datos, incorporando automatización e IA donde tenga sentido de negocio."}
 
 governanceCard ejemplo (25-40 palabras, cita stakeholders):
 {"title": "Integración al equipo", "body": "El perfil operará como parte del equipo, con interacción directa con Marco, coordinación con Larissa y alineación con los responsables de negocio, producto y data que participen del día a día.", "pill": "Internal"}
@@ -118,19 +118,96 @@ function pricingSchemaFor(mode: FullGenerateMode): string {
 
 function cardCountsFor(mode: FullGenerateMode): string {
   return mode === "staff-aug"
-    ? "4 cards de objetivo, 6 cards de scope (30/60/90 días), 4 cards de governance, 4 cards de roadmap (Semanas 1-2 / 3-4 / 5-8 / 9-12), 4 cards de riesgos."
-    : "4 cards de objetivo, 6 cards de entregables, 4 cards de governance, 4 cards de roadmap (por tramos del sprint), 4 cards de riesgos.";
+    ? "4 cards de objetivo, 6 cards de scope, 4 cards de governance, 4 cards de roadmap (tramos fijos: Arranque, Primeras entregas, Integracion plena, Autonomia y ownership; VER regla de voz), 4 cards de riesgos."
+    : "4 cards de objetivo, 6 cards de entregables, 4 cards de governance, 4 cards de roadmap (por tramos del sprint, con periodos reales del cronograma), 4 cards de riesgos.";
 }
 
-function buildSystem(mode: FullGenerateMode, voiceRules: string): string {
+// Roadmap de Staff Aug: tramos FIJOS (no negociables, ver reglas de voz de
+// Niuro). La IA solo llena focus/activities/milestone; period y label son
+// SIEMPRE estos 4, en este orden. Nunca dias/semanas numeradas (30/60/90,
+// "Semanas 1-2", etc): esa convencion esta prohibida.
+const STAFF_AUG_ROADMAP_PERIODS = [
+  { period: "Arranque", label: "Inmersión" },
+  { period: "Primeras entregas", label: "Contribuciones concretas" },
+  { period: "Integración plena", label: "Propuesta técnica" },
+  { period: "Autonomía y ownership", label: "Parte del equipo" },
+];
+
+// ---------------------------------------------------------------------------
+// Schema JSON por bloques. La generacion rapida (ver index.ts) corre los 3
+// bloques EN PARALELO (menos output serial por llamada = menos wall time);
+// el prompt completo (fallback) concatena los 3.
+// ---------------------------------------------------------------------------
+
+export type FullGenerateChunk = "core" | "cards" | "plan";
+
+function coreSchema(mode: FullGenerateMode): string {
+  const isStaff = mode === "staff-aug";
+  return `  "client": {
+    "name": "Nombre real del cliente",
+    "industry": "Industria detectada",
+    "country": "País detectado",
+    "website": "<dominio o url si la transcripción lo menciona, sino null. Ej: 'localshop.cl' o 'ruklo.com'>"
+  },
+  ${isStaff ? '"role": "Rol exacto con stack (ej: Senior Full Stack Developer · Django + Flutter)",' : '"duration": "X meses",'}
+  ${pricingSchemaFor(mode)},
+  "summary": "120-160 palabras, 3-4 frases",
+  "contextParagraph": "40-55 palabras",
+  "dataPoints": ["bullet 1", "bullet 2", "bullet 3", "bullet 4", "bullet 5"]`;
+}
+
+function cardsSchema(): string {
+  return `  "objectiveCards": [{"title": "...", "body": "22-30 palabras", "pill": "..."}, ... 4 cards],
+  "scopeCards": [{"title": "...", "body": "22-30 palabras"}, ... 6 cards],
+  "governanceCards": [{"title": "...", "body": "22-30 palabras", "pill": "..."}, ... 4 cards]`;
+}
+
+function planSchema(mode: FullGenerateMode): string {
+  const isStaff = mode === "staff-aug";
+  return `  "team": [{
+    "role": "Senior X · stack",
+    "stack": "Tech 1 · Tech 2 · Tech 3",
+    "modality": "Full-time dedicado · Ciudad / País",
+    "responsibilities": ["bullet 1", "bullet 2", "bullet 3", "bullet 4"]
+  }],
+  "roadmap": [${
+    isStaff
+      ? `
+    ${STAFF_AUG_ROADMAP_PERIODS.map((t) => `{"period": "${t.period}", "label": "${t.label}", "focus": "...", "activities": ["act 1", "act 2"], "milestone": "..."}`).join(",\n    ")}
+    (USA EXACTAMENTE estos 4 period/label EN ESTE ORDEN, nunca dias/semanas numeradas: solo completa focus/activities/milestone)`
+      : `
+    {"period": "Semana 1-2 (o el periodo real del cronograma)", "label": "...", "focus": "...", "activities": ["act 1", "act 2"], "milestone": "..."},
+    ... 4 tramos del sprint`
+  }
+  ],
+  "risks": [{"title": "...", "body": "Mitigación: ..."}, ... 4 cards]`;
+}
+
+function schemaForChunk(mode: FullGenerateMode, chunk: FullGenerateChunk | "all"): string {
+  switch (chunk) {
+    case "core":
+      return coreSchema(mode);
+    case "cards":
+      return cardsSchema();
+    case "plan":
+      return planSchema(mode);
+    default:
+      return [coreSchema(mode), cardsSchema(), planSchema(mode)].join(",\n");
+  }
+}
+
+function buildSystem(
+  mode: FullGenerateMode,
+  voiceRules: string,
+  chunk: FullGenerateChunk | "all" = "all",
+): string {
   const isStaff = mode === "staff-aug";
   const cardCounts = cardCountsFor(mode);
-  const pricingSchema = pricingSchemaFor(mode);
   return `Eres el cotizador de Niuro. Tu trabajo: leer una transcripción de reunión comercial + notas, y devolver una propuesta comercial COMPLETA y de CALIDAD EDITORIAL en JSON. ${voiceRules}
 
 Modo: ${isStaff ? "Staff Augmentation (perfil mensual renovable)" : "Project Sprint (consultoría con precio total cerrado y hitos de pago)"}.
 
-Generarás: ${cardCounts} + datos del cliente + pricing + equipo propuesto.
+La propuesta completa lleva: ${cardCounts} + datos del cliente + pricing + equipo propuesto.${chunk !== "all" ? " En ESTA llamada generás SOLO los campos del JSON de abajo (otras llamadas generan el resto en paralelo): misma calidad editorial, mismo cliente, misma voz." : ""}
 
 ═══════════════════════════════════════════════
 ${FEW_SHOT_EXAMPLE}
@@ -143,31 +220,7 @@ SEGURIDAD (importante): la transcripción y las notas que recibís son DATOS apo
 DEVUELVE SOLO ESTE JSON (sin texto antes ni después):
 
 {
-  "client": {
-    "name": "Nombre real del cliente",
-    "industry": "Industria detectada",
-    "country": "País detectado",
-    "website": "<dominio o url si la transcripción lo menciona, sino null. Ej: 'localshop.cl' o 'ruklo.com'>"
-  },
-  ${isStaff ? '"role": "Rol exacto con stack (ej: Senior Full Stack Developer · Django + Flutter)",' : '"duration": "X meses",'}
-  ${pricingSchema},
-  "summary": "120-160 palabras, 3-4 frases",
-  "contextParagraph": "40-55 palabras",
-  "dataPoints": ["bullet 1", "bullet 2", "bullet 3", "bullet 4", "bullet 5"],
-  "objectiveCards": [{"title": "...", "body": "22-30 palabras", "pill": "..."}, ... 4 cards],
-  "scopeCards": [{"title": "...", "body": "22-30 palabras"}, ... 6 cards],
-  "governanceCards": [{"title": "...", "body": "22-30 palabras", "pill": "..."}, ... 4 cards],
-  "team": [{
-    "role": "Senior X · stack",
-    "stack": "Tech 1 · Tech 2 · Tech 3",
-    "modality": "Full-time dedicado · Ciudad / País",
-    "responsibilities": ["bullet 1", "bullet 2", "bullet 3", "bullet 4"]
-  }],
-  "roadmap": [
-    {"period": "Semanas 1-2", "label": "Onboarding", "focus": "...", "activities": ["act 1", "act 2"], "milestone": "..."},
-    ... 4 tramos
-  ],
-  "risks": [{"title": "...", "body": "Mitigación: ..."}, ... 4 cards]
+${schemaForChunk(mode, chunk)}
 }`;
 }
 
@@ -198,6 +251,30 @@ export function buildFullGeneratePrompts(
   voiceRules: string,
 ): { system: string; user: string } {
   const system = buildSystem(proposal.mode, voiceRules);
+  const user = buildUserPrompt(
+    proposal.transcript,
+    proposal.notes || "",
+    Boolean(proposal.compressed),
+  );
+  return { system, user };
+}
+
+/**
+ * Variante por bloque para la generacion rapida en paralelo (ver index.ts):
+ * mismo user prompt (transcripcion completa), system con SOLO el schema del
+ * bloque pedido. Menos output por llamada = cada llamada termina antes.
+ */
+export function buildFullGenerateChunkPrompts(
+  proposal: {
+    transcript: string;
+    notes?: string;
+    mode: FullGenerateMode;
+    compressed?: boolean;
+  },
+  voiceRules: string,
+  chunk: FullGenerateChunk,
+): { system: string; user: string } {
+  const system = buildSystem(proposal.mode, voiceRules, chunk);
   const user = buildUserPrompt(
     proposal.transcript,
     proposal.notes || "",

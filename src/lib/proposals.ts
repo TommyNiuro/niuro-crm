@@ -69,12 +69,18 @@ export interface SerializedProposal {
   priority: string | null;
   genStatus: string | null;
   genError: string | null;
+  shareToken: string | null;
   sentAt: number | null;
   signedAt: number | null;
   closedAt: number | null;
   createdAt: number;
   updatedAt: number;
 }
+
+// Nombre de archivo estandarizado para descargas: ver src/lib/proposal-filename.ts
+// (modulo separado a proposta, sin imports de @/db, para poder usarse tambien
+// desde componentes cliente).
+export { buildProposalFileName } from "@/lib/proposal-filename";
 
 // Parseo tolerante: null/"" -> null, JSON invalido -> null (no rompe el GET).
 function parseJson<T>(value: string | null): T | null {
@@ -118,6 +124,7 @@ export function serializeProposal(row: Proposal): SerializedProposal {
     priority: row.priority,
     genStatus: row.genStatus,
     genError: row.genError,
+    shareToken: row.shareToken,
     sentAt: toMs(row.sentAt),
     signedAt: toMs(row.signedAt),
     closedAt: toMs(row.closedAt),

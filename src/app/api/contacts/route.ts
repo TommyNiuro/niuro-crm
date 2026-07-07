@@ -8,6 +8,8 @@ import { mergeCustomFields } from "@/lib/custom-fields";
 import { canonicalJid, phonebookNames } from "@/lib/lid";
 import { lastChatTimes } from "@/lib/chat-times";
 
+export const dynamic = "force-dynamic";
+
 // Nombres que en realidad son un número/JID crudo (contactos importados de
 // WhatsApp sin nombre real). Solo dígitos, con separadores opcionales.
 const JID_NAME_RE = /^\+?\d[\d\s.-]{5,}$/;

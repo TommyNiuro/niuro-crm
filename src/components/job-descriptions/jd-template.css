@@ -1,0 +1,350 @@
+/* ============================================================
+   Niuro Job Description Template · v2 (rediseño 2026-07-06)
+   Documento sobrio y premium: base Warm White + cards blancas con sombra
+   suave, acentos Navy, gold puntual, subheaders en azul. Menos beige plano,
+   mas jerarquia y profundidad. Todo scopeado bajo .jd-doc. Máx 3 páginas.
+   Fuentes ya cargadas por globals.css (Host Grotesk / Inter / JetBrains Mono).
+   ============================================================ */
+
+.jd-doc {
+  --navy: #050f41;
+  --navy-2: #1b2559;
+  --gold: #ffd166;
+  --gold-deep: #b8870e;
+  --amber: #d4940a;
+  --blue: #3b5fe5;
+  --warm: #ffffff; /* fondo de pagina: blanco (pedido de Tomas, sin tinte cafe) */
+  --card: #ffffff; /* cards: se distinguen por borde + sombra sobre el blanco */
+  --parch: #f5f0e8; /* uso muy puntual */
+  --red: #dc2626;
+  --green: #16a34a;
+  --ink: #1c2333;
+  --muted: #5b6478;
+  --line: #e6e8ec; /* gris frio neutro (sin cafe) */
+
+  --fd: "Host Grotesk", "Inter", sans-serif;
+  --fb: "Inter", system-ui, sans-serif;
+  --fm: "JetBrains Mono", ui-monospace, monospace;
+
+  --shadow-sm: 0 1px 2px rgba(5, 15, 65, 0.06), 0 2px 5px rgba(5, 15, 65, 0.05);
+  --shadow: 0 1px 2px rgba(5, 15, 65, 0.05), 0 8px 20px rgba(5, 15, 65, 0.08);
+
+  font-family: var(--fb);
+  font-size: 12px;
+  line-height: 1.46;
+  color: var(--ink);
+  background: var(--warm);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.jd-doc strong {
+  color: var(--navy);
+  font-weight: 700;
+}
+
+/* ---------- Encabezado ---------- */
+.jd-doc .jd-head {
+  margin-bottom: 12px;
+  padding-bottom: 11px;
+  border-bottom: 1px solid var(--line);
+}
+.jd-doc .jd-logos {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 15px;
+}
+.jd-doc .jd-head .logo-niuro {
+  height: 30px;
+  width: auto;
+  display: block;
+}
+.jd-doc .jd-client-logo {
+  height: 40px;
+  width: auto;
+  object-fit: contain;
+}
+.jd-doc .jd-client-avatar {
+  height: 42px;
+  min-width: 42px;
+  padding: 0 13px;
+  border-radius: 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-family: var(--fd);
+  font-weight: 600;
+  font-size: 16px;
+  box-shadow: var(--shadow-sm);
+}
+.jd-doc .eyebrow {
+  font-family: var(--fm);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--amber);
+}
+.jd-doc .role-title {
+  font-family: var(--fd);
+  font-weight: 700;
+  font-size: 28px;
+  line-height: 1.06;
+  color: var(--navy);
+  margin: 9px 0 4px;
+  letter-spacing: -0.01em;
+}
+.jd-doc .company-name {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+/* ---------- Pitch (gancho de una linea) ---------- */
+.jd-doc .pitch {
+  background: color-mix(in srgb, var(--navy) 4%, var(--warm));
+  border-left: 3px solid var(--gold);
+  border-radius: 8px;
+  padding: 10px 15px;
+  margin: 13px 0 4px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--navy-2);
+  break-inside: avoid;
+}
+
+/* ---------- Tabla de condiciones como cards ---------- */
+.jd-doc .cond-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 12px 0 4px;
+  break-inside: avoid;
+}
+.jd-doc .cond-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  box-shadow: var(--shadow-sm);
+}
+.jd-doc .cond-card .label {
+  font-family: var(--fm);
+  font-size: 8.5px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.jd-doc .cond-card .value {
+  font-size: 12.5px;
+  color: var(--navy);
+  margin-top: 3px;
+  font-weight: 600;
+  line-height: 1.28;
+}
+
+/* ---------- Secciones ---------- */
+.jd-doc .section {
+  margin: 13px 0;
+}
+.jd-doc .section h2 {
+  font-family: var(--fd);
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--navy);
+  margin: 0 0 7px;
+  padding-left: 11px;
+  border-left: 3px solid var(--gold);
+  line-height: 1.14;
+  break-after: avoid;
+  letter-spacing: -0.005em;
+}
+.jd-doc .section p {
+  line-height: 1.5;
+  margin: 5px 0;
+}
+.jd-doc .subhead {
+  font-family: var(--fm);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--blue);
+  font-weight: 600;
+  margin: 12px 0 4px;
+  break-after: avoid;
+}
+
+/* ---------- Listas ---------- */
+.jd-doc .section ul {
+  list-style: none;
+  padding: 0;
+  margin: 6px 0;
+}
+.jd-doc .section li {
+  position: relative;
+  padding-left: 17px;
+  margin: 4px 0;
+  line-height: 1.4;
+  break-inside: avoid;
+}
+.jd-doc .section li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 7px;
+  width: 6px;
+  height: 6px;
+  background: var(--gold);
+  border-radius: 50%;
+}
+.jd-doc .no-block li::before {
+  background: var(--red);
+}
+
+.jd-doc .cols {
+  column-count: 2;
+  column-gap: 26px;
+}
+.jd-doc .cols ul {
+  margin: 0;
+}
+
+/* ---------- Chips de stack ---------- */
+.jd-doc .chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 6px 0;
+}
+.jd-doc .chip {
+  font-size: 11.5px;
+  font-weight: 500;
+  padding: 4px 11px;
+  border-radius: 999px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  color: var(--navy);
+  box-shadow: var(--shadow-sm);
+}
+.jd-doc .chip.nice {
+  background: transparent;
+  box-shadow: none;
+  color: var(--muted);
+  border-style: dashed;
+}
+
+/* ---------- Indicadores de exito (cards numeradas) ---------- */
+.jd-doc .indicators {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 8px 0;
+}
+.jd-doc .ind-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  padding: 12px 13px;
+  box-shadow: var(--shadow-sm);
+  break-inside: avoid;
+  display: flex;
+  gap: 10px;
+}
+.jd-doc .ind-num {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  background: var(--navy);
+  color: var(--gold);
+  font-family: var(--fd);
+  font-weight: 700;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.jd-doc .ind-axis {
+  font-weight: 700;
+  color: var(--navy);
+  font-size: 12.5px;
+}
+.jd-doc .ind-meaning {
+  color: var(--muted);
+  font-size: 11.6px;
+  line-height: 1.4;
+  margin-top: 2px;
+}
+
+/* ---------- Panel de atraccion "Por que [empresa]" ---------- */
+.jd-doc .why-panel {
+  background: color-mix(in srgb, var(--navy) 3.5%, var(--warm));
+  border: 1px solid color-mix(in srgb, var(--navy) 12%, transparent);
+  border-radius: 12px;
+  padding: 14px 16px 12px;
+  box-shadow: var(--shadow-sm);
+  break-inside: avoid;
+}
+.jd-doc .why-panel h2 {
+  border-left: none;
+  padding-left: 0;
+  margin-bottom: 6px;
+}
+
+/* ---------- Condiciones como lineas etiquetadas (labels en negrita) ---------- */
+.jd-doc .cond-lines p {
+  margin: 3px 0;
+  line-height: 1.45;
+}
+.jd-doc .cond-lines strong {
+  color: var(--navy);
+}
+
+/* ---------- Linea contractual Niuro (card sobria, sin beige) ---------- */
+.jd-doc .niuro-line {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--navy);
+  border-radius: 9px;
+  padding: 11px 15px;
+  margin: 10px 0;
+  line-height: 1.5;
+  box-shadow: var(--shadow-sm);
+  color: var(--ink);
+  break-inside: avoid;
+}
+
+/* ---------- Tabla (onboarding opcional): header navy tipo CER ---------- */
+.jd-doc table.jd-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  margin: 8px 0;
+  font-size: 11.6px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+.jd-doc table.jd-table th {
+  background: var(--navy);
+  color: #fff;
+  text-align: left;
+  padding: 8px 12px;
+  font-family: var(--fd);
+  font-weight: 600;
+}
+.jd-doc table.jd-table td {
+  padding: 8px 12px;
+  border-top: 1px solid var(--line);
+  vertical-align: top;
+  background: var(--card);
+}
+
+.jd-doc .keep {
+  break-inside: avoid;
+}
+.jd-doc .muted {
+  color: var(--muted);
+}

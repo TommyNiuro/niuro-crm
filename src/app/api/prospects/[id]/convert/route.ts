@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { prospects, contacts, tasks, activities, stepTransitions } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, or } from "drizzle-orm";
 import { getStageNames, stageCfgFor } from "@/lib/stages";
 
 // POST /api/prospects/[id]/convert → pasa el prospecto al Pipeline como lead
@@ -36,29 +36,49 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   const defaultStage = getStageNames()[0] ?? "Prospecto";
   const prospectProb = stageCfgFor(defaultStage, 0).probability;
 
+  // Evita duplicar un contacto que ya existe con el mismo email/teléfono (ej.
+  // el decisor ya estaba en el CRM de un prospecto anterior). contacts.email/
+  // phone no tienen constraint unique, así que sin esto se duplicaba
+  // silenciosamente (auditoría 2026-07-04).
+  const dupeMatch =
+    row.contactEmail || row.contactPhone
+      ? db
+          .select()
+          .from(contacts)
+          .where(
+            or(
+              row.contactEmail ? eq(contacts.email, row.contactEmail) : undefined,
+              row.contactPhone ? eq(contacts.phone, row.contactPhone) : undefined
+            )
+          )
+          .get()
+      : undefined;
+
   const contact = db.transaction((tx) => {
-    const created = tx
-      .insert(contacts)
-      .values({
-        name,
-        email: row.contactEmail,
-        phone: row.contactPhone,
-        company: row.company,
-        jobDescription: roles.join("; ") || null,
-        source: "prospeccion",
-        temperature,
-        score: row.score,
-        stage: defaultStage,
-        probability: prospectProb,
-        valueCents: 0,
-        tags: JSON.stringify(["Prospección"]),
-        notes: metaLines.join("\n"),
-        lastInteractionAt: now,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .returning()
-      .get();
+    const created =
+      dupeMatch ??
+      tx
+        .insert(contacts)
+        .values({
+          name,
+          email: row.contactEmail,
+          phone: row.contactPhone,
+          company: row.company,
+          jobDescription: roles.join("; ") || null,
+          source: "prospeccion",
+          temperature,
+          score: row.score,
+          stage: defaultStage,
+          probability: prospectProb,
+          valueCents: 0,
+          tags: JSON.stringify(["Prospección"]),
+          notes: metaLines.join("\n"),
+          lastInteractionAt: now,
+          createdAt: now,
+          updatedAt: now,
+        })
+        .returning()
+        .get();
 
     const due = new Date(now.getTime() + 2 * 86400000);
     const taskTitle = `Contactar a ${row.contactName || row.company}`;

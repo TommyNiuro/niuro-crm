@@ -5,6 +5,8 @@ import { eq, and } from "drizzle-orm";
 import { canonicalJid } from "@/lib/lid";
 import { lastChatTimes } from "@/lib/chat-times";
 
+export const dynamic = "force-dynamic";
+
 // GET /api/tasks?scope=today|open  &  ?contactId=
 // Devuelve tareas abiertas con datos del contacto (empresa y última
 // interacción REAL del chat incluidas, para la vista Tareas).

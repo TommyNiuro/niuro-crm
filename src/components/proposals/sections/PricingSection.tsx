@@ -75,7 +75,9 @@ function StaffPricing({ proposal }: Props) {
           <tr>
             <td>
               <div className="bold">Modalidad</div>
-              <div className="text-xs text-muted">Full-time dedicado</div>
+              <div className="text-xs text-muted">
+                {proposal.team?.[0]?.modality || "Full-time dedicado"}
+              </div>
             </td>
             <td>
               <ul>
@@ -83,7 +85,16 @@ function StaffPricing({ proposal }: Props) {
                   Dedicacion mensual renovable bajo estructura de staff augmentation.
                 </li>
                 <li>
-                  Esquema final de presencialidad: <Pending />.
+                  {/* Lee la modalidad real del equipo (editable por chat/editor).
+                      Antes era un <Pending /> fijo de plantilla: pedir "la
+                      modalidad es remota" por chat no cambiaba esta linea nunca. */}
+                  Esquema final de presencialidad:{" "}
+                  {proposal.team?.[0]?.modality ? (
+                    <strong>{proposal.team[0].modality}</strong>
+                  ) : (
+                    <Pending />
+                  )}
+                  .
                 </li>
               </ul>
             </td>

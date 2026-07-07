@@ -11,6 +11,8 @@ import {
 } from "@/lib/proposals";
 import { dispatchRecordEvent } from "@/lib/workflows/dispatch";
 
+export const dynamic = "force-dynamic";
+
 // GET /api/proposals/[id] -> una propuesta con los campos JSON parseados.
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

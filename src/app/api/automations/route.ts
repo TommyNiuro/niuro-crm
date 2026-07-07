@@ -3,6 +3,8 @@ import { db } from "@/db";
 import { automations, leadCandidates, contacts } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   const rows = db.select().from(automations).all();
   // Métricas reales para la automatización de detección de leads.

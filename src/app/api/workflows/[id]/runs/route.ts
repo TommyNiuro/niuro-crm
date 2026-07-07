@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { rawDb } from "@/db";
 
+export const dynamic = "force-dynamic";
+
 // Historial de runs de un workflow (b4-triggers). Más reciente primero. ?limit
 // acota (default 50, tope 200). El GET de [id] ya embebe los últimos 50; este
 // endpoint es el acceso directo paginable al historial.

@@ -61,6 +61,14 @@ export function getBridgeUrl(): string {
   return url.replace(/\/$/, "");
 }
 
+/** Token compartido con el bridge Go (bridge-manager.ts lo genera y se lo pasa
+ *  por env var al spawnearlo). Sin esto, el REST del bridge queda abierto a
+ *  cualquier proceso local (auditoría 2026-07-04). Vacío si todavía no se
+ *  generó (instalaciones viejas / bridge no arrancado desde el CRM). */
+export function getBridgeAuthToken(): string {
+  return readSettings(["bridge_auth_token"]).bridge_auth_token || "";
+}
+
 /**
  * Earliest date the CRM will consider WhatsApp data (inbox + lead capture).
  * Format YYYY-MM-DD. Stored timestamps look like "2026-01-21 09:34:01-06:00",
@@ -478,7 +486,7 @@ export async function sendMessage(recipient: string, message: string): Promise<S
   try {
     const res = await fetch(`${getBridgeUrl()}/api/send`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "X-Bridge-Token": getBridgeAuthToken() },
       body: JSON.stringify({ recipient, message }),
       signal: controller.signal,
     });

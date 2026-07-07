@@ -170,7 +170,7 @@ async function main() {
     INSERT INTO lead_candidates (id, name, phone, chat_jid, score, temperature, reason,
       next_action, source, status, last_message_at, created_at, updated_at, breakdown)
     VALUES (lower(hex(randomblob(8))), ?, ?, ?, ?, ?, ?, ?, 'whatsapp', 'pending',
-      ?, unixepoch('now')*1000, unixepoch('now')*1000, ?)
+      ?, unixepoch('now'), unixepoch('now'), ?)
     ON CONFLICT(chat_jid) DO UPDATE SET
       name=excluded.name, score=excluded.score, temperature=excluded.temperature,
       reason=excluded.reason, next_action=excluded.next_action,
@@ -212,7 +212,7 @@ async function main() {
 
       const phone = chat.jid.split("@")[0];
       const lastMsgAt = msgs[msgs.length - 1]?.timestamp
-        ? new Date(msgs[msgs.length - 1].timestamp!).getTime() : Date.now();
+        ? Math.floor(new Date(msgs[msgs.length - 1].timestamp!).getTime() / 1000) : Math.floor(Date.now() / 1000);
       const nextAction =
         result.recommendation === "save" ? "Contactar — lead calificado" :
         result.recommendation === "review" ? "Revisar conversación" : null;

@@ -4,6 +4,8 @@ import { tickets } from "@/db/schema";
 import { desc, eq } from "drizzle-orm";
 import { dispatchRecordEvent } from "@/lib/workflows/dispatch";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   return NextResponse.json(db.select().from(tickets).orderBy(desc(tickets.createdAt)).all());
 }

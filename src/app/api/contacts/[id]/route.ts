@@ -9,6 +9,8 @@ import { logActivity, diffChanges } from "@/lib/timeline";
 import { dispatchRecordEvent } from "@/lib/workflows/dispatch";
 import { syncMoneyFromContact, alignDealStage } from "@/lib/deal-sync";
 
+export const dynamic = "force-dynamic";
+
 /** Saca el nombre legible del cliente desde la columna 'client' (JSON o string). */
 function parseClientName(raw: unknown): string {
   if (typeof raw !== "string") return "Propuesta";

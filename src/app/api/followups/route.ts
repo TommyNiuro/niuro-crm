@@ -3,6 +3,8 @@ import { db } from "@/db";
 import { activities, contacts } from "@/db/schema";
 import { eq, isNull, asc } from "drizzle-orm";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   const pendingFollowups = db
     .select({

@@ -3,6 +3,15 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import {
+  DndContext,
+  DragEndEvent,
+  PointerSensor,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
 import { Avatar } from "@/components/ds";
 import { STAGE_PERDIDOS } from "@/lib/crm-ui";
 import { formatCurrency } from "@/lib/constants";
@@ -106,23 +115,28 @@ function ContactCard({
   c,
   cfg,
   lost = false,
-  dragging = false,
   showMoney = true,
   variant = "sales",
-  onDragStart,
-  onDragEnd,
   onClick,
 }: {
   c: Contact;
   cfg: Record<string, StageCfg>;
   lost?: boolean;
-  dragging?: boolean;
   showMoney?: boolean;
   variant?: "sales" | "client" | "engineer";
-  onDragStart?: () => void;
-  onDragEnd?: () => void;
   onClick: () => void;
 }) {
+  // dnd-kit en vez de drag nativo HTML5: WKWebView (la app de escritorio,
+  // Tauri en macOS) no soporta bien el drag-and-drop nativo del navegador —
+  // funcionaba en Chrome pero la tarjeta rebotaba sin más en la app
+  // (auditoría 2026-07-04). dnd-kit usa eventos de puntero, no la API nativa.
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: c.id,
+    disabled: lost,
+  });
+  const style = transform
+    ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: 50 }
+    : undefined;
   // Fuera de ventas (ingeniero/cliente) la tarjeta pierde la semántica de
   // venta: ni temperatura ni warning por falta de próximo paso (las tareas
   // llegan al mover de etapa); solo el vencimiento real es riesgo.
@@ -137,13 +151,14 @@ function ContactCard({
 
   return (
     <div
+      ref={setNodeRef}
+      style={style}
+      {...listeners}
+      {...attributes}
       role="article"
       tabIndex={0}
       aria-label={`${c.name}${c.company ? ", " + c.company : ""}${atRisk ? " — requiere accion" : ""}`}
-      draggable={!lost}
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
-      onClick={onClick}
+      onClick={() => !isDragging && onClick()}
       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(); } }}
       className={cn(
         "rounded-xl bg-card border p-3.5 transition-all select-none group",
@@ -151,7 +166,7 @@ function ContactCard({
           ? "border-border opacity-70 cursor-pointer"
           : "border-border cursor-grab hover:border-border hover:shadow-md active:cursor-grabbing",
         atRisk && "border-l-[3px] border-l-warning",
-        dragging && "opacity-40",
+        isDragging && "opacity-40",
       )}
     >
       <div className="flex items-start gap-2.5">
@@ -267,9 +282,8 @@ export function PipelineBoard({ stages, stageCfg, emptyHints, title, subtitle, t
   );
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
-  const [dragId, setDragId] = useState<string | null>(null);
-  const [overStage, setOverStage] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
   const toggleCollapse = (stage: string) =>
     setCollapsed((prev) => {
@@ -339,6 +353,13 @@ export function PipelineBoard({ stages, stageCfg, emptyHints, title, subtitle, t
       setContacts(snapshot);
       toast.error("No se pudo mover el contacto — cambio revertido");
     }
+  };
+
+  const handleDragEnd = (e: DragEndEvent) => {
+    // Sin target (soltó fuera de cualquier columna droppable, o en la
+    // columna huérfana que queda deshabilitada) no hay nada que mover.
+    if (!e.over) return;
+    move(String(e.active.id), String(e.over.id));
   };
 
   const activeContacts = contacts.filter((c) => !c.archived);
@@ -431,174 +452,212 @@ export function PipelineBoard({ stages, stageCfg, emptyHints, title, subtitle, t
           ))}
         </div>
       ) : (
-        <div className="flex-1 min-h-0 flex gap-3 p-5 overflow-x-auto">
-          {allCols.map(({ key: stage, isLost, isOrphan }) => {
-            const cfg = isOrphan ? ORPHAN_CFG : cfgMap[stage];
-            const items = isLost
-              ? lostContacts
-              : isOrphan
-                ? orphans
-                : activeContacts.filter((c) => c.stage === stage);
-            const total = items.reduce((a, c) => a + (c.valueCents || 0), 0);
-            const weighted = isLost
-              ? 0
-              : items.reduce((a, c) => a + (c.valueCents || 0) * (c.probability || 0) / 100, 0);
-            const weightedPct = total > 0 ? Math.round((weighted / total) * 100) : 0;
-            const isCollapsed = collapsed.has(stage);
+        <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+          <div className="flex-1 min-h-0 flex gap-3 p-5 overflow-x-auto">
+            {allCols.map(({ key: stage, isLost, isOrphan }) => {
+              const cfg = isOrphan ? ORPHAN_CFG : cfgMap[stage];
+              const items = isLost
+                ? lostContacts
+                : isOrphan
+                  ? orphans
+                  : activeContacts.filter((c) => c.stage === stage);
+              const total = items.reduce((a, c) => a + (c.valueCents || 0), 0);
+              const weighted = isLost
+                ? 0
+                : items.reduce((a, c) => a + (c.valueCents || 0) * (c.probability || 0) / 100, 0);
+              const weightedPct = total > 0 ? Math.round((weighted / total) * 100) : 0;
+              const isCollapsed = collapsed.has(stage);
 
-            if (isCollapsed) {
               return (
-                <div
+                <Column
                   key={stage}
-                  role="button"
-                  tabIndex={0}
-                  aria-expanded={false}
-                  aria-label={`Expandir columna ${stage}, ${items.length} contactos`}
-                  onDragOver={(e) => { e.preventDefault(); setOverStage(stage); }}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    // A "Sin etapa" no se puede soltar: es virtual, no una etapa real.
-                    if (dragId && !isOrphan) move(dragId, stage);
-                    setDragId(null);
-                    setOverStage(null);
-                  }}
-                  className={cn(
-                    "flex flex-col items-center rounded-lg border bg-muted/40 border-border shrink-0 w-11 py-3 cursor-pointer hover:bg-muted/70 transition-colors",
-                    overStage === stage && "ring-2 ring-primary/40",
-                  )}
-                  onClick={() => toggleCollapse(stage)}
-                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleCollapse(stage); } }}
-                  title={`Expandir ${stage}`}
-                >
-                  <ChevronsRight className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <div className="flex-1 flex items-center justify-center">
-                    <span
-                      className="text-[12px] font-semibold whitespace-nowrap [writing-mode:vertical-rl] rotate-180"
-                      style={cfg ? { color: cfg.text } : undefined}
-                    >
-                      {stage}
-                    </span>
-                  </div>
-                  <span className="text-[11px] font-bold tabular-nums text-muted-foreground shrink-0">{items.length}</span>
-                </div>
+                  stage={stage}
+                  isLost={isLost}
+                  isOrphan={isOrphan}
+                  cfg={cfg}
+                  items={items}
+                  total={total}
+                  weighted={weighted}
+                  weightedPct={weightedPct}
+                  isCollapsed={isCollapsed}
+                  showMoney={showMoney}
+                  variant={variant}
+                  cfgMap={cfgMap}
+                  emptyHint={emptyHints[stage]}
+                  toggleCollapse={toggleCollapse}
+                  onOpen={(id) => router.push(`/contacts/${id}`)}
+                />
               );
-            }
-
-            return (
-              <div
-                key={stage}
-                onDragOver={(e) => { e.preventDefault(); setOverStage(stage); }}
-                onDragEnter={(e) => { e.preventDefault(); setOverStage(stage); }}
-                onDragLeave={(e) => {
-                  if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node))
-                    setOverStage((s) => (s === stage ? null : s));
-                }}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  // A "Sin etapa" no se puede soltar: es virtual, no una etapa real.
-                  if (dragId && !isOrphan) move(dragId, stage);
-                  setDragId(null);
-                  setOverStage(null);
-                }}
-                className={cn(
-                  "flex flex-col rounded-lg border transition-all",
-                  isLost
-                    ? "min-w-[250px] w-[250px] bg-muted/30 border-border/60"
-                    : "flex-1 min-w-[230px] bg-card border-border",
-                  overStage === stage && "ring-2 ring-[var(--hs-accent,theme(colors.sky.500))]/50 border-[var(--hs-accent,theme(colors.sky.500))]/50",
-                )}
-              >
-                <div
-                  className="px-3.5 py-2.5 border-b-2 rounded-t-lg"
-                  style={cfg ? { borderBottomColor: cfg.text, background: cfg.bg } : { borderBottomColor: "var(--border)" }}
-                >
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={cn("text-[12.5px] font-bold uppercase tracking-wide truncate", isLost && "text-muted-foreground")}
-                      style={cfg ? { color: cfg.text } : undefined}
-                    >
-                      {stage}
-                    </span>
-                    <span
-                      className="text-[11px] font-bold rounded-full px-1.5 py-0.5 tabular-nums shrink-0"
-                      style={cfg ? { color: cfg.text, background: "var(--card)" } : { color: "var(--muted-foreground)", background: "var(--card)" }}
-                    >
-                      {items.length}
-                    </span>
-                    <button
-                      onClick={() => toggleCollapse(stage)}
-                      aria-expanded={true}
-                      aria-label={`Colapsar columna ${stage}`}
-                      className="ml-auto p-0.5 rounded hover:bg-black/5 dark:hover:bg-white/10 cursor-pointer shrink-0"
-                      title={`Colapsar ${stage}`}
-                    >
-                      <ChevronsLeft className="h-3.5 w-3.5" style={cfg ? { color: cfg.text } : undefined} />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex-1 overflow-y-auto p-2 space-y-2 min-h-[80px]">
-                  {isOrphan && (
-                    <p className="text-[10.5px] leading-snug text-warning px-1.5 pt-1">
-                      Su etapa fue renombrada o borrada. Arrastrá cada contacto a su etapa actual.
-                    </p>
-                  )}
-                  {items.length === 0 ? (
-                    <p className="text-center text-[11px] text-muted-foreground py-6 px-3 leading-snug">
-                      {emptyHints[stage] ?? "Nada aquí todavía."}
-                    </p>
-                  ) : (
-                    items.map((c) => (
-                      <ContactCard
-                        key={c.id}
-                        c={c}
-                        cfg={cfgMap}
-                        lost={isLost}
-                        showMoney={showMoney}
-                        variant={variant}
-                        dragging={dragId === c.id}
-                        onDragStart={() => setDragId(c.id)}
-                        onDragEnd={() => setDragId(null)}
-                        onClick={() => router.push(`/contacts/${c.id}`)}
-                      />
-                    ))
-                  )}
-                </div>
-
-                <div className="border-t border-border px-3.5 py-2 bg-muted/20 rounded-b-lg space-y-0.5">
-                  {showMoney ? (
-                    <>
-                      <div className="flex items-center justify-between">
-                        <span className="text-[12px] font-bold tabular-nums text-foreground">
-                          {total ? formatCurrency(total) : "$0"}
-                        </span>
-                        <span className="text-[9.5px] uppercase tracking-wide text-muted-foreground font-medium">Total</span>
-                      </div>
-                      {!isLost && variant === "sales" && (
-                        <div className="flex items-center justify-between">
-                          <span className="text-[11px] tabular-nums text-muted-foreground">
-                            {weighted ? formatCurrency(weighted) : "$0"}
-                            {weighted > 0 && <span className="text-[11px] ml-1">({weightedPct}%)</span>}
-                          </span>
-                          <span className="text-[9.5px] uppercase tracking-wide text-muted-foreground font-medium flex items-center gap-0.5">
-                            Ponderado
-                            <Info className="h-2.5 w-2.5" />
-                          </span>
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    <div className="flex items-center justify-between">
-                      <span className="text-[12px] font-bold tabular-nums text-foreground">{items.length}</span>
-                      <span className="text-[9.5px] uppercase tracking-wide text-muted-foreground font-medium">Ingenieros</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+            })}
+          </div>
+        </DndContext>
       )}
+    </div>
+  );
+}
+
+function Column({
+  stage,
+  isLost,
+  isOrphan,
+  cfg,
+  items,
+  total,
+  weighted,
+  weightedPct,
+  isCollapsed,
+  showMoney,
+  variant,
+  cfgMap,
+  emptyHint,
+  toggleCollapse,
+  onOpen,
+}: {
+  stage: string;
+  isLost: boolean;
+  isOrphan?: boolean;
+  cfg: StageCfg | undefined;
+  items: Contact[];
+  total: number;
+  weighted: number;
+  weightedPct: number;
+  isCollapsed: boolean;
+  showMoney: boolean;
+  variant: "sales" | "client" | "engineer";
+  cfgMap: Record<string, StageCfg>;
+  emptyHint: string | undefined;
+  toggleCollapse: (stage: string) => void;
+  onOpen: (id: string) => void;
+}) {
+  // La columna huérfana ("Sin etapa") es virtual, no una etapa real: no se
+  // puede soltar ahí, solo arrastrar los contactos QUE YA están ahí hacia
+  // afuera. disabled:true hace que dnd-kit nunca la registre como `over`.
+  const { setNodeRef, isOver } = useDroppable({ id: stage, disabled: isOrphan });
+
+  if (isCollapsed) {
+    return (
+      <div
+        ref={setNodeRef}
+        role="button"
+        tabIndex={0}
+        aria-expanded={false}
+        aria-label={`Expandir columna ${stage}, ${items.length} contactos`}
+        className={cn(
+          "flex flex-col items-center rounded-lg border bg-muted/40 border-border shrink-0 w-11 py-3 cursor-pointer hover:bg-muted/70 transition-colors",
+          isOver && "ring-2 ring-primary/40",
+        )}
+        onClick={() => toggleCollapse(stage)}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleCollapse(stage); } }}
+        title={`Expandir ${stage}`}
+      >
+        <ChevronsRight className="h-4 w-4 text-muted-foreground shrink-0" />
+        <div className="flex-1 flex items-center justify-center">
+          <span
+            className="text-[12px] font-semibold whitespace-nowrap [writing-mode:vertical-rl] rotate-180"
+            style={cfg ? { color: cfg.text } : undefined}
+          >
+            {stage}
+          </span>
+        </div>
+        <span className="text-[11px] font-bold tabular-nums text-muted-foreground shrink-0">{items.length}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={cn(
+        "flex flex-col rounded-lg border transition-all",
+        isLost
+          ? "min-w-[250px] w-[250px] bg-muted/30 border-border/60"
+          : "flex-1 min-w-[230px] bg-card border-border",
+        isOver && "ring-2 ring-[var(--hs-accent,theme(colors.sky.500))]/50 border-[var(--hs-accent,theme(colors.sky.500))]/50",
+      )}
+    >
+      <div
+        className="px-3.5 py-2.5 border-b-2 rounded-t-lg"
+        style={cfg ? { borderBottomColor: cfg.text, background: cfg.bg } : { borderBottomColor: "var(--border)" }}
+      >
+        <div className="flex items-center gap-2">
+          <span
+            className={cn("text-[12.5px] font-bold uppercase tracking-wide truncate", isLost && "text-muted-foreground")}
+            style={cfg ? { color: cfg.text } : undefined}
+          >
+            {stage}
+          </span>
+          <span
+            className="text-[11px] font-bold rounded-full px-1.5 py-0.5 tabular-nums shrink-0"
+            style={cfg ? { color: cfg.text, background: "var(--card)" } : { color: "var(--muted-foreground)", background: "var(--card)" }}
+          >
+            {items.length}
+          </span>
+          <button
+            onClick={() => toggleCollapse(stage)}
+            aria-expanded={true}
+            aria-label={`Colapsar columna ${stage}`}
+            className="ml-auto p-0.5 rounded hover:bg-black/5 dark:hover:bg-white/10 cursor-pointer shrink-0"
+            title={`Colapsar ${stage}`}
+          >
+            <ChevronsLeft className="h-3.5 w-3.5" style={cfg ? { color: cfg.text } : undefined} />
+          </button>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-2 space-y-2 min-h-[80px]">
+        {isOrphan && (
+          <p className="text-[10.5px] leading-snug text-warning px-1.5 pt-1">
+            Su etapa fue renombrada o borrada. Arrastrá cada contacto a su etapa actual.
+          </p>
+        )}
+        {items.length === 0 ? (
+          <p className="text-center text-[11px] text-muted-foreground py-6 px-3 leading-snug">
+            {emptyHint ?? "Nada aquí todavía."}
+          </p>
+        ) : (
+          items.map((c) => (
+            <ContactCard
+              key={c.id}
+              c={c}
+              cfg={cfgMap}
+              lost={isLost}
+              showMoney={showMoney}
+              variant={variant}
+              onClick={() => onOpen(c.id)}
+            />
+          ))
+        )}
+      </div>
+
+      <div className="border-t border-border px-3.5 py-2 bg-muted/20 rounded-b-lg space-y-0.5">
+        {showMoney ? (
+          <>
+            <div className="flex items-center justify-between">
+              <span className="text-[12px] font-bold tabular-nums text-foreground">
+                {total ? formatCurrency(total) : "$0"}
+              </span>
+              <span className="text-[9.5px] uppercase tracking-wide text-muted-foreground font-medium">Total</span>
+            </div>
+            {!isLost && variant === "sales" && (
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] tabular-nums text-muted-foreground">
+                  {weighted ? formatCurrency(weighted) : "$0"}
+                  {weighted > 0 && <span className="text-[11px] ml-1">({weightedPct}%)</span>}
+                </span>
+                <span className="text-[9.5px] uppercase tracking-wide text-muted-foreground font-medium flex items-center gap-0.5">
+                  Ponderado
+                  <Info className="h-2.5 w-2.5" />
+                </span>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="flex items-center justify-between">
+            <span className="text-[12px] font-bold tabular-nums text-foreground">{items.length}</span>
+            <span className="text-[9.5px] uppercase tracking-wide text-muted-foreground font-medium">Ingenieros</span>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

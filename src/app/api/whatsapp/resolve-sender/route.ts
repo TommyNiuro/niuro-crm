@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { resolveSenderPhone } from "@/lib/lid";
 
+export const dynamic = "force-dynamic";
+
 // GET /api/whatsapp/resolve-sender?sender=<id> → { phone: "569..." | null }
 // Resuelve el autor de un mensaje de grupo (LID/formato viejo) a teléfono real.
 export async function GET(req: NextRequest) {

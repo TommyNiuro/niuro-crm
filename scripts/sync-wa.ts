@@ -139,6 +139,7 @@ function runSync() {
       PRIMARY KEY (id, chat_jid)
     );
     CREATE INDEX IF NOT EXISTS idx_wa_messages_chat_ts ON wa_messages(chat_jid, timestamp DESC);
+    CREATE INDEX IF NOT EXISTS idx_wa_messages_timestamp ON wa_messages(timestamp);
     CREATE INDEX IF NOT EXISTS idx_wa_chats_time ON wa_chats(last_message_time DESC);
   `);
 

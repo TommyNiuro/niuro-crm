@@ -193,7 +193,7 @@ export function openDb(
   if (key && !_migrateChecked) {
     _migrateChecked = true;
     try {
-      migrateToEncryptedIfNeeded(dbPath(), key);
+      migrateToEncryptedIfNeeded(file, key);
     } catch (e) {
       // Loguear crudo: si la migracion falla no queremos enmascararla, pero
       // tampoco tirar el proceso desde aca. La apertura keyed de abajo fallara

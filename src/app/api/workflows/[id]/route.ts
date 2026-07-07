@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { rawDb } from "@/db";
 
+export const dynamic = "force-dynamic";
+
 // GET (workflow + sus últimos runs), PATCH (editar/activar, bump version) y
 // DELETE de un workflow.
 

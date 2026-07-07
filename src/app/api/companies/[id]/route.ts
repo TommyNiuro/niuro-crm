@@ -7,6 +7,8 @@ import { mergeCustomFields, applyCustomFieldsFromBody } from "@/lib/custom-field
 import { logActivity, diffChanges } from "@/lib/timeline";
 import { dispatchRecordEvent } from "@/lib/workflows/dispatch";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }

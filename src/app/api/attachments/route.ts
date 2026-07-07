@@ -6,6 +6,8 @@ import { readFile, writeFile, unlink, mkdir } from "fs/promises";
 import path from "path";
 import { uploadsDir } from "@/lib/paths";
 
+export const dynamic = "force-dynamic";
+
 const UPLOADS_DIR = uploadsDir();
 const MAX_BYTES = 25 * 1024 * 1024; // 25MB
 

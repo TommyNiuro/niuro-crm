@@ -6,7 +6,11 @@ import { hasAccount, verifySessionToken, SESSION_COOKIE } from "@/lib/auth";
 // better-sqlite3, un modulo nativo que Edge no puede cargar.
 
 const PUBLIC_PATHS = new Set(["/setup-account", "/login"]);
-const PUBLIC_PREFIXES = ["/api/auth", "/_next", "/favicon"];
+// /p/ y /api/public: pagina de share de una propuesta (link que se manda a un
+// cliente externo por mail/WhatsApp, sin sesion de CRM). Solo expone lo que
+// GET /api/public/proposals/[token] decide devolver (nunca transcript/notas/
+// contactId/etc), scopeado por shareToken, no por id.
+const PUBLIC_PREFIXES = ["/api/auth", "/_next", "/favicon", "/p/", "/api/public"];
 // Pensados para que los dispare launchd/cron LOCAL sin sesion de browser,
 // igual que ya funcionaban antes de este gate.
 const TICK_PATHS = new Set(["/api/workflows/tick", "/api/sync/tick", "/api/whatsapp/tick"]);

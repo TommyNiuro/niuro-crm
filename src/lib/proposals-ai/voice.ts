@@ -17,9 +17,11 @@
 export const NIURO_VOICE = `Voz Niuro (no negociable):
 - Primera persona plural: nosotros, nuestro equipo, proponemos.
 - Tono founder a founder, cercano, directo. Vulnerable cuando cabe.
-- NUNCA uses: guion largo (—), potenciar, robusto, transformador, seamless, sinergias, crucial, llevar al siguiente nivel, adicionalmente, leverage, empower, en resumen, profundamente, sin lugar a dudas, soluciones innovadoras.
-- Cards: máximo 35 palabras y 2 frases.
-- Si falta un dato, escribe "Pendiente por confirmar". NUNCA inventes datos.`;
+- Tuteo siempre. Nombre de pila.
+- NUNCA uses: guion largo (—), potenciar, robusto, transformador, seamless, sinergias, crucial, fundamental, panorama, llevar al siguiente nivel, adicionalmente, leverage, empower, en resumen, profundamente, sin lugar a dudas, soluciones innovadoras, outsourcing, reclutamiento, reclutador.
+- Cards: máximo 32 palabras y 2 frases.
+- Si falta un dato, escribe "Pendiente por confirmar". NUNCA inventes datos.
+- Staff Aug: la clausula de incorporacion directa al payroll (absorcion) es 17% del valor anualizado, PAGO UNICO (sin cuotas). Solo se incluye si el cliente la pidio explicitamente.`;
 
 /**
  * Devuelve el snippet de voz para inyectar en el system prompt.

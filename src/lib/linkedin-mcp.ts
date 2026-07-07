@@ -14,7 +14,10 @@ import { spawn } from "child_process";
 import fs from "fs";
 import os from "os";
 import path from "path";
-import { readSettings, writeSettings } from "@/lib/settings";
+import { readSettingsOn, writeSettingsOn } from "@/lib/settings";
+import { openDb } from "@/lib/db-open";
+import { dbPath } from "@/lib/paths";
+import { LEGAL_SUFFIX_RE } from "@/lib/prospect-score";
 
 // Presupuesto compartido de requests a LinkedIn (búsquedas de empleo +
 // perfiles de empresa comparten el mismo contador semanal): el scraping
@@ -24,16 +27,26 @@ const RATE_LIMIT_KEY = "linkedin_search_log";
 const RATE_LIMIT_MAX_PER_WEEK = 6;
 
 /** ¿Podemos pegarle a LinkedIn una vez más esta semana? Si sí, registra el
- *  intento (cuenta aunque falle después, a propósito: es presupuesto). */
+ *  intento (cuenta aunque falle después, a propósito: es presupuesto).
+ *  Read-check-write en UNA transacción sobre UNA conexión: dos llamadas
+ *  concurrentes (scan por launchd + click manual en la UI) ya no pueden leer
+ *  el mismo conteo y pisarse al escribir (auditoría 2026-07-04). */
 export function checkAndRecordLinkedinBudget(): boolean {
-  const raw = readSettings([RATE_LIMIT_KEY])[RATE_LIMIT_KEY];
-  let log: number[] = [];
-  try { log = raw ? (JSON.parse(raw) as number[]) : []; } catch { log = []; }
-  const weekAgo = Date.now() - 7 * 86400000;
-  const recent = log.filter((t) => t > weekAgo);
-  if (recent.length >= RATE_LIMIT_MAX_PER_WEEK) return false;
-  writeSettings({ [RATE_LIMIT_KEY]: JSON.stringify([...recent, Date.now()]) });
-  return true;
+  const sqlite = openDb(dbPath(), { timeout: 15000 });
+  try {
+    return sqlite.transaction(() => {
+      const raw = readSettingsOn(sqlite, [RATE_LIMIT_KEY])[RATE_LIMIT_KEY];
+      let log: number[] = [];
+      try { log = raw ? (JSON.parse(raw) as number[]) : []; } catch { log = []; }
+      const weekAgo = Date.now() - 7 * 86400000;
+      const recent = log.filter((t) => t > weekAgo);
+      if (recent.length >= RATE_LIMIT_MAX_PER_WEEK) return false;
+      writeSettingsOn(sqlite, { [RATE_LIMIT_KEY]: JSON.stringify([...recent, Date.now()]) });
+      return true;
+    })();
+  } finally {
+    sqlite.close();
+  }
 }
 
 export function linkedinSessionExists(): boolean {
@@ -137,7 +150,16 @@ export interface LinkedinCompanyInfo {
  *  encuentra, se corta con error explícito en vez de inventar datos. */
 export async function getCompanyProfile(companyName: string): Promise<LinkedinCompanyInfo> {
   const { runClaude, FAST_MODEL } = await import("@/lib/claude-subprocess");
-  const slug = companyName.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+  // Saca sufijos legales (mismo regex que companyKey en prospect-score.ts)
+  // antes de sluggificar: sin esto "Acme Corp S.A." daba "acme-corp-s-a", que
+  // LinkedIn casi nunca reconoce (auditoría 2026-07-04: la mayoría de los
+  // intentos fallaban acá, gastando presupuesto semanal sin resultado).
+  const slug = companyName
+    .toLowerCase()
+    .replace(LEGAL_SUFFIX_RE, "")
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
 
   const result = (await callLinkedinTool("get_company_profile", { company_name: slug })) as {
     content?: { type: string; text?: string }[];

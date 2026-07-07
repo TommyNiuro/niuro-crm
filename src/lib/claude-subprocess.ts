@@ -1,16 +1,52 @@
 import { spawn } from "child_process";
-import { writeFileSync, unlinkSync, createReadStream } from "fs";
-import { tmpdir } from "os";
+import { writeFileSync, unlinkSync, createReadStream, existsSync, readdirSync } from "fs";
+import { tmpdir, homedir } from "os";
 import { join, dirname, isAbsolute, resolve, sep } from "path";
 import crypto from "crypto";
 import { uploadsDir, dbPath } from "@/lib/paths";
 import { openDb } from "@/lib/db-open";
 
+// Ubicaciones tipicas de instalacion de `claude` cuando NO esta en el PATH del
+// proceso. La .app empaquetada la lanza launchd con un PATH GUI minimo
+// (/usr/bin:/bin:/usr/sbin:/sbin) que NO incluye el bin de nvm/npm-global donde
+// vive claude: ahi el `perl ... exec claude` del subprocess no encuentra el
+// binario, exec falla y perl sale 0 con stdout vacio -> "claude respuesta
+// no-JSON (0 chars)" (bug real 2026-07-06, rompia JD y Propuestas por igual).
+// NO se pina una version de nvm (eso mato la IA al subir Node, auditoria
+// 2026-06-09): se globean las versiones instaladas, mas nuevas primero, y se
+// devuelve la primera que exista en disco.
+function claudeBinCandidates(): string[] {
+  const home = homedir();
+  const out: string[] = [];
+  try {
+    const nvmBase = join(home, ".nvm", "versions", "node");
+    const versions = readdirSync(nvmBase).sort((a, b) =>
+      b.localeCompare(a, undefined, { numeric: true }),
+    );
+    for (const v of versions) out.push(join(nvmBase, v, "bin", "claude"));
+  } catch {
+    // sin nvm: seguimos con las rutas fijas de abajo
+  }
+  out.push(
+    join(home, ".claude", "local", "claude"),
+    "/opt/homebrew/bin/claude",
+    "/usr/local/bin/claude",
+    "/usr/bin/claude",
+  );
+  return out;
+}
+
 // Resolución del binario (auditoría 2026-06-09): la ruta clavada a una versión
 // de nvm mataba la IA en silencio al actualizar Node. Orden: env CLAUDE_BIN →
-// "claude" resuelto del PATH del entorno.
+// primer candidato que exista en disco (fija la ruta absoluta para que el exec
+// funcione bajo el PATH GUI minimo de la .app) → "claude" resuelto por PATH
+// (dev / terminal con nvm cargado).
 function resolveClaudeBin(): string {
-  return process.env.CLAUDE_BIN || "claude";
+  if (process.env.CLAUDE_BIN) return process.env.CLAUDE_BIN;
+  for (const c of claudeBinCandidates()) {
+    if (existsSync(c)) return c;
+  }
+  return "claude";
 }
 export const CLAUDE_BIN = resolveClaudeBin();
 
@@ -70,8 +106,10 @@ function cacheKey(prompt: string): string {
 
 // Semáforo global (auditoría 2026-06-09): sin esto, 5 "Re-analizar" simultáneos
 // lanzaban hasta 10 procesos claude compitiendo por la sesión Max y los timeouts
-// se disparaban en cascada. Máximo 2 a la vez; el resto espera su turno en cola.
-const MAX_CONCURRENT = 2;
+// se disparaban en cascada. Subido de 2 a 3 (2026-07-05): la generación rápida
+// de propuestas corre 3 bloques Haiku en paralelo y con cap 2 el tercero
+// esperaba en cola, sumando un bloque entero de latencia al wall time.
+const MAX_CONCURRENT = 3;
 let _running = 0;
 const _waiters: (() => void)[] = [];
 
@@ -171,13 +209,37 @@ async function runClaudeOnce(
   return new Promise((resolve, reject) => {
     const cleanEnv = { ...process.env };
     delete cleanEnv.ANTHROPIC_API_KEY;
+    // Purga de env de Claude Code (bug real 2026-07-05): el server del CRM se
+    // lanza casi siempre DESDE una sesion de Claude Code (update-app.sh, dev
+    // server), asi que process.env trae CLAUDECODE/CLAUDE_* heredados. Con
+    // esas vars el CLI hijo se cree parte de esa sesion y carga sus plugins,
+    // skills y MCP servers: ~196k tokens de overhead POR LLAMADA (Haiku
+    // revienta su limite de 200k y Sonnet tarda minutos prefilleando).
+    for (const k of Object.keys(cleanEnv)) {
+      if (k === "CLAUDECODE" || k.startsWith("CLAUDE_")) delete cleanEnv[k];
+    }
+
+    // Prepend del dir del binario resuelto al PATH del subprocess: la .app
+    // empaquetada corre con un PATH GUI minimo que no incluye el bin de nvm.
+    // Con CLAUDE_BIN ya en ruta absoluta el exec funciona igual, pero asi el
+    // dir (que trae claude + su node/npm hermanos) queda alcanzable por si el
+    // CLI necesita alguna herramienta vecina. Inofensivo si CLAUDE_BIN es "claude".
+    if (CLAUDE_BIN.includes("/")) {
+      const binDir = dirname(CLAUDE_BIN);
+      cleanEnv.PATH = cleanEnv.PATH ? `${binDir}:${cleanEnv.PATH}` : binDir;
+    }
 
     // Usar Perl para cerrar TODOS los FDs heredados de Next.js (3..1023)
     // antes de exec-ar claude. Esto evita que el claude CLI (también Node.js)
     // vea los sockets/pipes del servidor y quede colgado sin poder salir.
     // --tools "" desactiva web search y cualquier herramienta externa que cuelga el proceso
     const addDirFlag = imagePath ? ` --add-dir "${dirname(imagePath)}"` : "";
-    const shellCmd = `perl -MPOSIX -e 'for my $i (3..1023){ POSIX::close($i) }; exec @ARGV' -- "${CLAUDE_BIN}" -p --output-format json --input-format text --model "${model}" --dangerously-skip-permissions --tools ""${addDirFlag} < "${tmpFile}"`;
+    // --strict-mcp-config + --setting-sources "" + --disable-slash-commands:
+    // sesion "pelada" sin MCP/skills/plugins (solo el prompt importa). Cinturon
+    // y tirantes junto con la purga de env de arriba: aunque el proceso padre
+    // este contaminado con config de una sesion de Claude Code, el hijo no
+    // carga nada extra. Auth Max no se toca (viene del keychain, no de settings).
+    const shellCmd = `perl -MPOSIX -e 'for my $i (3..1023){ POSIX::close($i) }; exec @ARGV' -- "${CLAUDE_BIN}" -p --output-format json --input-format text --model "${model}" --dangerously-skip-permissions --tools "" --strict-mcp-config --setting-sources "" --disable-slash-commands${addDirFlag} < "${tmpFile}"`;
 
     // Windows no tiene /bin/sh ni perl: spawn directo del CLI (claude.exe en el
     // PATH, o CLAUDE_BIN apuntando al .exe) con el prompt piped a stdin. El hack
@@ -187,6 +249,7 @@ async function runClaudeOnce(
     const winArgs = [
       "-p", "--output-format", "json", "--input-format", "text",
       "--model", model, "--dangerously-skip-permissions", "--tools", "",
+      "--strict-mcp-config", "--setting-sources", "", "--disable-slash-commands",
       ...(imagePath ? ["--add-dir", dirname(imagePath)] : []),
     ];
     const child =
@@ -236,8 +299,14 @@ async function runClaudeOnce(
       cleanup();
       const ms = Date.now() - t0;
       if (code !== 0 && code !== null) {
-        console.error(`[claude] exit ${code} en ${ms}ms: ${stderr.slice(0, 300)}`);
-        reject(new Error(`claude exited ${code}: ${stderr.slice(0, 300)}`));
+        // El CLI a veces manda el detalle util (ej. "Not logged in · Please run
+        // /login") por STDOUT en vez de stderr cuando falla antes de generar el
+        // envelope JSON. Sin este fallback, un stderr vacio dejaba el error como
+        // "claude exited 1: " sin ninguna pista (bug real detectado 2026-07-05:
+        // sesion del CLI deslogueada, el mensaje quedaba invisible en la UI).
+        const detail = stderr.trim() || stdout.trim() || "sin detalle (revisa que `claude` este logueado: corre `claude` y /login)";
+        console.error(`[claude] exit ${code} en ${ms}ms: ${detail.slice(0, 300)}`);
+        reject(new Error(`claude exited ${code}: ${detail.slice(0, 300)}`));
         return;
       }
       try {

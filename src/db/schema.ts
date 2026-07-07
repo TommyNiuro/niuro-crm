@@ -316,6 +316,9 @@ export const proposals = sqliteTable("proposals", {
   sentAt: integer("sent_at", { mode: "timestamp" }),
   signedAt: integer("signed_at", { mode: "timestamp" }),
   closedAt: integer("closed_at", { mode: "timestamp" }),
+  // Token de la pagina publica /p/[token] (sin auth), para enviar por mail/WhatsApp.
+  // NULL hasta que se comparte por primera vez.
+  shareToken: text("share_token"),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .$defaultFn(() => new Date()),
@@ -326,6 +329,73 @@ export const proposals = sqliteTable("proposals", {
 
 export type Proposal = typeof proposals.$inferSelect;
 export type NewProposal = typeof proposals.$inferInsert;
+
+// Snapshots manuales de una propuesta (guardar/listar/restaurar). snapshot es
+// la fila completa de proposals serializada, tal como devuelve serializeProposal.
+export const proposalVersions = sqliteTable("proposal_versions", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  proposalId: text("proposal_id").notNull(),
+  snapshot: text("snapshot").notNull(),
+  label: text("label"),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
+export type ProposalVersion = typeof proposalVersions.$inferSelect;
+export type NewProposalVersion = typeof proposalVersions.$inferInsert;
+
+// Descripciones de cargo (Job Descriptions). Espejo del metadata de proposals:
+// transcripción -> JD editorial (columnas JSON) generada por IA en background.
+// Sin pricing/roadmap/sprint-mode (eso es de propuestas). viability es interno
+// (análisis Frankenstein): se muestra en la UI, NUNCA se renderiza en el PDF.
+export const jobDescriptions = sqliteTable("job_descriptions", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  contactId: text("contact_id").references(() => contacts.id),
+  dealId: text("deal_id").references(() => deals.id),
+  status: text("status").notNull().default("draft"), // draft|sent|archived
+  template: text("template").notNull().default("intermediate"), // compact|intermediate|full
+  client: text("client").notNull(), // JSON JobDescriptionClient
+  roleTitle: text("role_title"), // rol aterrizado (nombre de mercado)
+  transcript: text("transcript"),
+  notes: text("notes"),
+  // Contenido editorial (JSON o texto). Ver src/types para el shape de cada columna.
+  pitch: text("pitch"), // gancho de una linea ("En resumen: buscamos...")
+  conditions: text("conditions"), // JSON JobDescriptionConditions
+  about: text("about"), // prosa: sobre la empresa
+  roleObjective: text("role_objective"), // prosa: el rol / objetivo del cargo
+  responsibilities: text("responsibilities"), // JSON string[]
+  profile: text("profile"), // JSON JobDescriptionProfile
+  powerSkills: text("power_skills"), // JSON string[]
+  notLookingFor: text("not_looking_for"), // JSON string[] (qué NO buscamos)
+  whyCompany: text("why_company"), // prosa: por qué [empresa]
+  conditionsClosing: text("conditions_closing"), // prosa (legacy, fallback)
+  benefits: text("benefits"), // beneficios como línea propia (IA pagadas, mentoría)
+  startDate: text("start_date"), // inicio esperado ("Septiembre 2026", "Lo antes posible")
+  successIndicators: text("success_indicators"), // JSON JobDescriptionSuccessIndicator[] (opcional)
+  onboarding: text("onboarding"), // JSON JobDescriptionOnboarding (opcional)
+  viability: text("viability"), // JSON JobDescriptionViability (SOLO UI)
+  generated: integer("generated", { mode: "boolean" })
+    .notNull()
+    .default(false),
+  // Estado de la generación IA en background (fire-and-forget + polling), igual
+  // que proposals: null|generating|ready|error.
+  genStatus: text("gen_status"),
+  genError: text("gen_error"),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+  updatedAt: integer("updated_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+});
+
+export type JobDescription = typeof jobDescriptions.$inferSelect;
+export type NewJobDescription = typeof jobDescriptions.$inferInsert;
 
 // Radar de grupos: mensajes en grupos de WhatsApp donde alguien busca talento
 // de software que Niuro puede proveer. Detectados por scripts/scan-groups.ts.

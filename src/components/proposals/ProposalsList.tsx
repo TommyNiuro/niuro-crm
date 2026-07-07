@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { FileText, Plus, RefreshCw, ArrowRight, Building2 } from "lucide-react";
+import { FileText, Plus, RefreshCw, ArrowRight, Building2, Pencil } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { statusMeta, modeLabel, modeColor } from "./status";
@@ -47,6 +48,7 @@ function fmtDate(value: string | number | null): string {
 }
 
 export function ProposalsList() {
+  const router = useRouter();
   const [items, setItems] = useState<ProposalListItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -110,10 +112,15 @@ export function ProposalsList() {
               const mc = modeColor(p.mode);
               const subtitle = p.mode === "sprint" ? p.duration : p.role;
               return (
-                <Link
+                <div
                   key={p.id}
-                  href={`/proposals/${p.id}`}
-                  className="group block rounded-2xl border border-border bg-card p-4 transition-all duration-200 hover:shadow-lg hover:border-border/80"
+                  onClick={() => router.push(`/proposals/${p.id}`)}
+                  role="link"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") router.push(`/proposals/${p.id}`);
+                  }}
+                  className="group block rounded-2xl border border-border bg-card p-4 transition-all duration-200 hover:shadow-lg hover:border-border/80 cursor-pointer"
                 >
                   <div className="flex items-start gap-3">
                     <div className="min-w-0 flex-1">
@@ -150,9 +157,17 @@ export function ProposalsList() {
                         </span>
                       </div>
                     </div>
+                    <Link
+                      href={`/proposals/${p.id}?edit=1`}
+                      onClick={(e) => e.stopPropagation()}
+                      title="Editar contenido"
+                      className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Link>
                     <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-90 transition-opacity mt-1 shrink-0" />
                   </div>
-                </Link>
+                </div>
               );
             })}
           </div>

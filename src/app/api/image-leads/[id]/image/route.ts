@@ -6,6 +6,8 @@ import { readFile } from "fs/promises";
 import path from "path";
 import { uploadsDir } from "@/lib/paths";
 
+export const dynamic = "force-dynamic";
+
 const UPLOADS_DIR = uploadsDir();
 
 const MIME_BY_EXT: Record<string, string> = {

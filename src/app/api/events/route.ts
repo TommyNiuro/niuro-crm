@@ -3,6 +3,8 @@ import { db } from "@/db";
 import { events } from "@/db/schema";
 import { asc } from "drizzle-orm";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   return NextResponse.json(db.select().from(events).orderBy(asc(events.date)).all());
 }

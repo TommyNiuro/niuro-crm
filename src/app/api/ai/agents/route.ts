@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { rawDb } from "@/db";
 
+export const dynamic = "force-dynamic";
+
 // /api/ai/agents (b6-ui-agentes). Agentes IA reutilizables: un nombre + un rol
 // (system prompt) + qué tools puede usar. La tabla se crea on-demand (no esta en
 // el schema de Drizzle): es metadata liviana de un operador unico/local.

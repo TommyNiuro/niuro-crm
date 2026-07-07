@@ -4,6 +4,8 @@ import path from "path";
 import { getQr } from "@/lib/bridge-manager";
 import { invalidateChatCache } from "@/lib/whatsapp";
 
+export const dynamic = "force-dynamic";
+
 // Estado del pairing para la UI. Cuando pasa a "connected" por primera vez,
 // dispara el sync inicial del historial al crm.db (el lock de sync-wa evita
 // corridas solapadas si esto se llamara dos veces).

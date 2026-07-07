@@ -48,7 +48,7 @@ const upsert = db.prepare(`
   INSERT INTO lead_candidates (id, name, phone, chat_jid, score, temperature, reason,
     next_action, source, status, last_message_at, created_at, updated_at, breakdown)
   VALUES (lower(hex(randomblob(8))), ?, ?, ?, ?, ?, ?, ?, 'whatsapp', 'pending',
-    ?, unixepoch('now')*1000, unixepoch('now')*1000, ?)
+    ?, unixepoch('now'), unixepoch('now'), ?)
   ON CONFLICT(chat_jid) DO UPDATE SET
     name=excluded.name, score=excluded.score, temperature=excluded.temperature,
     reason=excluded.reason, next_action=excluded.next_action,
@@ -66,12 +66,12 @@ function save(jid: string, name: string | null, lastTs: string | null,
   if (seen.has(jid)) return; // primer veredicto gana (evita duplicados entre lotes)
   seen.add(jid);
   const phone = jid.split("@")[0];
-  const lastMs = lastTs ? new Date(lastTs).getTime() : Date.now();
+  const lastMs = lastTs ? Math.floor(new Date(lastTs).getTime() / 1000) : Math.floor(Date.now() / 1000);
   const nextAction =
     recommendation === "save" ? "Contactar — lead calificado" :
     recommendation === "review" ? "Revisar conversación" : null;
   upsert.run(name || `+${phone}`, phone, jid, score, temperature, reason,
-    nextAction, isNaN(lastMs) ? Date.now() : lastMs, JSON.stringify(breakdown));
+    nextAction, isNaN(lastMs) ? Math.floor(Date.now() / 1000) : lastMs, JSON.stringify(breakdown));
   counters[temperature] = (counters[temperature] ?? 0) + 1;
   imported++;
 }

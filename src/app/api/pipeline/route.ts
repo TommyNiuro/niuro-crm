@@ -4,6 +4,8 @@ import { pipelineStages, deals, contacts, stepTransitions } from "@/db/schema";
 import { eq, asc } from "drizzle-orm";
 import { STAGE_CFG } from "@/lib/crm-ui";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   try {
     const stages = db
