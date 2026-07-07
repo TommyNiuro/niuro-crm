@@ -117,11 +117,15 @@ export function Conversation({
     }
   };
 
-  // Limpia la sugerencia al cambiar de chat.
+  // Limpia la sugerencia y el borrador del composer al cambiar de chat: sin esto,
+  // lo que quedaba tipeado y sin enviar se arrastraba al chat siguiente, con riesgo
+  // de mandárselo al contacto equivocado. El efecto de draft del Radar (abajo) corre
+  // después y vuelve a precargar si este chat tiene un borrador propio.
   useEffect(() => {
     setSuggestion(null);
     setSugMode(null);
     setSugError(null);
+    setText("");
   }, [chat.jid]);
 
   // Borrador del Radar: si este chat es el 1-a-1 destino (no hay mensaje

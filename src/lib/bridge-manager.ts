@@ -101,6 +101,11 @@ export async function ensureBridge(): Promise<{ running: boolean; error?: string
       detached: true, // sobrevive al request; el bridge es un daemon
       stdio: "ignore",
     });
+    // spawn falla async (evento 'error'), no por throw: sin este handler un fallo
+    // asíncrono quedaba sin capturar (y un 'error' sin listener tira el proceso).
+    child.on("error", (e) => {
+      console.error("[bridge-manager] no se pudo spawnear el bridge:", e instanceof Error ? e.message : e);
+    });
     child.unref();
   } catch (e) {
     return { running: false, error: e instanceof Error ? e.message : String(e) };

@@ -28,6 +28,16 @@ export async function GET() {
         detached: true,
         stdio: "ignore",
       });
+      // spawn falla async (evento 'error'), no por throw: sin este handler, un fallo
+      // de PATH (la .app corre con PATH GUI mínimo, sin npx) quedaba sin capturar y
+      // syncKicked permanecía true para siempre (nunca reintentaba). El sync periódico
+      // por launchd es la red de seguridad.
+      // TODO (auditoría): correr el sync in-process (refactor de sync-wa.ts a función
+      // exportable) para no depender de npx/tsx en el PATH de la .app.
+      child.on("error", (e) => {
+        console.error("[whatsapp/qr] no se pudo lanzar el sync inicial:", e instanceof Error ? e.message : e);
+        syncKicked = false; // permitir reintento en el próximo poll
+      });
       child.unref();
     } catch {
       syncKicked = false; // permitir reintento en el próximo poll
