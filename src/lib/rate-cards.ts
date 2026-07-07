@@ -247,16 +247,49 @@ export const RATE_CARDS: RoleEntry[] = [
   },
 ];
 
+// --- Auditoría 2026-07-07: saneo de rangos implausibles ---
+// El histórico tiene algunos `max` claramente erróneos (typos: un rate mensual en
+// USD por encima de ~20k es casi seguro un dígito de más, ej. 71500, 65000, 273000).
+// NO se corrigen los valores (no se puede inferir el real sin el dato de origen),
+// pero se ACOTAN al consumirlos para no mostrar una tarifa disparatada, y se pueden
+// listar con findSuspiciousRates() para corregir el histórico a mano.
+const RATE_MAX_PLAUSIBLE = 20000;
+
+function sanitizeRange(r: RateRange): RateRange {
+  if (r.max <= RATE_MAX_PLAUSIBLE) return r;
+  const capped = Math.max(r.min, Math.min(r.max, Math.round(r.min * 3)));
+  console.warn(`[rate-cards] max implausible (${r.max}) acotado a ${capped}; corregir el histórico`);
+  return { min: r.min, max: capped };
+}
+
+/** Lista entradas con rangos sospechosos (max implausible o spread max/min > 8x)
+ *  para revisión/corrección manual del histórico. */
+export function findSuspiciousRates(): { role: string; seniority: string; min: number; max: number; reason: string }[] {
+  const out: { role: string; seniority: string; min: number; max: number; reason: string }[] = [];
+  for (const entry of RATE_CARDS) {
+    for (const [sen, range] of Object.entries(entry.rates) as [Seniority, RateRange | undefined][]) {
+      if (!range) continue;
+      if (range.max > RATE_MAX_PLAUSIBLE) {
+        out.push({ role: entry.role, seniority: sen, min: range.min, max: range.max, reason: `max ${range.max} > ${RATE_MAX_PLAUSIBLE}` });
+      } else if (range.min > 0 && range.max / range.min > 8) {
+        out.push({ role: entry.role, seniority: sen, min: range.min, max: range.max, reason: `max/min ${(range.max / range.min).toFixed(1)}x` });
+      }
+    }
+  }
+  return out;
+}
+
 /**
  * Estima rango mensual USD para un rol + seniority. Devuelve null si no hay match.
- * Fallback: si el seniority exacto no esta, usa el promedio del rol.
+ * Fallback: si el seniority exacto no esta, usa el promedio del rol. Los rangos
+ * se sanean (max acotado) para no propagar typos del histórico.
  */
 export function estimateMonthlyRate(role: string, seniority: Seniority | null): RateRange | null {
   const entry = findRoleEntry(role);
   if (!entry) return null;
-  if (seniority && entry.rates[seniority]) return entry.rates[seniority]!;
-  // Fallback: rango global del rol
-  const all = Object.values(entry.rates).filter((r): r is RateRange => !!r);
+  if (seniority && entry.rates[seniority]) return sanitizeRange(entry.rates[seniority]!);
+  // Fallback: rango global del rol (cada rango saneado antes de agregar)
+  const all = Object.values(entry.rates).filter((r): r is RateRange => !!r).map(sanitizeRange);
   if (all.length === 0) return null;
   const min = Math.min(...all.map((r) => r.min));
   const max = Math.max(...all.map((r) => r.max));
