@@ -51,6 +51,15 @@ jobs:
         shell: bash
         env:
           CGO_ENABLED: "1"
+          # Firma + notarización de macOS. Si estos secrets existen, Tauri firma con
+          # el Developer ID y notariza con Apple; si están vacíos, build SIN firmar
+          # (sin romper). Alta de los secrets: docs/SIGNING.md.
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
       # El bundler de .dmg de Tauri es frágil; en Mac distribuimos el .app zippeado.
       - name: Package macOS .app (zip)
