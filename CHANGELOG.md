@@ -2,6 +2,26 @@
 
 Historial de versiones de Niuro CRM. Formato basado en [Keep a Changelog](https://keepachangelog.com/es/1.1.0/); versionado [SemVer](https://semver.org/lang/es/).
 
+## [0.2.1] - 2026-07-08
+
+Correcciones, endurecimiento para uso open source y migración de tareas programadas.
+
+### Corregido
+
+- **Aislamiento de tests**: ya no dependen de la DB local del repo (setup de Vitest con `CRM_DATA_DIR` temporal por archivo); `sharedDb()` reabre si cambia la ruta de la DB. 257 tests en verde, CI incluido.
+- **Puerto del bridge de WhatsApp** documentado correctamente (`8790`) en README, `.env.example` e INTEGRATIONS (antes decía `8080` y la conexión fallaba siguiendo el doc).
+- **Higiene del build de escritorio**: el bundle ya no arrastra `data/` (la DB local) ni `.env*`.
+
+### Cambiado
+
+- **CC de propuestas** configurable por `NEXT_PUBLIC_PROPOSAL_CC` (antes clavado a una casilla fija).
+- **Digest y categorización** corren directo contra la DB (sin depender de un server en un puerto fijo).
+- Rutas personales fuera de los scripts de ops (`$HOME` + ruta relativa al script).
+
+### Notas
+
+- Documentado el modelo **single-tenant** (una instancia por operador): ver sección "Tenancy" del README.
+
 ## [0.2.0] - 2026-07-02
 
 Versión mayor de funcionalidad: migración de los datos reales a la .app, reformulación completa de Ajustes, Analítica y Conversaciones, multi-pipeline y unificación de identidades de WhatsApp.

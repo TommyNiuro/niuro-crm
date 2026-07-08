@@ -29,6 +29,11 @@ mkdir -p "$SERVER_DIR/.next"
 cp -R .next/static "$SERVER_DIR/.next/static"
 if [ -d public ]; then cp -R public "$SERVER_DIR/public"; fi
 
+# Higiene: el standalone puede arrastrar data/ (la crm.db local del que buildea)
+# y .env*; NUNCA deben ir al bundle distribuible (fuga de datos). La DB real vive
+# en Application Support en runtime, no en el bundle.
+rm -rf "$SERVER_DIR/data" "$SERVER_DIR"/.env "$SERVER_DIR"/.env.* 2>/dev/null || true
+
 echo "==> 3/5  Compilando el bridge de WhatsApp (Go) y empaquetandolo"
 # El bridge va DENTRO del .app para que el usuario conecte WhatsApp sin instalar
 # Go ni correr nada a mano (el launcher le pasa la ruta por BRIDGE_BIN).
