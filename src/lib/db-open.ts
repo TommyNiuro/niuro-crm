@@ -216,3 +216,15 @@ export function openDb(
   }
   return db;
 }
+
+// Conexion compartida y persistente para los call sites que hoy abren+cierran por
+// llamada (verifySessionToken, settings, audit). Abrir la DB cifrada deriva la
+// llave con PBKDF2 (~55ms medidos, kdf_iter=64007); hacerlo POR REQUEST hacia que
+// TODO el CRM se sintiera lento aunque las queries fueran de 1-2ms. Se abre una vez
+// por proceso y se reusa (mismo patron de vida que la conexion de @/db). NO cerrar.
+let _shared: Database.Database | null = null;
+export function sharedDb(): Database.Database {
+  if (_shared && _shared.open) return _shared;
+  _shared = openDb(dbPath(), { timeout: 15000 });
+  return _shared;
+}

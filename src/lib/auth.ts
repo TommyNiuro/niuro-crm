@@ -9,7 +9,7 @@
 import crypto from "crypto";
 import Database from "better-sqlite3";
 import { dbPath } from "./paths";
-import { openDb as openEncrypted } from "./db-open";
+import { openDb as openEncrypted, sharedDb } from "./db-open";
 import { readSettings, writeSettings } from "./settings";
 import { appendAudit } from "./audit";
 
@@ -133,15 +133,12 @@ export function verifySessionToken(token: string | undefined | null): boolean {
   if (!token) return false;
   const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
   try {
-    const db = openDb();
-    try {
-      const row = db
-        .prepare("SELECT expires_at FROM auth_sessions WHERE token_hash = ?")
-        .get(tokenHash) as { expires_at: number } | undefined;
-      return !!row && row.expires_at > Date.now();
-    } finally {
-      db.close();
-    }
+    // sharedDb(): conexión persistente, NO re-deriva la llave por request (era ~55ms
+    // en CADA request por venir del gate del middleware).
+    const row = sharedDb()
+      .prepare("SELECT expires_at FROM auth_sessions WHERE token_hash = ?")
+      .get(tokenHash) as { expires_at: number } | undefined;
+    return !!row && row.expires_at > Date.now();
   } catch {
     return false; // DB no disponible aun (pre-init): tratar como no autenticado
   }

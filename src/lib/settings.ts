@@ -4,23 +4,20 @@
  * operator.ts <-> db/index.ts). Fallback silencioso si la DB no existe todavía.
  */
 import Database from "better-sqlite3";
-import { dbPath } from "./paths";
-import { openDb } from "./db-open";
+import { sharedDb } from "./db-open";
 
 /** Lee varias claves de una. Devuelve solo las presentes (value != null). */
 export function readSettings(keys: string[]): Record<string, string> {
   const out: Record<string, string> = {};
   if (keys.length === 0) return out;
   try {
-    const sqlite = openDb(dbPath(), { readonly: true, timeout: 5000 });
-    try {
-      const q = sqlite.prepare("SELECT value FROM crm_settings WHERE key = ?");
-      for (const k of keys) {
-        const row = q.get(k) as { value: string } | undefined;
-        if (row?.value != null) out[k] = row.value;
-      }
-    } finally {
-      sqlite.close();
+    // sharedDb(): conexión persistente. readSettings es HOT (hasAccount en el gate
+    // del middleware, operator, bridge token...); abrir+cerrar por llamada re-derivaba
+    // la llave (~55ms) en cada request.
+    const q = sharedDb().prepare("SELECT value FROM crm_settings WHERE key = ?");
+    for (const k of keys) {
+      const row = q.get(k) as { value: string } | undefined;
+      if (row?.value != null) out[k] = row.value;
     }
   } catch {
     // DB no disponible aún (pre-init): el caller usa su fallback.
@@ -57,10 +54,6 @@ export function writeSettingsOn(sqlite: Database.Database, pairs: Record<string,
  * abrir en escritura. Si necesitás atomicidad con otra tabla, usá writeSettingsOn
  * sobre tu propia conexión en vez de esta. */
 export function writeSettings(pairs: Record<string, string>): void {
-  const sqlite = openDb(dbPath(), { timeout: 15000 });
-  try {
-    sqlite.transaction(() => writeSettingsOn(sqlite, pairs))();
-  } finally {
-    sqlite.close();
-  }
+  const sqlite = sharedDb();
+  sqlite.transaction(() => writeSettingsOn(sqlite, pairs))();
 }
