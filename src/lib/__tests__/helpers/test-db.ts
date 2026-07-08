@@ -123,6 +123,7 @@ const CREATE_TABLES = [
     sent_at INTEGER,
     signed_at INTEGER,
     closed_at INTEGER,
+    share_token TEXT,
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL
   )`,
