@@ -18,7 +18,7 @@
     "postinstall": "node -e \"require('fs').mkdirSync('data',{recursive:true})\"",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
-    "backup": "bash scripts/backup-db.sh",
+    "backup": "bash scripts/run-db-backup.sh",
     "tauri": "tauri",
     "desktop:icon": "tauri icon src-tauri/app-icon.png",
     "desktop:build": "bash scripts/build-desktop.sh"

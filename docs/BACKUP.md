@@ -1,7 +1,15 @@
 # Backups de la base de datos
 
-El CRM guarda todo en una sola base SQLite (`crm.db`). `scripts/backup-db.sh` hace
-copias consistentes (WAL-safe), con rotación e integrity check.
+El CRM guarda todo en una sola base SQLite (`crm.db`). En la .app instalada esa
+base está **cifrada** (SQLCipher vía `better-sqlite3-multiple-ciphers`), así que
+el `sqlite3` pelado y `sqlite3 .backup` NO pueden abrirla.
+
+El backup lo hace `scripts/backup-db.ts`: abre la DB con la llave (misma
+`openDb()` que el resto del CRM), fuerza `PRAGMA wal_checkpoint(TRUNCATE)` para
+volcar el `-wal` al `.db`, y hace una **copia cruda de bytes** del archivo. Como
+el cifrado es a nivel de página del archivo en disco, esa copia cruda ya es un
+backup cifrado válido. Después verifica el snapshot (`integrity_check` con la
+llave), lo comprime con gzip y rota.
 
 ## Manual
 
@@ -9,66 +17,43 @@ copias consistentes (WAL-safe), con rotación e integrity check.
 npm run backup
 ```
 
-Crea un backup timestamped en `<data>/backups/crm-YYYYMMDD-HHMMSS.db`, verifica su
-integridad y conserva las últimas 14 (configurable con `BACKUP_KEEP`).
+Corre `scripts/run-db-backup.sh`, que exporta `CRM_DATA_DIR` apuntando a la DB de
+la .app (`~/Library/Application Support/io.niuro.crm`) y ejecuta
+`scripts/backup-db.ts`. Deja un `crm-YYYY-MM-DD-HH-MM-SS.db.gz` en
+`~/niuro/backups/crm/`, verificado e íntegro, y conserva los últimos 14.
 
-## Variables de entorno
+## Automático (macOS, launchd)
 
-| Env | Default | Qué hace |
-|---|---|---|
-| `CRM_DB_PATH` / `CRM_DATA_DIR` | `./data/crm.db` | Ubicación de la DB (igual que la app). |
-| `BACKUP_DIR` | `<dir de la DB>/backups` | Destino de los backups. |
-| `BACKUP_KEEP` | `14` | Cuántos backups conservar (rota el resto). |
-| `BACKUP_UPLOAD_CMD` | (vacío) | Comando de subida off-site. Se ejecuta con la ruta del backup como último argumento. Sin esto, la subida es no-op. |
-
-### Off-site (opcional, sin lock-in)
-
-No hay credenciales en el script. Para subir a donde quieras, seteá `BACKUP_UPLOAD_CMD`:
+Backup diario 03:30 vía el LaunchAgent `com.niuro.db-backup`, que ejecuta el
+mismo wrapper `scripts/run-db-backup.sh`. Verificá que esté cargado con:
 
 ```bash
-# rclone (S3, R2, GDrive, etc.)
-export BACKUP_UPLOAD_CMD="rclone copy --quiet"   # -> rclone copy --quiet <backup>  (ajustá el remoto)
-
-# aws s3
-export BACKUP_UPLOAD_CMD="aws s3 cp"             # -> aws s3 cp <backup> s3://tu-bucket/  (agregá el destino)
+launchctl list | grep com.niuro.db-backup
 ```
 
-## Automatizar (macOS, launchd)
-
-Backup diario a las 3am. Guardá esto en
-`~/Library/LaunchAgents/io.niuro.crm.backup.plist` y cargalo con
-`launchctl load ~/Library/LaunchAgents/io.niuro.crm.backup.plist`:
-
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>Label</key><string>io.niuro.crm.backup</string>
-  <key>ProgramArguments</key>
-  <array>
-    <string>/bin/bash</string>
-    <string>/Users/TU_USUARIO/niuro/niuro-crm-oss/scripts/backup-db.sh</string>
-  </array>
-  <key>EnvironmentVariables</key>
-  <dict>
-    <key>CRM_DATA_DIR</key>
-    <string>/Users/TU_USUARIO/Library/Application Support/io.niuro.crm</string>
-  </dict>
-  <key>StartCalendarInterval</key>
-  <dict><key>Hour</key><integer>3</integer><key>Minute</key><integer>0</integer></dict>
-</dict>
-</plist>
-```
-
-(Para la app de escritorio, `CRM_DATA_DIR` es `~/Library/Application Support/io.niuro.crm`.)
+Si no aparece, cargá su plist desde `~/Library/LaunchAgents/` con
+`launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.niuro.db-backup.plist`.
 
 ## Restaurar
 
-Los backups son archivos SQLite normales. Para restaurar, cerrá la app y reemplazá
-`crm.db` por el backup (borrá también `crm.db-wal` y `crm.db-shm` si existen):
+Los backups son archivos SQLite **cifrados** (misma llave que la app, en el
+Keychain `io.niuro.crm`). Para restaurar, cerrá la app, descomprimí y reemplazá
+`crm.db` (borrá también `-wal` y `-shm` si existen):
 
 ```bash
-cp "<data>/backups/crm-YYYYMMDD-HHMMSS.db" "<data>/crm.db"
-rm -f "<data>/crm.db-wal" "<data>/crm.db-shm"
+DATA="$HOME/Library/Application Support/io.niuro.crm"
+gunzip -k "$HOME/niuro/backups/crm/crm-YYYY-MM-DD-HH-MM-SS.db.gz"
+cp "$HOME/niuro/backups/crm/crm-YYYY-MM-DD-HH-MM-SS.db" "$DATA/crm.db"
+rm -f "$DATA/crm.db-wal" "$DATA/crm.db-shm"
+```
+
+La app vuelve a abrir la DB con la llave del Keychain al reiniciar. Verificación
+rápida de que un backup abre con la llave:
+
+```bash
+CRM_DATA_DIR="$HOME/Library/Application Support/io.niuro.crm" \
+  npx tsx -e 'import {openDb} from "./src/lib/db-open";
+  const db=openDb(process.argv[1],{readonly:true});
+  console.log("contacts:", db.prepare("SELECT count(*) c FROM contacts").get());
+  db.close();' "/ruta/al/crm-....db"
 ```
