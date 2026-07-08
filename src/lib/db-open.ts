@@ -223,8 +223,17 @@ export function openDb(
 // TODO el CRM se sintiera lento aunque las queries fueran de 1-2ms. Se abre una vez
 // por proceso y se reusa (mismo patron de vida que la conexion de @/db). NO cerrar.
 let _shared: Database.Database | null = null;
+let _sharedPath: string | null = null;
 export function sharedDb(): Database.Database {
-  if (_shared && _shared.open) return _shared;
-  _shared = openDb(dbPath(), { timeout: 15000 });
+  const target = dbPath();
+  // Reusar la conexión persistente SOLO si sigue apuntando a la MISMA DB. En prod
+  // dbPath() nunca cambia (siempre cache-hit, cero costo). En tests que swapean
+  // CRM_DB_PATH por caso, esto reabre en vez de servir una conexión vieja a un
+  // archivo ya borrado (era la causa de "Tomás" filtrado entre tests y del
+  // "attempt to write a readonly database").
+  if (_shared && _shared.open && _sharedPath === target) return _shared;
+  if (_shared && _shared.open) _shared.close();
+  _shared = openDb(target, { timeout: 15000 });
+  _sharedPath = target;
   return _shared;
 }

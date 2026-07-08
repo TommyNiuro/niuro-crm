@@ -1,8 +1,15 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import path from "path";
 import { dataDir, dbPath, uploadsDir, recoveryDir } from "../paths";
 
 const ENV_KEYS = ["CRM_DATA_DIR", "CRM_DB_PATH"] as const;
+
+// Este archivo testea la resolución de paths a partir del env, así que arranca
+// de un env limpio: el setup global (vitest.setup.ts) setea CRM_DATA_DIR para
+// aislar la DB, y sin este beforeEach el primer caso ("default cwd/data") lo veía.
+beforeEach(() => {
+  for (const k of ENV_KEYS) delete process.env[k];
+});
 
 afterEach(() => {
   for (const k of ENV_KEYS) delete process.env[k];

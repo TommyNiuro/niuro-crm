@@ -7,6 +7,8 @@ export default defineConfig({
   },
   test: {
     include: ["src/**/*.test.ts"],
+    // Aísla cada test de la DB local del repo (data/crm.db). Ver vitest.setup.ts.
+    setupFiles: ["./vitest.setup.ts"],
     // El primer run en frío compila/carga el binario nativo (better-sqlite3-
     // multiple-ciphers), lo que en CI puede empujar el primer test más allá del
     // default de 5s. 20s da margen sin enmascarar cuelgues reales.
