@@ -12,6 +12,7 @@
  */
 
 import { openDb } from "../src/lib/db-open";
+import { dbPath } from "../src/lib/paths";
 import path from "path";
 import { existsSync } from "fs";
 import { execFileSync } from "child_process";
@@ -21,7 +22,9 @@ import { runClaude, CLAUDE_BIN, DEFAULT_MODEL } from "../src/lib/claude-subproce
 import { buildLearnedContext } from "../src/lib/learned-examples";
 import { getRubricConfig } from "../src/lib/score-lead-server";
 
-const CRM_DB = path.resolve(process.cwd(), "data/crm.db");
+// Respeta CRM_DATA_DIR (el wrapper de launchd lo apunta a la DB de prod cifrada);
+// antes clavaba cwd/data/crm.db y corría contra la DB de dev.
+const CRM_DB = dbPath();
 const FORCE = process.argv.includes("--force");
 const BATCH = 5;
 const MSGS_PER_CHAT = 40;

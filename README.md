@@ -70,6 +70,17 @@ Detalle de cada una en [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md). Lista compl
 - **Cuenta local**: una sola cuenta por instalación (email + contraseña, hash scrypt en tu DB). Sin servidor externo. Si la olvidás: `npx tsx scripts/reset-account.ts` (resetea credenciales, no borra datos).
 - **Cifrado en reposo (opcional)**: si hay una llave disponible, la DB se cifra sola en el próximo arranque (SQLCipher vía `better-sqlite3-multiple-ciphers`). La app de Mac genera y guarda la llave en el Keychain automáticamente. Corriendo por npm se activa con la variable `CRM_DB_KEY`, o creando la entrada del Keychain de macOS: `security add-generic-password -s io.niuro.crm -a db-key -w "tu-llave-larga"`. Sin llave, la DB queda en texto plano (default en dev, Linux y CI). Ojo: si perdés la llave, los datos cifrados no se recuperan.
 
+## Tenancy (una instancia por operador)
+
+Niuro CRM es **single-tenant por diseño**: una instalación = un operador (o un
+equipo que comparte una cuenta), con sus datos en su propia DB local. No hay
+aislamiento multi-tenant (ni `org_id`, ni row-level security): para servir a
+varias organizaciones, corré **una instancia por organización**. Bajo ese
+modelo, los caches y el rate-limiting por proceso son correctos (un solo proceso
+por instalación). Convertirlo en un SaaS hosteado multi-tenant sería otra
+arquitectura (Postgres + RLS + auth multi-org), fuera del alcance de este
+proyecto local-first.
+
 ## Plataforma
 
 Verificado en CI sobre hardware real (workflow `compat.yml`): **macOS Apple Silicon**, **macOS Intel**, **Windows** y **Linux** corren la app completa (install con binarios precompilados del módulo cifrado, typecheck, tests, build y arranque del server con su gate de cuenta).
