@@ -348,3 +348,14 @@
 .jd-doc .muted {
   color: var(--muted);
 }
+
+/* PDF: Chromium bandea las box-shadow suaves al rasterizar a PDF (bordes/lineas
+   duras alrededor de las cards). En print anulamos las sombras via las variables;
+   las cards siguen definidas por su border, sin artefactos. En pantalla (preview
+   del /print) las sombras se mantienen. */
+@media print {
+  .jd-doc {
+    --shadow-sm: none;
+    --shadow: none;
+  }
+}
