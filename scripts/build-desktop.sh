@@ -43,19 +43,40 @@ rm -rf src-tauri/resources/bridge
 mkdir -p src-tauri/resources/bridge
 touch src-tauri/resources/bridge/.keep
 if command -v go >/dev/null 2>&1; then
-  npm run bridge:build
-  cp bridge/whatsapp-bridge src-tauri/resources/bridge/whatsapp-bridge
-  chmod +x src-tauri/resources/bridge/whatsapp-bridge
+  # bridge:build NO debe tumbar el build de escritorio: en Windows necesita CGO
+  # (compilador C); si falla, se arma el instalador SIN bridge (WhatsApp in-app
+  # queda pendiente de compilar a mano, ya caveateado para Windows).
+  if npm run bridge:build; then
+    # Go en Windows produce whatsapp-bridge.exe; en Mac/Linux whatsapp-bridge.
+    BRIDGE_SRC="bridge/whatsapp-bridge"
+    [ -f "bridge/whatsapp-bridge.exe" ] && BRIDGE_SRC="bridge/whatsapp-bridge.exe"
+    cp "$BRIDGE_SRC" "src-tauri/resources/bridge/$(basename "$BRIDGE_SRC")"
+    chmod +x "src-tauri/resources/bridge/$(basename "$BRIDGE_SRC")" 2>/dev/null || true
+    echo "    Bridge embebido: $(basename "$BRIDGE_SRC")"
+  else
+    echo "    AVISO: fallo el build del bridge (¿CGO / compilador C?); instalador SIN bridge."
+  fi
 else
-  echo "    AVISO: Go no esta instalado; el .app se arma SIN el bridge embebido."
+  echo "    AVISO: Go no esta instalado; el instalador se arma SIN el bridge embebido."
   echo "    La conexion de WhatsApp in-app no funcionara hasta compilarlo (ver docs/INTEGRATIONS.md)."
 fi
 
 echo "==> 4/5  Generando iconos de la app"
 npx tauri icon src-tauri/app-icon.png >/dev/null
 
-echo "==> 5/5  Tauri build (.app + .dmg)"
-npx tauri build
+echo "==> 5/5  Tauri build"
+# Bundle por plataforma: en Mac solo .app (se distribuye zippeado; el bundler de
+# .dmg de Tauri es fragil), en Windows el instalador NSIS (.exe).
+case "$(uname -s)" in
+  Darwin*) TAURI_BUNDLES="app" ;;
+  MINGW*|MSYS*|CYGWIN*|Windows*) TAURI_BUNDLES="nsis" ;;
+  *) TAURI_BUNDLES="" ;;
+esac
+if [ -n "$TAURI_BUNDLES" ]; then
+  npx tauri build --bundles "$TAURI_BUNDLES"
+else
+  npx tauri build
+fi
 
 echo ""
 echo "Listo. Bundles en: src-tauri/target/release/bundle/"
