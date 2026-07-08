@@ -50,7 +50,7 @@ export const RATE_CARDS: RoleEntry[] = [
     rates: {
       mid: { min: 3250, max: 3250 },
       senior: { min: 2925, max: 5200 },
-      lead: { min: 1, max: 9100 },
+      lead: { min: 3900, max: 9100 }, // saneado 2026-07-07 desde el rate card real: quitado México USD 1 (registro sucio)
     },
   },
   {
@@ -68,7 +68,7 @@ export const RATE_CARDS: RoleEntry[] = [
     role: "Fullstack Developer",
     keywords: ["fullstack", "full-stack", "full stack"],
     rates: {
-      mid: { min: 1625, max: 65000 },
+      mid: { min: 1625, max: 4030 }, // saneado: quitados Rumania 65000 y Nicaragua 26000 (anuales cargados como mensuales)
       senior: { min: 2243, max: 5948 },
       lead: { min: 3900, max: 3900 },
       principal: { min: 1300, max: 1300 },
@@ -89,9 +89,9 @@ export const RATE_CARDS: RoleEntry[] = [
     rates: {
       junior: { min: 1040, max: 7800 },
       mid: { min: 520, max: 6890 },
-      senior: { min: 1820, max: 71500 },
+      senior: { min: 1820, max: 9100 }, // saneado: quitados Líbano 71500 y Nicaragua 59215 (máximo limpio real = Canadá 9100)
       lead: { min: 1560, max: 6500 },
-      principal: { min: 1950, max: 273000 },
+      principal: { min: 1950, max: 14463 }, // saneado: quitado USA 273000 (máximo limpio real = Brasil 14463)
     },
   },
 
@@ -210,7 +210,7 @@ export const RATE_CARDS: RoleEntry[] = [
     role: "Project Manager",
     keywords: ["project manager", "pmp"],
     rates: {
-      senior: { min: 3120, max: 71500 },
+      senior: { min: 3120, max: 5200 }, // saneado: quitado Líbano 71500 (máximo limpio real = Argentina 5200)
       lead: { min: 6500, max: 6500 },
     },
   },
