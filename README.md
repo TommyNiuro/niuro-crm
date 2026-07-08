@@ -56,7 +56,7 @@ La app funciona sin ninguna configurada. Cada integración se activa por variabl
 | Integración | Variables de entorno | Dependencia externa |
 |---|---|---|
 | IA (copiloto, propuestas, workflows con IA) | `CLAUDE_BIN` (opcional, override del binario) | CLI `claude` instalado y autenticado |
-| WhatsApp inbox | `WHATSAPP_BRIDGE_URL`, `WHATSAPP_DB_PATH`, `WHATSAPP_SINCE` | Bridge HTTP de WhatsApp en `localhost:8080` |
+| WhatsApp inbox | `WHATSAPP_BRIDGE_URL`, `WHATSAPP_DB_PATH`, `WHATSAPP_SINCE` | Bridge HTTP de WhatsApp en `localhost:8790` |
 | Email digest diario | `RESEND_API_KEY`, `DIGEST_EMAIL`, `DIGEST_FROM` | Cuenta de Resend |
 | Import HubSpot (one-shot) | `HUBSPOT_API_KEY` | Cuenta de HubSpot |
 

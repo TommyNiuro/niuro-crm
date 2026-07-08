@@ -7,15 +7,15 @@
 
 set -u
 
-export CRM_DATA_DIR="/Users/enderys/Library/Application Support/io.niuro.crm"
+export CRM_DATA_DIR="$HOME/Library/Application Support/io.niuro.crm"
 
-cd "/Users/enderys/niuro/niuro-crm-oss" || {
+cd "$HOME/niuro/niuro-crm-oss" || {
   echo "[followup-cadence] FATAL: no pude cd al repo" >&2
   exit 1
 }
 
 NPX="$(command -v npx || true)"
-[ -n "$NPX" ] || NPX="/Users/enderys/.nvm/versions/node/v24.14.0/bin/npx"
+[ -n "$NPX" ] || NPX="$HOME/.nvm/versions/node/v24.14.0/bin/npx"
 
 run_step() {
   local label="$1"

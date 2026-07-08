@@ -20,7 +20,7 @@ Todas las integraciones son opcionales y van por variables de entorno en `.env.l
 
 **Qué hace.** Trae tus conversaciones de WhatsApp a un inbox dentro del CRM.
 
-**Dependencia externa.** Necesita un servicio bridge de WhatsApp corriendo como HTTP en `localhost:8080`. Sin ese bridge, el inbox simplemente queda vacío.
+**Dependencia externa.** Necesita un servicio bridge de WhatsApp corriendo como HTTP en `localhost:8790`. Sin ese bridge, el inbox simplemente queda vacío.
 
 El bridge es el de [whatsapp-mcp](https://github.com/lharries/whatsapp-mcp) (carpeta
 `whatsapp-bridge`: Go + whatsmeow). Cloná ese repo, levantá el bridge y vinculá tu
@@ -28,7 +28,7 @@ teléfono escaneando el QR; el bridge guarda el historial en su propia `messages
 que es a la que apunta `WHATSAPP_DB_PATH`.
 
 **Activar.**
-- `WHATSAPP_BRIDGE_URL` (default `http://localhost:8080`)
+- `WHATSAPP_BRIDGE_URL` (default `http://localhost:8790`)
 - `WHATSAPP_DB_PATH` (ruta a la `messages.db` del bridge)
 - `WHATSAPP_STORE_DB_PATH` (ruta a la `whatsapp.db` del bridge, el store de sesión/contactos)
 - `WHATSAPP_SINCE` (fecha desde la cual sincronizar, ej. `2024-12-01`)

@@ -31,8 +31,10 @@ export function ProposalSendDialog({ proposalId, clientName }: Props) {
   );
   const [sending, setSending] = useState(false);
 
-  // CC fijo en todo mail de propuesta (pedido de Tomas).
-  const CC_FIJO = "carlos@niuro.io";
+  // CC opcional en todo mail de propuesta. Configurable por env (build-time,
+  // client component): seteá NEXT_PUBLIC_PROPOSAL_CC antes de buildear para
+  // CCear siempre a esa casilla. Vacío por default (sin CC).
+  const CC_FIJO = process.env.NEXT_PUBLIC_PROPOSAL_CC || "";
 
   // Descarga el PDF por blob (para adjuntarlo en Outlook: mailto no lleva adjuntos).
   const downloadPdf = async (): Promise<boolean> => {
@@ -63,20 +65,22 @@ export function ProposalSendDialog({ proposalId, clientName }: Props) {
       try {
         const pdfOk = await downloadPdf();
         const subject = `Propuesta Niuro${clientName ? " · " + clientName : ""}`;
+        const ccPart = CC_FIJO ? `cc=${encodeURIComponent(CC_FIJO)}&` : "";
         const mailto =
-          `mailto:${encodeURIComponent(to.trim())}` +
-          `?cc=${encodeURIComponent(CC_FIJO)}` +
-          `&subject=${encodeURIComponent(subject)}` +
+          `mailto:${encodeURIComponent(to.trim())}?` +
+          ccPart +
+          `subject=${encodeURIComponent(subject)}` +
           `&body=${encodeURIComponent(message)}`;
         const a = document.createElement("a");
         a.href = mailto;
         document.body.appendChild(a);
         a.click();
         a.remove();
+        const ccNota = CC_FIJO ? ` con copia a ${CC_FIJO}` : "";
         toast.success(
           pdfOk
-            ? `Abrí el correo con copia a ${CC_FIJO}. El PDF se descargó para que lo adjuntes.`
-            : `Abrí el correo con copia a ${CC_FIJO}.`,
+            ? `Abrí el correo${ccNota}. El PDF se descargó para que lo adjuntes.`
+            : `Abrí el correo${ccNota}.`,
         );
       } finally {
         setSending(false);
