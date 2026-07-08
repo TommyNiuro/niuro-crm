@@ -5,54 +5,219 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Niuro CRM</title>
     <style>
+      :root {
+        --bg0: #070b16;
+        --bg1: #0b1120;
+        --emerald: #10b981;
+        --emerald-lt: #34d399;
+        --teal: #2dd4bf;
+        --ink: #f4f8ff;
+        --muted: #8ea0bd;
+      }
       * { margin: 0; padding: 0; box-sizing: border-box; }
       html, body {
         height: 100%;
-        background: #0f172a;
-        color: #f8fafc;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif;
-        -webkit-user-select: none;
-        user-select: none;
+        overflow: hidden;
+        background: var(--bg0);
+        color: var(--ink);
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
+        -webkit-user-select: none; user-select: none;
+        -webkit-font-smoothing: antialiased;
       }
-      .wrap {
-        height: 100%;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 22px;
+
+      /* ---------- capas de fondo ---------- */
+      .stage { position: fixed; inset: 0; overflow: hidden; }
+
+      /* base con vignette suave */
+      .stage::after {
+        content: ""; position: absolute; inset: 0;
+        background:
+          radial-gradient(120% 90% at 50% 8%, rgba(16,185,129,0.10), transparent 55%),
+          radial-gradient(140% 120% at 50% 120%, #05070f 0%, transparent 60%);
+        pointer-events: none;
       }
-      .logo {
-        width: 64px;
-        height: 64px;
-        border-radius: 16px;
-        background: #10b981;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 34px;
-        font-weight: 700;
-        color: #0f172a;
+
+      /* blobs de aurora que derivan lento */
+      .aurora { position: absolute; border-radius: 50%; filter: blur(70px); opacity: 0.55; mix-blend-mode: screen; will-change: transform; }
+      .a1 { width: 46vmax; height: 46vmax; left: 8%;  top: 6%;  background: radial-gradient(circle at 30% 30%, rgba(16,185,129,0.9), transparent 60%); animation: drift1 18s ease-in-out infinite; }
+      .a2 { width: 40vmax; height: 40vmax; right: 4%; top: 22%; background: radial-gradient(circle at 60% 40%, rgba(45,212,191,0.75), transparent 62%); animation: drift2 22s ease-in-out infinite; }
+      .a3 { width: 52vmax; height: 52vmax; left: 20%; bottom: -18%; background: radial-gradient(circle at 50% 50%, rgba(59,130,246,0.5), transparent 60%); animation: drift3 26s ease-in-out infinite; }
+      @keyframes drift1 { 0%,100%{transform:translate3d(0,0,0) scale(1)} 50%{transform:translate3d(6%,4%,0) scale(1.12)} }
+      @keyframes drift2 { 0%,100%{transform:translate3d(0,0,0) scale(1.05)} 50%{transform:translate3d(-5%,6%,0) scale(0.95)} }
+      @keyframes drift3 { 0%,100%{transform:translate3d(0,0,0) scale(1)} 50%{transform:translate3d(4%,-5%,0) scale(1.1)} }
+
+      /* partículas */
+      #stars { position: absolute; inset: 0; }
+
+      /* grano fino para profundidad */
+      .grain {
+        position: absolute; inset: -50%;
+        background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.4'/></svg>");
+        opacity: 0.035; mix-blend-mode: overlay;
+        animation: grain 6s steps(6) infinite;
       }
-      .title { font-size: 20px; font-weight: 600; letter-spacing: 0.2px; }
-      #spinner {
-        width: 26px;
-        height: 26px;
-        border: 3px solid rgba(255, 255, 255, 0.15);
-        border-top-color: #10b981;
-        border-radius: 50%;
-        animation: spin 0.8s linear infinite;
-      }
+      @keyframes grain { 0%{transform:translate(0,0)} 100%{transform:translate(-10%,8%)} }
+
+      /* ---------- contenido central ---------- */
+      .core { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 30px; text-align: center; }
+
+      .mark-wrap { position: relative; display: grid; place-items: center; }
+
+      /* anillos luminosos contra-rotantes (loader) */
+      .ring { position: absolute; border-radius: 50%; }
+      .ring.r1 { width: 128px; height: 128px; background: conic-gradient(from 0deg, transparent 0 62%, var(--emerald-lt) 78%, transparent 92%); mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2.5px)); -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 2.5px), #000 calc(100% - 2.5px)); animation: spin 2.6s cubic-bezier(.5,.15,.4,.9) infinite; opacity: 0.9; }
+      .ring.r2 { width: 150px; height: 150px; background: conic-gradient(from 180deg, transparent 0 70%, rgba(45,212,191,0.85) 84%, transparent 96%); mask: radial-gradient(farthest-side, transparent calc(100% - 1.5px), #000 calc(100% - 1.5px)); -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 1.5px), #000 calc(100% - 1.5px)); animation: spin 4.2s linear infinite reverse; opacity: 0.6; }
       @keyframes spin { to { transform: rotate(360deg); } }
-      #msg { font-size: 13px; color: #94a3b8; max-width: 320px; text-align: center; line-height: 1.5; }
+
+      /* logo N */
+      .logo {
+        position: relative; width: 92px; height: 92px; border-radius: 24px;
+        background: linear-gradient(145deg, #34d399, #10b981 55%, #0d9488);
+        display: grid; place-items: center;
+        box-shadow: 0 12px 40px rgba(16,185,129,0.35), inset 0 1px 0 rgba(255,255,255,0.4);
+        animation: breathe 3.4s ease-in-out infinite;
+      }
+      @keyframes breathe {
+        0%,100% { box-shadow: 0 12px 40px rgba(16,185,129,0.30), inset 0 1px 0 rgba(255,255,255,0.4); transform: translateY(0); }
+        50%     { box-shadow: 0 20px 60px rgba(16,185,129,0.55), inset 0 1px 0 rgba(255,255,255,0.5); transform: translateY(-3px); }
+      }
+      .logo svg { width: 52px; height: 52px; }
+      .logo .n-stroke { stroke: #05231a; stroke-width: 9; stroke-linecap: round; stroke-linejoin: round; fill: none;
+        stroke-dasharray: 240; stroke-dashoffset: 240; animation: draw 3.2s cubic-bezier(.6,0,.25,1) infinite; }
+      @keyframes draw {
+        0% { stroke-dashoffset: 240; }
+        45% { stroke-dashoffset: 0; }
+        75% { stroke-dashoffset: 0; opacity: 1; }
+        90%,100% { stroke-dashoffset: 0; opacity: 1; }
+      }
+      /* destello que barre el logo */
+      .logo::after {
+        content: ""; position: absolute; inset: 0; border-radius: 24px; overflow: hidden;
+        background: linear-gradient(115deg, transparent 30%, rgba(255,255,255,0.55) 48%, transparent 62%);
+        background-size: 250% 100%; background-position: 200% 0;
+        animation: sheen 3.4s ease-in-out infinite; mix-blend-mode: overlay;
+      }
+      @keyframes sheen { 0%,100% { background-position: 200% 0; } 55% { background-position: -60% 0; } }
+
+      /* wordmark */
+      .word {
+        font-size: 30px; font-weight: 700; letter-spacing: -0.5px;
+        background: linear-gradient(180deg, #ffffff, #cfe9df 70%, #9fd8c7);
+        -webkit-background-clip: text; background-clip: text; color: transparent;
+        opacity: 0; transform: translateY(10px); animation: rise .9s .35s cubic-bezier(.2,.8,.2,1) forwards;
+      }
+      @keyframes rise { to { opacity: 1; transform: translateY(0); } }
+
+      /* status con destello */
+      .status { position: relative; min-height: 20px; opacity: 0; animation: rise .9s .55s cubic-bezier(.2,.8,.2,1) forwards; }
+      .status .msg {
+        display: inline-block; font-size: 13.5px; letter-spacing: 0.3px; color: var(--muted);
+        transition: opacity .45s ease, transform .45s ease;
+        background: linear-gradient(90deg, var(--muted) 0%, #e8f6f0 20%, var(--muted) 40%);
+        background-size: 200% 100%; -webkit-background-clip: text; background-clip: text;
+        animation: shimmer 3.2s linear infinite;
+      }
+      @keyframes shimmer { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
+      .dots::after { content: ""; animation: dots 1.4s steps(4,end) infinite; }
+      @keyframes dots { 0%{content:""} 25%{content:"."} 50%{content:".."} 75%{content:"..."} }
+
+      /* barra de progreso indeterminada, delgada */
+      .bar { width: 190px; height: 2px; border-radius: 2px; background: rgba(255,255,255,0.08); overflow: hidden; opacity: 0; animation: rise .9s .7s cubic-bezier(.2,.8,.2,1) forwards; }
+      .bar > i { display: block; height: 100%; width: 40%; border-radius: 2px;
+        background: linear-gradient(90deg, transparent, var(--emerald-lt), var(--teal), transparent);
+        animation: slide 1.5s cubic-bezier(.65,.05,.35,1) infinite; }
+      @keyframes slide { 0% { transform: translateX(-120%); } 100% { transform: translateX(320%); } }
+
+      @media (prefers-reduced-motion: reduce) {
+        .aurora, .grain, .ring, .logo, .logo::after, .n-stroke, .word, .status, .bar, .bar > i, .msg { animation: none !important; }
+        .word, .status, .bar { opacity: 1; transform: none; }
+        .n-stroke { stroke-dashoffset: 0; }
+      }
     </style>
   </head>
   <body>
-    <div class="wrap">
-      <div class="logo">N</div>
-      <div class="title">Niuro CRM</div>
-      <div id="spinner"></div>
-      <div id="msg">Iniciando el servidor local...</div>
+    <div class="stage">
+      <div class="aurora a1"></div>
+      <div class="aurora a2"></div>
+      <div class="aurora a3"></div>
+      <canvas id="stars"></canvas>
+      <div class="grain"></div>
     </div>
+
+    <div class="core">
+      <div class="mark-wrap">
+        <div class="ring r2"></div>
+        <div class="ring r1"></div>
+        <div class="logo">
+          <svg viewBox="0 0 64 64" aria-hidden="true">
+            <path class="n-stroke" d="M16 48 V16 L48 48 V16" />
+          </svg>
+        </div>
+      </div>
+      <div class="word">Niuro CRM</div>
+      <div class="status"><span class="msg dots" id="msg">Iniciando el servidor local</span></div>
+      <div class="bar"><i></i></div>
+    </div>
+
+    <script>
+      // Constelación de partículas (ligera, ~46 puntos) con líneas de cercanía.
+      (function () {
+        var c = document.getElementById("stars");
+        if (!c || !c.getContext) return;
+        var x = c.getContext("2d"), dpr = Math.min(window.devicePixelRatio || 1, 2), W, H, pts = [];
+        function resize() {
+          W = c.width = innerWidth * dpr; H = c.height = innerHeight * dpr;
+          c.style.width = innerWidth + "px"; c.style.height = innerHeight + "px";
+        }
+        function init() {
+          resize();
+          var n = Math.min(52, Math.round((innerWidth * innerHeight) / 26000));
+          pts = [];
+          for (var i = 0; i < n; i++) pts.push({
+            x: Math.random() * W, y: Math.random() * H,
+            vx: (Math.random() - 0.5) * 0.18 * dpr, vy: (Math.random() - 0.5) * 0.18 * dpr,
+            r: (Math.random() * 1.4 + 0.5) * dpr
+          });
+        }
+        var reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+        function frame() {
+          x.clearRect(0, 0, W, H);
+          for (var i = 0; i < pts.length; i++) {
+            var p = pts[i];
+            if (!reduce) { p.x += p.vx; p.y += p.vy; }
+            if (p.x < 0 || p.x > W) p.vx *= -1;
+            if (p.y < 0 || p.y > H) p.vy *= -1;
+            for (var j = i + 1; j < pts.length; j++) {
+              var q = pts[j], dx = p.x - q.x, dy = p.y - q.y, d = dx * dx + dy * dy, max = (120 * dpr) * (120 * dpr);
+              if (d < max) {
+                x.strokeStyle = "rgba(52,211,153," + (0.14 * (1 - d / max)).toFixed(3) + ")";
+                x.lineWidth = dpr * 0.6;
+                x.beginPath(); x.moveTo(p.x, p.y); x.lineTo(q.x, q.y); x.stroke();
+              }
+            }
+            x.fillStyle = "rgba(180,240,220,0.55)";
+            x.beginPath(); x.arc(p.x, p.y, p.r, 0, 6.283); x.fill();
+          }
+          requestAnimationFrame(frame);
+        }
+        addEventListener("resize", init); init(); requestAnimationFrame(frame);
+      })();
+
+      // Mensajes que rotan (progreso percibido; genéricos y verdaderos).
+      (function () {
+        var el = document.getElementById("msg");
+        if (!el) return;
+        var msgs = ["Iniciando el servidor local", "Preparando tu espacio de trabajo", "Cargando el pipeline", "Casi listo"];
+        var i = 0;
+        setInterval(function () {
+          i = (i + 1) % msgs.length;
+          el.style.opacity = "0"; el.style.transform = "translateY(4px)";
+          setTimeout(function () {
+            el.textContent = msgs[i];
+            el.style.opacity = "1"; el.style.transform = "translateY(0)";
+          }, 420);
+        }, 2600);
+      })();
+    </script>
   </body>
 </html>
